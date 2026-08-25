@@ -2321,9 +2321,50 @@ function adminGetRegistrationSignSheet(token,conferenceId,filters){
     if(filters.participantType==='EXTERNAL')rows=rows.filter(function(r){return upper_(r.ParticipantType)!=='INTERNAL';});
     if(filters.organization){const oq=clean_(filters.organization).toLowerCase();rows=rows.filter(function(r){return [r.OrganizationGroup,r.OrganizationUnit,r.Institution].join(' ').toLowerCase().indexOf(oq)>=0;});}
     const day=num_(filters.dayIndex,0);if(day>=1&&day<=3)rows=rows.filter(function(r){return bool_(r['AttendanceDay'+day]);});
-    rows.sort(function(a,b){const ga=[a.OrganizationGroup,a.Institution||a.OrganizationUnit,a.FullName].join('|'),gb=[b.OrganizationGroup,b.Institution||b.OrganizationUnit,b.FullName].join('|');return ga.localeCompare(gb,'th');});
+    
+    const format = filters.reportFormat || 'GROUP_BY_ORG';
+    if(format === 'FLAT_BY_REGID'){
+      rows.sort(function(a,b){
+        const isInternalA = upper_(a.ParticipantType) === 'INTERNAL' ? 0 : 1;
+        const isInternalB = upper_(b.ParticipantType) === 'INTERNAL' ? 0 : 1;
+        if(isInternalA !== isInternalB) return isInternalA - isInternalB;
+        return String(a.RegID||'').localeCompare(String(b.RegID||''), 'th', {numeric:true});
+      });
+    } else {
+      rows.sort(function(a,b){
+        const isInternalA = upper_(a.ParticipantType) === 'INTERNAL' ? 0 : 1;
+        const isInternalB = upper_(b.ParticipantType) === 'INTERNAL' ? 0 : 1;
+        if(isInternalA !== isInternalB) return isInternalA - isInternalB;
+        const ga=[a.OrganizationGroup||'',a.Institution||a.OrganizationUnit||''].join('|');
+        const gb=[b.OrganizationGroup||'',b.Institution||b.OrganizationUnit||''].join('|');
+        const cmp = ga.localeCompare(gb,'th');
+        if(cmp !== 0) return cmp;
+        return String(a.RegID||'').localeCompare(String(b.RegID||''), 'th', {numeric:true});
+      });
+    }
+    
     const conf=findOne_('Conferences',{ConferenceID:conferenceId})||{},eventDates=jsonParse_(getSetting_(conferenceId,'EVENT_DATES_JSON','[]'),[]).slice(0,3);
-    return {conference:serialize_(conf),eventDates:eventDates,generatedAt:formatDateTime_(new Date()),rows:serialize_(rows.map(function(r){return {RegID:r.RegID,FullName:r.FullName,Position:r.Position,Profession:r.Profession,OrganizationGroup:r.OrganizationGroup,OrganizationUnit:r.OrganizationUnit,Institution:r.Institution,ParticipantType:r.ParticipantType,AttendanceDay1:bool_(r.AttendanceDay1),AttendanceDay2:bool_(r.AttendanceDay2),AttendanceDay3:bool_(r.AttendanceDay3)};}))};
+    return {
+      conference:serialize_(conf),
+      eventDates:eventDates,
+      reportFormat:format,
+      generatedAt:formatDateTime_(new Date()),
+      rows:serialize_(rows.map(function(r){
+        return {
+          RegID:r.RegID,
+          FullName:r.FullName,
+          Position:r.Position,
+          Profession:r.Profession,
+          OrganizationGroup:r.OrganizationGroup,
+          OrganizationUnit:r.OrganizationUnit,
+          Institution:r.Institution,
+          ParticipantType:r.ParticipantType,
+          AttendanceDay1:bool_(r.AttendanceDay1),
+          AttendanceDay2:bool_(r.AttendanceDay2),
+          AttendanceDay3:bool_(r.AttendanceDay3)
+        };
+      }))
+    };
   });
 }
 
