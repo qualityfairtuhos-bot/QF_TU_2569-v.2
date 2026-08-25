@@ -2330,6 +2330,17 @@ function adminGetRegistrationSignSheet(token,conferenceId,filters){
         if(isInternalA !== isInternalB) return isInternalA - isInternalB;
         return String(a.RegID||'').localeCompare(String(b.RegID||''), 'th', {numeric:true});
       });
+    } else if(format === 'GROUP_BY_ORG_NAME') {
+      rows.sort(function(a,b){
+        const isInternalA = upper_(a.ParticipantType) === 'INTERNAL' ? 0 : 1;
+        const isInternalB = upper_(b.ParticipantType) === 'INTERNAL' ? 0 : 1;
+        if(isInternalA !== isInternalB) return isInternalA - isInternalB;
+        const ga=[a.OrganizationGroup||'',a.Institution||a.OrganizationUnit||''].join('|');
+        const gb=[b.OrganizationGroup||'',b.Institution||b.OrganizationUnit||''].join('|');
+        const cmp = ga.localeCompare(gb,'th');
+        if(cmp !== 0) return cmp;
+        return String(a.FullName||'').localeCompare(String(b.FullName||''), 'th');
+      });
     } else {
       rows.sort(function(a,b){
         const isInternalA = upper_(a.ParticipantType) === 'INTERNAL' ? 0 : 1;
@@ -3152,21 +3163,39 @@ function exportWorksToExcel(token,conferenceId){
     const assigns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});
     const asc=assigns.reduce(function(a,c){if(upper_(c.Status)!=='CANCELLED'&&upper_(c.Status)!=='DECLINED'){if(!a[c.WorkID])a[c.WorkID]={a:0,c:0,t:0};a[c.WorkID].a++;if(['COMPLETE','LOCKED'].indexOf(upper_(c.Status))>=0){a[c.WorkID].c++;a[c.WorkID].t+=num_(c.TotalScore);}}return a;},{});
     
+    var categories = {};
+    findMany_('WorkCategories', { ConferenceID: conferenceId }).forEach(function(c) {
+      categories[c.CategoryID] = c;
+      if (c.CategoryCode) categories[c.CategoryCode] = c;
+    });
+
+    var ptMap = {};
+    findMany_('PresentationTypes', { ConferenceID: conferenceId }).forEach(function(pt) {
+      ptMap[pt.PresentationTypeID] = pt;
+      if (pt.TypeCode) ptMap[pt.TypeCode] = pt;
+    });
+
     rows = rows.map(function(w){
       const ac=asc[w.WorkID]||{a:0,c:0,t:0};
-      const presenter = (authorsByWork[w.WorkID]||[]).find(a=>a.IsPresenter) || {};
+      const presenter = (authorsByWork[w.WorkID]||[]).find(a=>a.IsPresenter) || (authorsByWork[w.WorkID]||[])[0] || {};
+      const cat = categories[w.CategoryID] || {};
+      const ptReq = ptMap[w.PresentationTypeRequested] || {};
+      const ptFin = ptMap[w.PresentationTypeFinal] || {};
+      const catName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || '';
+      const ptName = ptFin.TypeNameTH || w.PresentationTypeName || ptReq.TypeNameTH || ptReq.TypeCode || w.PresentationTypeRequested || '';
+
       return {
         WorkCode: w.WorkCode||w.WorkID,
-        ThaiTitle: w.ThaiTitle||w.TitleTH||'',
-        EnglishTitle: w.EnglishTitle||w.TitleEN||'',
-        WorkType: w.WorkType||'',
-        PresenterName: w.PresenterName||presenter.FullName||'',
-        PresenterEmail: w.PresenterEmail||'',
-        Theme: w.Theme||w.Field||'',
+        ThaiTitle: w.TitleTH||w.ThaiTitle||'',
+        EnglishTitle: w.TitleEN||w.EnglishTitle||'',
+        CategoryName: catName,
+        PresentationType: ptName,
+        PresenterName: presenter.FullName||w.PresenterName||'',
+        PresenterEmail: presenter.Email||w.PresenterEmail||'',
         CurrentStatus: w.Status||w.CurrentStatus||'',
         ReviewerAssignedCount: ac.a,
         ReviewerCompletedCount: ac.c,
-        AverageScore: ac.c?ac.t/ac.c:0
+        AverageScore: ac.c?Number(ac.t/ac.c).toFixed(2):'0'
       };
     });
     
@@ -3175,7 +3204,7 @@ function exportWorksToExcel(token,conferenceId){
     const ss = SpreadsheetApp.create('Works_Export_' + Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd_HHmm'));
     const sh = ss.getSheets()[0];
     sh.setName('Works');
-    const headers = ['WorkCode','ThaiTitle','EnglishTitle','WorkType','PresenterName','PresenterEmail','Theme','CurrentStatus','ReviewerAssignedCount','ReviewerCompletedCount','AverageScore'];
+    const headers = ['WorkCode','ThaiTitle','EnglishTitle','CategoryName','PresentationType','PresenterName','PresenterEmail','CurrentStatus','ReviewerAssignedCount','ReviewerCompletedCount','AverageScore'];
     sh.getRange(1,1,1,headers.length).setValues([headers]);
     if (rows.length) {
       sh.getRange(2,1,rows.length,headers.length).setValues(rows.map(r => headers.map(h => r[h] || '')));
@@ -3791,7 +3820,16 @@ function adminListWorks(token, conferenceId, filters) {
     });
 
     var categories = {};
-    findMany_('WorkCategories', { ConferenceID: conferenceId }).forEach(function(c) { categories[c.CategoryID] = c; });
+    findMany_('WorkCategories', { ConferenceID: conferenceId }).forEach(function(c) {
+      categories[c.CategoryID] = c;
+      if (c.CategoryCode) categories[c.CategoryCode] = c;
+    });
+
+    var ptMap = {};
+    findMany_('PresentationTypes', { ConferenceID: conferenceId }).forEach(function(pt) {
+      ptMap[pt.PresentationTypeID] = pt;
+      if (pt.TypeCode) ptMap[pt.TypeCode] = pt;
+    });
 
     var regs = findMany_('Registrations', { ConferenceID: conferenceId });
     var regMap = {};
@@ -3799,38 +3837,54 @@ function adminListWorks(token, conferenceId, filters) {
 
     var rows = works.map(function(w) {
       var ac = asc[w.WorkID] || { a: 0, c: 0, t: 0 };
-      var presenter = (authorsByWork[w.WorkID] || []).find(function(a) { return bool_(a.IsPresenter); }) || {};
+      var presenter = (authorsByWork[w.WorkID] || []).find(function(a) { return bool_(a.IsPresenter); }) || (authorsByWork[w.WorkID] || [])[0] || {};
       var cat = categories[w.CategoryID] || {};
+      var ptReq = ptMap[w.PresentationTypeRequested] || {};
+      var ptFin = ptMap[w.PresentationTypeFinal] || {};
       var regId = w.RegID || presenter.RegID || '';
       var reg = regMap[regId] || {};
-      return {
+
+      var resolvedCatName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '';
+      var resolvedPtReqName = w.PresentationTypeName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || w.PresentationTypeRequested || '';
+      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || w.PresentationTypeFinal || '';
+      var displayPt = resolvedPtFinName || resolvedPtReqName || '';
+
+      return Object.assign({}, w, {
         WorkID: w.WorkID,
         RegID: regId,
         WorkCode: w.WorkCode || w.WorkID,
-        TitleTH: w.TitleTH || '',
-        TitleEN: w.TitleEN || '',
-        ThaiTitle: w.TitleTH || '',
-        EnglishTitle: w.TitleEN || '',
-        WorkType: cat.CategoryNameTH || '',
-        Field: cat.CategoryNameTH || '',
-        Theme: cat.CategoryNameTH || '',
-        Status: w.Status || '',
-        CurrentStatus: w.Status || '',
+        TitleTH: w.TitleTH || w.ThaiTitle || '',
+        TitleEN: w.TitleEN || w.EnglishTitle || '',
+        ThaiTitle: w.TitleTH || w.ThaiTitle || '',
+        EnglishTitle: w.TitleEN || w.EnglishTitle || '',
+        CategoryID: w.CategoryID || '',
+        CategoryName: resolvedCatName,
+        CategoryNameTH: resolvedCatName,
+        Category: resolvedCatName,
+        WorkType: resolvedCatName,
+        Field: resolvedCatName,
+        Theme: resolvedCatName,
+        PresentationTypeRequested: w.PresentationTypeRequested || '',
+        PresentationTypeName: resolvedPtReqName,
+        PresentationTypeFinal: w.PresentationTypeFinal || '',
+        PresentationType: displayPt,
+        Status: w.Status || w.CurrentStatus || '',
+        CurrentStatus: w.Status || w.CurrentStatus || '',
         RegistrationStatus: reg.RegistrationStatus || '',
-        PresenterName: presenter.FullName || '',
-        PresenterEmail: presenter.Email || '',
+        PresenterName: presenter.FullName || w.PresenterName || '',
+        PresenterEmail: presenter.Email || w.PresenterEmail || '',
         ReviewerAssignedCount: ac.a,
         ReviewerCompletedCount: ac.c,
         AverageScore: ac.c ? ac.t / ac.c : 0,
-        authors: serialize_(authorsByWork[w.WorkID] || []),
-        files: serialize_(filesByWork[w.WorkID] || [])
-      };
+        authors: authorsByWork[w.WorkID] || [],
+        files: filesByWork[w.WorkID] || []
+      });
     });
 
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
       rows = rows.filter(function(x) {
-        return [x.WorkCode, x.TitleTH, x.TitleEN, x.PresenterName].join(' ').toLowerCase().indexOf(q) >= 0;
+        return [x.WorkCode, x.TitleTH, x.TitleEN, x.PresenterName, x.CategoryName, x.PresentationType].join(' ').toLowerCase().indexOf(q) >= 0;
       });
     }
     if (filters.status) {

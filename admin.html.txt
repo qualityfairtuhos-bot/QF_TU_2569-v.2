@@ -998,8 +998,9 @@ async function openRegistrationSignSheet(){
   const html=`<div style="text-align:left">
     <label style="display:block;margin-bottom:12px;font-weight:600;color:#1e293b">รูปแบบการจัดพิมพ์รายงาน:
       <select id="psReportFormat" class="swal2-select" style="width:100%;margin:6px 0 0;font-size:0.9rem;border-radius:8px">
-        <option value="GROUP_BY_ORG">แบบที่ 1: แยกตามหน่วยงาน/ฝ่าย และหน่วยงานย่อย (ภายในกลุ่มย่อยเรียงตาม RegID จากน้อยไปมาก)</option>
-        <option value="FLAT_BY_REGID">แบบที่ 2: เรียงตาม RegID จากน้อยไปมาก (ไม่แยกกลุ่มย่อย มีคอลัมน์แสดงฝ่าย/หน่วยงาน)</option>
+        <option value="GROUP_BY_ORG_REGID">แบบที่ 1: แยกตามหน่วยงานและหน่วยงานย่อย (ภายในกลุ่มย่อยเรียงตาม RegID จากน้อยไปมาก)</option>
+        <option value="GROUP_BY_ORG_NAME">แบบที่ 2: แยกตามหน่วยงานและหน่วยงานย่อย (ภายในกลุ่มย่อยเรียงตาม ชื่อ-สกุล)</option>
+        <option value="FLAT_BY_REGID">แบบที่ 3: เรียงตาม RegID จากน้อยไปมาก (ตารางรวม ไม่แยกกลุ่มย่อย)</option>
       </select>
     </label>
     <label style="display:block;margin-bottom:12px;font-weight:600;color:#1e293b">กลุ่มผู้สมัคร:
@@ -1058,7 +1059,7 @@ async function openRegistrationSignSheet(){
 function renderSignSheetWindow(win,d,filters){
   const rows=d.rows||[];
   const dates=(d.eventDates||[]).slice(0,3);
-  const format=d.reportFormat||filters.reportFormat||'GROUP_BY_ORG';
+  const format=d.reportFormat||filters.reportFormat||'GROUP_BY_ORG_REGID';
   const confName=d.conference?.ConferenceNameTH||'การประชุมวิชาการ TUH Quality Fair';
 
   const dateHeads=dates.map((x,i)=>`<th colspan="2" style="font-size:8px">วันที่ ${i+1}<br>${esc(beDateOnly(x))}</th>`).join('');
@@ -1067,6 +1068,7 @@ function renderSignSheetWindow(win,d,filters){
   let sectionsHtml='';
 
   const renderTableSection=(title,subTitle,list,showOrgCol=true)=>{
+    const totalCols=(showOrgCol?5:4)+(dates.length*2);
     const body=list.map((r,i)=>`<tr>
       <td class="c">${i+1}</td>
       <td class="c" style="font-weight:600">${esc(r.RegID)}</td>
@@ -1084,14 +1086,18 @@ function renderSignSheetWindow(win,d,filters){
     </tr>`).join('');
 
     return `<section class="sheet break">
-      <h1>${esc(confName)}</h1>
-      <h2>${esc(title)}</h2>
-      <div class="meta" style="display:flex;justify-content:space-between;border-bottom:1px solid #cbd5e1;padding-bottom:4px;margin-bottom:6px">
-        <div>${subTitle}</div>
-        <div><b>จำนวนทั้งหมด:</b> ${list.length} คน</div>
-      </div>
       <table>
         <thead>
+          <tr class="header-repeat-row">
+            <th colspan="${totalCols}" class="header-repeat-cell" style="background:#fff;border:none;padding:0 0 6px 0;text-align:left;font-weight:normal;">
+              <h1>${esc(confName)}</h1>
+              <h2>${esc(title)}</h2>
+              <div class="meta" style="display:flex;justify-content:space-between;border-bottom:1px solid #cbd5e1;padding-bottom:4px;margin-bottom:6px">
+                <div>${subTitle}</div>
+                <div><b>จำนวนทั้งหมด:</b> ${list.length} คน</div>
+              </div>
+            </th>
+          </tr>
           <tr>
             <th rowspan="2" style="width:32px">ลำดับ</th>
             <th rowspan="2" style="width:65px">RegID</th>
@@ -1105,8 +1111,12 @@ function renderSignSheetWindow(win,d,filters){
           </tr>
         </thead>
         <tbody>${body}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="${totalCols}" style="border:none;text-align:right;font-size:8px;padding-top:4px;color:#64748b">พิมพ์เมื่อ ${esc(formatBeDateTime(d.generatedAt))}</td>
+          </tr>
+        </tfoot>
       </table>
-      <div class="foot">พิมพ์เมื่อ ${esc(formatBeDateTime(d.generatedAt))}</div>
     </section>`;
   };
 
@@ -1147,11 +1157,16 @@ function renderSignSheetWindow(win,d,filters){
         (groups[key]||(groups[key]=[])).push(r);
       });
 
-      Object.keys(groups).forEach(g=>{
+      Object.keys(groups).sort((a,b)=>a.localeCompare(b,'th')).forEach(g=>{
         const gList=groups[g];
+        if(format==='GROUP_BY_ORG_NAME'){
+          gList.sort((a,b)=>String(a.FullName||'').localeCompare(String(b.FullName||''),'th'));
+        }else{
+          gList.sort((a,b)=>String(a.RegID||'').localeCompare(String(b.RegID||''),'th',{numeric:true}));
+        }
         sectionsHtml+=renderTableSection(
           `ใบเซ็นชื่อผู้ลงทะเบียน (${part.name})`,
-          `<b>สังกัด/ฝ่าย/หน่วยงาน:</b> ${esc(g)} &nbsp;|&nbsp; <b>กลุ่ม:</b> ${esc(part.name)}`,
+          `<b>สังกัด/ฝ่าย/หน่วยงาน:</b> ${esc(g)} &nbsp;|&nbsp; <b>กลุ่ม:</b> ${esc(part.name)}${format==='GROUP_BY_ORG_NAME'?' (เรียงตามชื่อ-สกุล)':' (เรียงตาม RegID)'}`,
           gList,
           false
         );
@@ -1174,20 +1189,30 @@ function renderSignSheetWindow(win,d,filters){
     @page { size: A4 landscape; margin: 7mm 8mm 7mm 8mm; }
     * { box-sizing: border-box; }
     body { font-family: 'Prompt', sans-serif; color: #111; margin: 0; background: #fff; }
-    .sheet { page-break-inside: avoid; margin-bottom: 20px; }
+    .sheet { margin-bottom: 20px; }
     .sheet.break { page-break-after: always; }
     .sheet:last-child { page-break-after: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr { page-break-inside: avoid; }
     h1 { font-size: 14px; text-align: center; margin: 0 0 2px; color: #006D70; font-weight: 700; }
     h2 { font-size: 12px; text-align: center; margin: 0 0 5px; color: #334155; font-weight: 600; }
     .meta { font-size: 9.5px; margin: 4px 0; color: #1e293b; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.5px; }
     th, td { border: 1px solid #333; padding: 2.5px 3.5px; vertical-align: middle; height: 23px; word-break: break-word; }
     th { background: #f1f5f9; text-align: center; font-weight: 600; }
+    .header-repeat-row th, .header-repeat-cell { background: #fff !important; border: none !important; }
     .c, .date, .na { text-align: center; }
     .na { color: #94a3b8; background: #fafafa; }
     .sign { min-width: 75px; }
     .foot { text-align: right; font-size: 8px; margin-top: 4px; color: #64748b; }
-    @media print { button { display: none; } .sheet { margin-bottom: 0; } }
+    @media print { 
+      button { display: none; } 
+      .sheet { margin-bottom: 0; }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      tr { page-break-inside: avoid; }
+    }
   </style>
 </head>
 <body>
@@ -1208,9 +1233,9 @@ async function loadWorks(){
     window.WORK_ROWS = rows;
     $('#workRows').innerHTML=rows.length?rows.map(w=>`<tr>
       <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
-      <td>${esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-')}<div class="muted" style="font-size:0.75rem">${esc(w.Theme||w.Field||'')}</div></td>
-      <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||'-')}</td>
-      <td><span class="badge ${/oral/i.test(w.PresentationTypeFinal||w.PresentationTypeName||w.PresentationTypeRequested||w.PresentationType||'')?'ok':/poster/i.test(w.PresentationTypeFinal||w.PresentationTypeName||w.PresentationTypeRequested||w.PresentationType||'')?'warn':''}">${esc(w.PresentationTypeFinal||w.PresentationTypeName||w.PresentationTypeRequested||w.PresentationType||'-')}</span></td>
+      <td>${esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-')}${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}</td>
+      <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||w.WorkType||w.Field||w.Theme||'-')}</td>
+      <td><span class="badge ${/oral|บรรยาย/i.test(w.PresentationTypeName||w.PresentationTypeFinal||w.PresentationType||w.PresentationTypeRequested||'')?'ok':/poster|โปสเตอร์/i.test(w.PresentationTypeName||w.PresentationTypeFinal||w.PresentationType||w.PresentationTypeRequested||'')?'warn':''}">${esc(w.PresentationTypeName||w.PresentationTypeFinal||w.PresentationType||w.PresentationTypeRequested||'-')}</span></td>
       <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
       <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
       <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
