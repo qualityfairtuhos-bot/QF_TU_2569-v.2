@@ -936,7 +936,16 @@ const MASTER_TABLES_ = ['Conferences', 'Settings', 'RegistrationTypes', 'WorkCat
 function headerMap_(name){
   globalThis.__TUH_HEADERS=globalThis.__TUH_HEADERS||{};
   if(globalThis.__TUH_HEADERS[name]) return globalThis.__TUH_HEADERS[name];
-  const sh=getSheet_(name), h=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0], m={}; h.forEach(function(x,i){if(x)m[x]=i;});
+  const sh=getSheet_(name), h=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0], m={}; 
+  h.forEach(function(x,i){
+    if(x){
+      m[x]=i;
+      const cleanX = String(x).replace(/[\s\r\n]+/g, '');
+      if (m[cleanX] === undefined) m[cleanX] = i;
+      const lowX = cleanX.toLowerCase();
+      if (m[lowX] === undefined) m[lowX] = i;
+    }
+  });
   return globalThis.__TUH_HEADERS[name]={headers:h,map:m};
 }
 function getRecords_(name){
@@ -959,7 +968,17 @@ function getRecords_(name){
 
   const sh=getSheet_(name), hm=headerMap_(name), last=sh.getLastRow(); if(last<2)return globalThis.__TUH_RECORDS[name]=[];
   const values=sh.getRange(2,1,last-1,hm.headers.length).getValues();
-  const records = values.map(function(r,idx){ const o={__row:idx+2}; hm.headers.forEach(function(h,i){o[h]=r[i];}); return o; });
+  const records = values.map(function(r,idx){ 
+    const o={__row:idx+2}; 
+    hm.headers.forEach(function(h,i){
+      o[h]=r[i];
+      const cleanH = String(h||'').replace(/[\s\r\n]+/g, '');
+      if (cleanH && o[cleanH] === undefined) o[cleanH] = r[i];
+      const lowH = String(cleanH).toLowerCase();
+      if (lowH && o[lowH] === undefined) o[lowH] = r[i];
+    }); 
+    return o; 
+  });
   globalThis.__TUH_RECORDS[name] = records;
 
   if (isMaster) {
@@ -2394,7 +2413,6 @@ function adminUpdateRegistrationStatus(token,conferenceId,regId,status,note){
     return {RegID:regId,oldStatus:oldStatus,newStatus:status,mealPass:mealPass};
   });
 }
-function adminListWorks(token,conferenceId,filters){return runSafely_('adminListWorks',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);filters=filters||{};let rows=findMany_('Works',{ConferenceID:conferenceId});if(filters.status)rows=rows.filter(function(x){return x.Status===filters.status;});const authorsByWork={},filesByWork={};findMany_('WorkAuthors',{ConferenceID:conferenceId}).forEach(function(a){(authorsByWork[a.WorkID]||(authorsByWork[a.WorkID]=[])).push(a);});findMany_('WorkFiles',{ConferenceID:conferenceId}).forEach(function(f){if(bool_(f.Active))(filesByWork[f.WorkID]||(filesByWork[f.WorkID]=[])).push(f);});const assigns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});const asc=assigns.reduce(function(a,c){if(upper_(c.Status)!=='CANCELLED'&&upper_(c.Status)!=='DECLINED'){if(!a[c.WorkID])a[c.WorkID]={a:0,c:0,t:0};a[c.WorkID].a++;if(['COMPLETE','LOCKED'].indexOf(upper_(c.Status))>=0){a[c.WorkID].c++;a[c.WorkID].t+=num_(c.TotalScore);}}return a;},{});return serialize_(rows.map(function(w){const ac=asc[w.WorkID]||{a:0,c:0,t:0};return Object.assign({},w,{authors:authorsByWork[w.WorkID]||[],files:filesByWork[w.WorkID]||[],ReviewerAssignedCount:ac.a,ReviewerCompletedCount:ac.c,AverageScore:ac.c?ac.t/ac.c:0});}));});}
 function adminScreenWork(token,conferenceId,workId,decision,note,deadline){return runSafely_('adminScreenWork',function(){const ctx=requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId),w=findOne_('Works',{ConferenceID:conferenceId,WorkID:workId});if(!w)throw new Error('ไม่พบผลงาน');decision=upper_(decision);let status;if(decision==='PASS')status='WAITING_REVIEWER_ASSIGN';else if(decision==='RETURN')status='RETURNED_FOR_EDIT';else status='REJECTED';updateRecord_('Works',w.__row,{ScreeningStatus:decision,ScreeningNote:clean_(note),Status:status,RevisionDeadline:deadline||'',UpdatedAt:new Date(),LastModifiedBy:ctx.user.Email});return {status:status};});}
 function getAdminSettings(token,conferenceId){
   return runSafely_('getAdminSettings',function(){
@@ -3845,17 +3863,24 @@ function adminListWorks(token, conferenceId, filters) {
       var reg = regMap[regId] || {};
 
       var resolvedCatName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '';
-      var rawPtName = clean_(w.PresentationTypeName || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
-      var rawPtReq = clean_(w.PresentationTypeRequested || '');
-      var rawPtFin = clean_(w.PresentationTypeFinal || '');
+      var rawPtName = clean_(w.PresentationTypeName || w['PresentationType Name'] || w['PresentationTypeName'] || w.presentationtypename || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
+      var rawPtReq = clean_(w.PresentationTypeRequested || w['PresentationTypeRequested'] || w.presentationtyperequested || '');
+      var rawPtFin = clean_(w.PresentationTypeFinal || w['PresentationTypeFinal'] || w.presentationtypefinal || '');
       
-      var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || rawPtReq || '';
-      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || rawPtFin || '';
-      var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || '';
-      if (/oral|บรรยาย/i.test(displayPt)) {
-        displayPt = 'บรรยาย';
-      } else if (/poster|โปสเตอร์|eposter/i.test(displayPt)) {
-        displayPt = 'แบบโปสเตอร์';
+      var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || '';
+      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || '';
+      
+      if (!resolvedPtReqName) {
+        if (/PT-2026-000001|ORAL/i.test(rawPtReq)) resolvedPtReqName = 'แบบบรรยาย';
+        else if (/PT-2026-000002|POSTER|EPOSTER/i.test(rawPtReq)) resolvedPtReqName = 'แบบโปสเตอร์ (e-poster)';
+        else resolvedPtReqName = rawPtReq;
+      }
+
+      var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || rawPtReq || '';
+      if (/oral|บรรยาย|PT-2026-000001/i.test(displayPt)) {
+        displayPt = 'แบบบรรยาย';
+      } else if (/poster|โปสเตอร์|eposter|PT-2026-000002/i.test(displayPt)) {
+        displayPt = 'แบบโปสเตอร์ (e-poster)';
       }
 
       return Object.assign({}, w, {
@@ -3902,11 +3927,17 @@ function adminListWorks(token, conferenceId, filters) {
     if (filters.presentationType) {
       var ptFilter = clean_(filters.presentationType).toLowerCase();
       rows = rows.filter(function(x) {
-        var pName = (x.PresentationTypeName || x.PresentationType || x.PresentationTypeRequested || x.PresentationTypeFinal || '').toLowerCase();
-        if (ptFilter === 'oral' || ptFilter === 'บรรยาย') {
-          return pName.indexOf('oral') >= 0 || pName.indexOf('บรรยาย') >= 0;
-        } else if (ptFilter === 'poster' || ptFilter === 'โปสเตอร์' || ptFilter === 'eposter' || ptFilter === 'แบบโปสเตอร์') {
-          return pName.indexOf('poster') >= 0 || pName.indexOf('โปสเตอร์') >= 0 || pName.indexOf('eposter') >= 0;
+        var pName = [
+          x.PresentationTypeName,
+          x.PresentationType,
+          x.PresentationTypeRequested,
+          x.PresentationTypeFinal
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (ptFilter.indexOf('oral') >= 0 || ptFilter.indexOf('บรรยาย') >= 0) {
+          return pName.indexOf('oral') >= 0 || pName.indexOf('บรรยาย') >= 0 || pName.indexOf('pt-2026-000001') >= 0;
+        } else if (ptFilter.indexOf('poster') >= 0 || ptFilter.indexOf('โปสเตอร์') >= 0 || ptFilter.indexOf('eposter') >= 0) {
+          return pName.indexOf('poster') >= 0 || pName.indexOf('โปสเตอร์') >= 0 || pName.indexOf('eposter') >= 0 || pName.indexOf('pt-2026-000002') >= 0;
         }
         return pName.indexOf(ptFilter) >= 0;
       });

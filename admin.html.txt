@@ -115,10 +115,10 @@
         </div>
         <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
           <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
-          <select id="workPresentationType" class="field" style="width:160px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
-            <option value="">ทุกรูปแบบ</option>
-            <option value="บรรยาย">บรรยาย</option>
-            <option value="แบบโปสเตอร์">แบบโปสเตอร์</option>
+          <select id="workPresentationType" class="field" style="width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+            <option value="">ทุกรูปแบบการนำเสนอ</option>
+            <option value="แบบบรรยาย">แบบบรรยาย</option>
+            <option value="แบบโปสเตอร์">แบบโปสเตอร์ (e-poster)</option>
           </select>
           <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
             <option value="">ทุกสถานะ</option>
@@ -1249,24 +1249,36 @@ async function loadWorks(){
     if (ptVal) {
       const ptf = ptVal.toLowerCase();
       filteredRows = filteredRows.filter(w => {
-        const pt = (w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || '').toLowerCase();
-        if (ptf === 'บรรยาย' || ptf === 'oral') return pt.includes('บรรยาย') || pt.includes('oral');
-        if (ptf === 'แบบโปสเตอร์' || ptf === 'โปสเตอร์' || ptf === 'poster' || ptf === 'eposter') return pt.includes('โปสเตอร์') || pt.includes('poster') || pt.includes('eposter');
-        return pt.includes(ptf);
+        const raw = [
+          w.PresentationTypeName,
+          w.PresentationType,
+          w.PresentationTypeFinal,
+          w.PresentationTypeRequested,
+          w['รูปแบบการนำเสนอ'],
+          w['รูปแบบ']
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (ptf.includes('บรรยาย') || ptf.includes('oral')) {
+          return raw.includes('บรรยาย') || raw.includes('oral') || raw.includes('pt-2026-000001') || raw.includes('pt-oral');
+        }
+        if (ptf.includes('โปสเตอร์') || ptf.includes('poster') || ptf.includes('eposter')) {
+          return raw.includes('โปสเตอร์') || raw.includes('poster') || raw.includes('eposter') || raw.includes('pt-2026-000002') || raw.includes('pt-eposter');
+        }
+        return raw.includes(ptf);
       });
     }
 
     $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
-      let rawPt = (w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || '').trim();
+      let rawPt = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '').trim();
       let ptDisplay = rawPt;
       let badgeClass = '';
-      if (/oral|บรรยาย/i.test(rawPt)) {
-        ptDisplay = 'บรรยาย';
+      if (/oral|บรรยาย|pt-2026-000001/i.test(rawPt)) {
+        ptDisplay = 'แบบบรรยาย';
         badgeClass = 'ok';
-      } else if (/poster|โปสเตอร์|eposter/i.test(rawPt)) {
-        ptDisplay = 'แบบโปสเตอร์';
+      } else if (/poster|โปสเตอร์|eposter|pt-2026-000002/i.test(rawPt)) {
+        ptDisplay = 'แบบโปสเตอร์ (e-poster)';
         badgeClass = 'warn';
-      } else if (!ptDisplay) {
+      } else if (!ptDisplay || ptDisplay === '-') {
         ptDisplay = '-';
       }
 

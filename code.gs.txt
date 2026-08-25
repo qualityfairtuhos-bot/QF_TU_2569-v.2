@@ -2894,17 +2894,24 @@ function adminListWorks(token, conferenceId, filters) {
       var reg = regMap[regId] || {};
 
       var resolvedCatName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '';
-      var rawPtName = clean_(w.PresentationTypeName || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
-      var rawPtReq = clean_(w.PresentationTypeRequested || '');
-      var rawPtFin = clean_(w.PresentationTypeFinal || '');
+      var rawPtName = clean_(w.PresentationTypeName || w['PresentationType Name'] || w['PresentationTypeName'] || w.presentationtypename || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
+      var rawPtReq = clean_(w.PresentationTypeRequested || w['PresentationTypeRequested'] || w.presentationtyperequested || '');
+      var rawPtFin = clean_(w.PresentationTypeFinal || w['PresentationTypeFinal'] || w.presentationtypefinal || '');
       
-      var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || rawPtReq || '';
-      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || rawPtFin || '';
-      var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || '';
-      if (/oral|บรรยาย/i.test(displayPt)) {
-        displayPt = 'บรรยาย';
-      } else if (/poster|โปสเตอร์|eposter/i.test(displayPt)) {
-        displayPt = 'แบบโปสเตอร์';
+      var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || '';
+      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || '';
+
+      if (!resolvedPtReqName) {
+        if (/PT-2026-000001|ORAL/i.test(rawPtReq)) resolvedPtReqName = 'แบบบรรยาย';
+        else if (/PT-2026-000002|POSTER|EPOSTER/i.test(rawPtReq)) resolvedPtReqName = 'แบบโปสเตอร์ (e-poster)';
+        else resolvedPtReqName = rawPtReq;
+      }
+
+      var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || rawPtReq || '';
+      if (/oral|บรรยาย|PT-2026-000001/i.test(displayPt)) {
+        displayPt = 'แบบบรรยาย';
+      } else if (/poster|โปสเตอร์|eposter|PT-2026-000002/i.test(displayPt)) {
+        displayPt = 'แบบโปสเตอร์ (e-poster)';
       }
 
       return {
@@ -2951,11 +2958,17 @@ function adminListWorks(token, conferenceId, filters) {
     if (filters.presentationType) {
       var ptFilter = clean_(filters.presentationType).toLowerCase();
       rows = rows.filter(function(x) {
-        var pName = (x.PresentationTypeName || x.PresentationType || x.PresentationTypeRequested || x.PresentationTypeFinal || '').toLowerCase();
-        if (ptFilter === 'oral' || ptFilter === 'บรรยาย') {
-          return pName.indexOf('oral') >= 0 || pName.indexOf('บรรยาย') >= 0;
-        } else if (ptFilter === 'poster' || ptFilter === 'โปสเตอร์' || ptFilter === 'eposter' || ptFilter === 'แบบโปสเตอร์') {
-          return pName.indexOf('poster') >= 0 || pName.indexOf('โปสเตอร์') >= 0 || pName.indexOf('eposter') >= 0;
+        var pName = [
+          x.PresentationTypeName,
+          x.PresentationType,
+          x.PresentationTypeRequested,
+          x.PresentationTypeFinal
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (ptFilter.indexOf('oral') >= 0 || ptFilter.indexOf('บรรยาย') >= 0) {
+          return pName.indexOf('oral') >= 0 || pName.indexOf('บรรยาย') >= 0 || pName.indexOf('pt-2026-000001') >= 0;
+        } else if (ptFilter.indexOf('poster') >= 0 || ptFilter.indexOf('โปสเตอร์') >= 0 || ptFilter.indexOf('eposter') >= 0) {
+          return pName.indexOf('poster') >= 0 || pName.indexOf('โปสเตอร์') >= 0 || pName.indexOf('eposter') >= 0 || pName.indexOf('pt-2026-000002') >= 0;
         }
         return pName.indexOf(ptFilter) >= 0;
       });
