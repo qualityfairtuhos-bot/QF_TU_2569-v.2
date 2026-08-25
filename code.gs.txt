@@ -2878,12 +2878,35 @@ function adminListWorks(token, conferenceId, filters) {
     var regMap = {};
     regs.forEach(function(r) { regMap[r.RegID] = r; });
 
+    var ptMap = {};
+    findMany_('PresentationTypes', { ConferenceID: conferenceId }).forEach(function(pt) {
+      ptMap[pt.PresentationTypeID] = pt;
+      if (pt.TypeCode) ptMap[pt.TypeCode] = pt;
+    });
+
     var rows = works.map(function(w) {
       var ac = asc[w.WorkID] || { a: 0, c: 0, t: 0 };
-      var presenter = (authorsByWork[w.WorkID] || []).find(function(a) { return bool_(a.IsPresenter); }) || {};
+      var presenter = (authorsByWork[w.WorkID] || []).find(function(a) { return bool_(a.IsPresenter); }) || (authorsByWork[w.WorkID] || [])[0] || {};
       var cat = categories[w.CategoryID] || {};
+      var ptReq = ptMap[w.PresentationTypeRequested] || {};
+      var ptFin = ptMap[w.PresentationTypeFinal] || {};
       var regId = w.RegID || presenter.RegID || '';
       var reg = regMap[regId] || {};
+
+      var resolvedCatName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '';
+      var rawPtName = clean_(w.PresentationTypeName || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
+      var rawPtReq = clean_(w.PresentationTypeRequested || '');
+      var rawPtFin = clean_(w.PresentationTypeFinal || '');
+      
+      var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || rawPtReq || '';
+      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || rawPtFin || '';
+      var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || '';
+      if (/oral|บรรยาย/i.test(displayPt)) {
+        displayPt = 'บรรยาย';
+      } else if (/poster|โปสเตอร์|eposter/i.test(displayPt)) {
+        displayPt = 'แบบโปสเตอร์';
+      }
+
       return {
         WorkID: w.WorkID,
         RegID: regId,
@@ -2892,9 +2915,17 @@ function adminListWorks(token, conferenceId, filters) {
         TitleEN: w.TitleEN || '',
         ThaiTitle: w.TitleTH || '',
         EnglishTitle: w.TitleEN || '',
-        WorkType: cat.CategoryNameTH || '',
-        Field: cat.CategoryNameTH || '',
-        Theme: cat.CategoryNameTH || '',
+        CategoryID: w.CategoryID || '',
+        CategoryName: resolvedCatName,
+        CategoryNameTH: resolvedCatName,
+        Category: resolvedCatName,
+        WorkType: resolvedCatName,
+        Field: resolvedCatName,
+        Theme: resolvedCatName,
+        PresentationTypeRequested: rawPtReq,
+        PresentationTypeName: displayPt || rawPtName || resolvedPtReqName || '',
+        PresentationTypeFinal: rawPtFin,
+        PresentationType: displayPt || rawPtName || resolvedPtReqName || '',
         Status: w.Status || '',
         CurrentStatus: w.Status || '',
         RegistrationStatus: reg.RegistrationStatus || '',
@@ -2911,11 +2942,23 @@ function adminListWorks(token, conferenceId, filters) {
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
       rows = rows.filter(function(x) {
-        return [x.WorkCode, x.TitleTH, x.TitleEN, x.PresenterName].join(' ').toLowerCase().indexOf(q) >= 0;
+        return [x.WorkCode, x.TitleTH, x.TitleEN, x.PresenterName, x.CategoryName, x.PresentationType, x.PresentationTypeName].join(' ').toLowerCase().indexOf(q) >= 0;
       });
     }
     if (filters.status) {
       rows = rows.filter(function(x) { return upper_(x.Status) === upper_(filters.status); });
+    }
+    if (filters.presentationType) {
+      var ptFilter = clean_(filters.presentationType).toLowerCase();
+      rows = rows.filter(function(x) {
+        var pName = (x.PresentationTypeName || x.PresentationType || x.PresentationTypeRequested || x.PresentationTypeFinal || '').toLowerCase();
+        if (ptFilter === 'oral' || ptFilter === 'บรรยาย') {
+          return pName.indexOf('oral') >= 0 || pName.indexOf('บรรยาย') >= 0;
+        } else if (ptFilter === 'poster' || ptFilter === 'โปสเตอร์' || ptFilter === 'eposter' || ptFilter === 'แบบโปสเตอร์') {
+          return pName.indexOf('poster') >= 0 || pName.indexOf('โปสเตอร์') >= 0 || pName.indexOf('eposter') >= 0;
+        }
+        return pName.indexOf(ptFilter) >= 0;
+      });
     }
 
     rows.sort(function(a, b) { return String(a.WorkCode).localeCompare(String(b.WorkCode)); });

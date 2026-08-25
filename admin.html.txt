@@ -113,8 +113,13 @@
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
         </div>
-        <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px">
-          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
+        <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
+          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
+          <select id="workPresentationType" class="field" style="width:160px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+            <option value="">ทุกรูปแบบ</option>
+            <option value="บรรยาย">บรรยาย</option>
+            <option value="แบบโปสเตอร์">แบบโปสเตอร์</option>
+          </select>
           <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
             <option value="">ทุกสถานะ</option>
             <option value="RECEIVED">RECEIVED</option>
@@ -1229,13 +1234,47 @@ async function verifyPay(id,decision){const returning=decision==='RETURN';const 
 async function loadWorks(){
   show('กำลังโหลดผลงาน');
   try{
-    const rows=await rpc('adminListWorks',TOKEN,CID,{q:$('#workSearch').value,status:$('#workStatus').value});
+    const searchVal = ($('#workSearch')?.value || '').trim();
+    const statusVal = ($('#workStatus')?.value || '').trim();
+    const ptVal = ($('#workPresentationType')?.value || '').trim();
+    
+    const rows = await rpc('adminListWorks', TOKEN, CID, {
+      q: searchVal,
+      status: statusVal,
+      presentationType: ptVal
+    });
     window.WORK_ROWS = rows;
-    $('#workRows').innerHTML=rows.length?rows.map(w=>`<tr>
+    
+    let filteredRows = rows || [];
+    if (ptVal) {
+      const ptf = ptVal.toLowerCase();
+      filteredRows = filteredRows.filter(w => {
+        const pt = (w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || '').toLowerCase();
+        if (ptf === 'บรรยาย' || ptf === 'oral') return pt.includes('บรรยาย') || pt.includes('oral');
+        if (ptf === 'แบบโปสเตอร์' || ptf === 'โปสเตอร์' || ptf === 'poster' || ptf === 'eposter') return pt.includes('โปสเตอร์') || pt.includes('poster') || pt.includes('eposter');
+        return pt.includes(ptf);
+      });
+    }
+
+    $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
+      let rawPt = (w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || '').trim();
+      let ptDisplay = rawPt;
+      let badgeClass = '';
+      if (/oral|บรรยาย/i.test(rawPt)) {
+        ptDisplay = 'บรรยาย';
+        badgeClass = 'ok';
+      } else if (/poster|โปสเตอร์|eposter/i.test(rawPt)) {
+        ptDisplay = 'แบบโปสเตอร์';
+        badgeClass = 'warn';
+      } else if (!ptDisplay) {
+        ptDisplay = '-';
+      }
+
+      return `<tr>
       <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
       <td>${esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-')}${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}</td>
       <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||w.WorkType||w.Field||w.Theme||'-')}</td>
-      <td><span class="badge ${/oral|บรรยาย/i.test(w.PresentationTypeName||w.PresentationTypeFinal||w.PresentationType||w.PresentationTypeRequested||'')?'ok':/poster|โปสเตอร์/i.test(w.PresentationTypeName||w.PresentationTypeFinal||w.PresentationType||w.PresentationTypeRequested||'')?'warn':''}">${esc(w.PresentationTypeName||w.PresentationTypeFinal||w.PresentationType||w.PresentationTypeRequested||'-')}</span></td>
+      <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
       <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
       <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
       <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
@@ -1259,7 +1298,8 @@ async function loadWorks(){
           return `<a target="_blank" href="${esc(f.FileUrl)}" class="btn btn-soft btn-sm" title="${t}"><i class="fa-solid ${i}"></i></a>`;
         }).join('')}
       </td>
-    </tr>`).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+    </tr>`;
+    }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
   }finally{
     hide();
   }

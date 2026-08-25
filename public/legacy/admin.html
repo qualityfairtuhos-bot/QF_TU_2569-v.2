@@ -113,8 +113,13 @@
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
         </div>
-        <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px">
-          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
+        <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
+          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
+          <select id="workPresentationType" class="field" style="width:160px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+            <option value="">ทุกรูปแบบ</option>
+            <option value="บรรยาย">บรรยาย</option>
+            <option value="แบบโปสเตอร์">แบบโปสเตอร์</option>
+          </select>
           <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
             <option value="">ทุกสถานะ</option>
             <option value="RECEIVED">RECEIVED</option>
@@ -132,6 +137,7 @@
                 <th>CODE</th>
                 <th>ชื่อผลงาน</th>
                 <th>ประเภท</th>
+                <th>รูปแบบ</th>
                 <th>ผู้นำเสนอ</th>
                 <th>Reviewer</th>
                 <th>คะแนน</th>
@@ -898,7 +904,7 @@ async function openRegistrationEdit(id){
           <div style="border-top:1px dashed #cbd5e1;padding-top:10px">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
               <input type="checkbox" id="erWork" ${r.WantsSubmitWork?'checked':''} style="width:16px;height:16px;cursor:pointer">
-              <span style="font-size:0.9rem;font-weight:600;color:#006D70">มีความประสงค์ส่งผลงานวิชาการ</span>
+              <span style="font-size:0.9rem;font-weight:600;color:#006D70">ประสงค์ส่งผลงาน (ผู้นำเสนอหลักเป็นผู้กรอกข้อมูลและส่งไฟล์ผลงาน)</span>
             </label>
           </div>
         </div>
@@ -991,17 +997,232 @@ async function openRegistrationEdit(id){
 
 function beDateOnly(v){const d=parseStoredDate(v);if(!d)return String(v||'');return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543}`}
 async function openRegistrationSignSheet(){
-  const html=`<div style="text-align:left"><label>ประเภทผู้สมัคร<select id="psType" class="swal2-select" style="width:100%;margin:5px 0 10px"><option value="">ทั้งหมด</option><option value="INTERNAL">บุคลากรภายใน รพ.มธ.</option><option value="EXTERNAL">บุคคลภายนอก</option></select></label><label>วันเข้าร่วม<select id="psDay" class="swal2-select" style="width:100%;margin:5px 0 10px"><option value="0">ทุกวันที่เลือกเข้าร่วม</option><option value="1">วันที่ 1</option><option value="2">วันที่ 2</option><option value="3">วันที่ 3</option></select></label><label>ฝ่าย/หน่วยงานที่ต้องการค้นหา<input id="psOrg" class="swal2-input" style="width:100%;margin:5px 0 10px" placeholder="เว้นว่างเพื่อพิมพ์ทั้งหมด"></label><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="psIncomplete"> รวมข้อมูลที่ยังไม่ครบหรือถูกส่งคืน</label></div>`;
-  const x=await Swal.fire({title:'พิมพ์ใบเซ็นชื่อหน้างาน',html,showCancelButton:true,confirmButtonText:'สร้างใบเซ็นชื่อ',confirmButtonColor:'#006D70',preConfirm:()=>({participantType:$('#psType').value,dayIndex:Number($('#psDay').value||0),organization:$('#psOrg').value,includeIncomplete:$('#psIncomplete').checked,q:$('#regSearch').value,status:$('#regStatus').value})});if(!x.isConfirmed)return;
-  const win=window.open('','_blank');if(!win)return Swal.fire({icon:'warning',title:'เบราว์เซอร์บล็อกหน้าต่างใหม่',text:'กรุณาอนุญาต Pop-up แล้วลองใหม่'});
+  const html=`<div style="text-align:left">
+    <label style="display:block;margin-bottom:12px;font-weight:600;color:#1e293b">รูปแบบการจัดพิมพ์รายงาน:
+      <select id="psReportFormat" class="swal2-select" style="width:100%;margin:6px 0 0;font-size:0.9rem;border-radius:8px">
+        <option value="GROUP_BY_ORG_REGID">แบบที่ 1: แยกตามหน่วยงานและหน่วยงานย่อย (ภายในกลุ่มย่อยเรียงตาม RegID จากน้อยไปมาก)</option>
+        <option value="GROUP_BY_ORG_NAME">แบบที่ 2: แยกตามหน่วยงานและหน่วยงานย่อย (ภายในกลุ่มย่อยเรียงตาม ชื่อ-สกุล)</option>
+        <option value="FLAT_BY_REGID">แบบที่ 3: เรียงตาม RegID จากน้อยไปมาก (ตารางรวม ไม่แยกกลุ่มย่อย)</option>
+      </select>
+    </label>
+    <label style="display:block;margin-bottom:12px;font-weight:600;color:#1e293b">กลุ่มผู้สมัคร:
+      <select id="psType" class="swal2-select" style="width:100%;margin:6px 0 0;font-size:0.9rem;border-radius:8px">
+        <option value="">ทั้งหมด (แยกชุดภายใน รพ. / ภายนอก รพ.)</option>
+        <option value="INTERNAL">เฉพาะบุคลากรภายใน รพ.ธรรมศาสตร์ฯ</option>
+        <option value="EXTERNAL">เฉพาะบุคคลภายนอก รพ.</option>
+      </select>
+    </label>
+    <label style="display:block;margin-bottom:12px;font-weight:600;color:#1e293b">วันเข้าร่วมงาน:
+      <select id="psDay" class="swal2-select" style="width:100%;margin:6px 0 0;font-size:0.9rem;border-radius:8px">
+        <option value="0">ทุกวันที่เลือกเข้าร่วม</option>
+        <option value="1">วันที่ 1</option>
+        <option value="2">วันที่ 2</option>
+        <option value="3">วันที่ 3</option>
+      </select>
+    </label>
+    <label style="display:block;margin-bottom:12px;font-weight:600;color:#1e293b">ฝ่าย/หน่วยงานที่ต้องการค้นหา:
+      <input id="psOrg" class="swal2-input" style="width:100%;margin:6px 0 0;font-size:0.9rem;box-sizing:border-box" placeholder="เว้นว่างเพื่อพิมพ์ทั้งหมด">
+    </label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:0.9rem;cursor:pointer">
+      <input type="checkbox" id="psIncomplete" style="width:16px;height:16px"> รวมข้อมูลที่ยังไม่ครบหรือถูกส่งคืน
+    </label>
+  </div>`;
+  const x=await Swal.fire({
+    title:'พิมพ์ใบเซ็นชื่อผู้ลงทะเบียน',
+    html,
+    showCancelButton:true,
+    confirmButtonText:'สร้างรายงานใบเซ็นชื่อ',
+    confirmButtonColor:'#006D70',
+    cancelButtonText:'ยกเลิก',
+    preConfirm:()=>({
+      reportFormat:$('#psReportFormat').value,
+      participantType:$('#psType').value,
+      dayIndex:Number($('#psDay').value||0),
+      organization:$('#psOrg').value,
+      includeIncomplete:$('#psIncomplete').checked,
+      q:$('#regSearch').value,
+      status:$('#regStatus').value
+    })
+  });
+  if(!x.isConfirmed)return;
+  const win=window.open('','_blank');
+  if(!win)return Swal.fire({icon:'warning',title:'เบราว์เซอร์บล็อกหน้าต่างใหม่',text:'กรุณาอนุญาต Pop-up แล้วลองใหม่'});
   win.document.write('<p style="font-family:sans-serif;padding:20px">กำลังเตรียมใบเซ็นชื่อ...</p>');
-  show('กำลังสร้างใบเซ็นชื่อ');try{const d=await rpc('adminGetRegistrationSignSheet',TOKEN,CID,x.value);hide();renderSignSheetWindow(win,d,x.value)}catch(e){win.close();err(e)}
+  show('กำลังสร้างใบเซ็นชื่อ');
+  try{
+    const d=await rpc('adminGetRegistrationSignSheet',TOKEN,CID,x.value);
+    hide();
+    renderSignSheetWindow(win,d,x.value);
+  }catch(e){
+    win.close();
+    err(e);
+  }
 }
 function renderSignSheetWindow(win,d,filters){
-  const rows=d.rows||[],dates=(d.eventDates||[]).slice(0,3),groups={};rows.forEach(r=>{const key=[r.OrganizationGroup,r.Institution||r.OrganizationUnit].filter(Boolean).join(' / ')||'ไม่ระบุหน่วยงาน';(groups[key]||(groups[key]=[])).push(r)});const groupKeys=Object.keys(groups);if(!groupKeys.length)groups['ไม่พบข้อมูล']=[];
-  const dateHeads=dates.map((x,i)=>`<th colspan="2">วันที่ ${i+1}<br>${esc(beDateOnly(x))}</th>`).join('');
-  const pages=Object.keys(groups).map((g,gi)=>{const list=groups[g],body=list.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc(r.FullName)}</td><td>${esc(r.Position||r.Profession||'')}</td><td>${esc(r.Institution||r.OrganizationUnit||r.OrganizationGroup||'')}</td>${dates.map((x,di)=>r['AttendanceDay'+(di+1)]?'<td class="sign"></td><td class="date">'+esc(beDateOnly(x))+'</td>':'<td class="na">-</td><td class="na">-</td>').join('')}</tr>`).join('')+Array.from({length:5},(_,i)=>`<tr><td class="c">${list.length+i+1}</td><td></td><td></td><td></td>${dates.map(()=>'<td class="sign"></td><td></td>').join('')}</tr>`).join('');return `<section class="sheet ${gi<groupKeys.length-1?'break':''}"><h1>${esc(d.conference.ConferenceNameTH||'ใบเซ็นชื่อผู้เข้าร่วมงาน')}</h1><h2>ใบเซ็นชื่อผู้เข้าร่วมงาน</h2><div class="meta"><b>ฝ่าย/หน่วยงาน:</b> ${esc(g)} &nbsp; <b>จำนวน:</b> ${list.length} คน</div><table><thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">ชื่อ-นามสกุล</th><th rowspan="2">ตำแหน่ง</th><th rowspan="2">หน่วยงาน</th>${dateHeads}</tr><tr>${dates.map(()=>'<th>ลายมือชื่อ</th><th>วันที่</th>').join('')}</tr></thead><tbody>${body}</tbody></table><div class="foot">พิมพ์เมื่อ ${esc(formatBeDateTime(d.generatedAt))}</div></section>`}).join('');
-  win.document.open();win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบเซ็นชื่อผู้ลงทะเบียน</title><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet"><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Prompt,sans-serif;color:#111;margin:0}.sheet{page-break-inside:avoid}.break{page-break-after:always}h1{font-size:15px;text-align:center;margin:0 0 2px}h2{font-size:13px;text-align:center;margin:0 0 6px}.meta{font-size:10px;margin:4px 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5px}th,td{border:1px solid #333;padding:3px;vertical-align:middle;height:24px}th{background:#f0f3f4;text-align:center}th:nth-child(1){width:34px}th:nth-child(2){width:145px}th:nth-child(3){width:95px}th:nth-child(4){width:130px}.c,.date,.na{text-align:center}.sign{min-width:80px}.foot{text-align:right;font-size:8px;margin-top:4px}@media print{button{display:none}}</style></head><body>${pages}<script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script></body></html>`);win.document.close();
+  const rows=d.rows||[];
+  const dates=(d.eventDates||[]).slice(0,3);
+  const format=d.reportFormat||filters.reportFormat||'GROUP_BY_ORG_REGID';
+  const confName=d.conference?.ConferenceNameTH||'การประชุมวิชาการ TUH Quality Fair';
+
+  const dateHeads=dates.map((x,i)=>`<th colspan="2" style="font-size:8px">วันที่ ${i+1}<br>${esc(beDateOnly(x))}</th>`).join('');
+  const subDateHeads=dates.map(()=>'<th>ลายมือชื่อ</th><th>วันที่</th>').join('');
+
+  let sectionsHtml='';
+
+  const renderTableSection=(title,subTitle,list,showOrgCol=true)=>{
+    const totalCols=(showOrgCol?5:4)+(dates.length*2);
+    const body=list.map((r,i)=>`<tr>
+      <td class="c">${i+1}</td>
+      <td class="c" style="font-weight:600">${esc(r.RegID)}</td>
+      <td>${esc(r.FullName)}</td>
+      <td>${esc(r.Position||r.Profession||'-')}</td>
+      ${showOrgCol?`<td>${esc([r.OrganizationGroup,r.Institution||r.OrganizationUnit].filter(Boolean).join(' / ')||'-')}</td>`:''}
+      ${dates.map((x,di)=>r['AttendanceDay'+(di+1)]?'<td class="sign"></td><td class="date">'+esc(beDateOnly(x))+'</td>':'<td class="na">-</td><td class="na">-</td>').join('')}
+    </tr>`).join('')+Array.from({length:Math.max(3,Math.min(5,8-(list.length%15||15)))},(_,i)=>`<tr>
+      <td class="c">${list.length+i+1}</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      ${showOrgCol?'<td></td>':''}
+      ${dates.map(()=>'<td class="sign"></td><td></td>').join('')}
+    </tr>`).join('');
+
+    return `<section class="sheet break">
+      <table>
+        <thead>
+          <tr class="header-repeat-row">
+            <th colspan="${totalCols}" class="header-repeat-cell" style="background:#fff;border:none;padding:0 0 6px 0;text-align:left;font-weight:normal;">
+              <h1>${esc(confName)}</h1>
+              <h2>${esc(title)}</h2>
+              <div class="meta" style="display:flex;justify-content:space-between;border-bottom:1px solid #cbd5e1;padding-bottom:4px;margin-bottom:6px">
+                <div>${subTitle}</div>
+                <div><b>จำนวนทั้งหมด:</b> ${list.length} คน</div>
+              </div>
+            </th>
+          </tr>
+          <tr>
+            <th rowspan="2" style="width:32px">ลำดับ</th>
+            <th rowspan="2" style="width:65px">RegID</th>
+            <th rowspan="2" style="width:135px">ชื่อ-นามสกุล</th>
+            <th rowspan="2" style="width:95px">ตำแหน่ง/วิชาชีพ</th>
+            ${showOrgCol?'<th rowspan="2" style="width:140px">ฝ่าย/กลุ่มงาน / หน่วยงาน</th>':''}
+            ${dateHeads}
+          </tr>
+          <tr>
+            ${subDateHeads}
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="${totalCols}" style="border:none;text-align:right;font-size:8px;padding-top:4px;color:#64748b">พิมพ์เมื่อ ${esc(formatBeDateTime(d.generatedAt))}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>`;
+  };
+
+  if(format==='FLAT_BY_REGID'){
+    const internalList=rows.filter(r=>String(r.ParticipantType).toUpperCase()==='INTERNAL');
+    const externalList=rows.filter(r=>String(r.ParticipantType).toUpperCase()!=='INTERNAL');
+
+    if(internalList.length){
+      sectionsHtml+=renderTableSection(
+        'ใบเซ็นชื่อผู้ลงทะเบียน (บุคลากรภายใน รพ.ธรรมศาสตร์เฉลิมพระเกียรติ)',
+        '<b>ประเภท:</b> บุคลากรภายใน รพ.มธ. (เรียงตามรหัสลงทะเบียน RegID)',
+        internalList,
+        true
+      );
+    }
+    if(externalList.length){
+      sectionsHtml+=renderTableSection(
+        'ใบเซ็นชื่อผู้ลงทะเบียน (บุคคลภายนอก รพ.)',
+        '<b>ประเภท:</b> บุคคลภายนอก รพ. (เรียงตามรหัสลงทะเบียน RegID)',
+        externalList,
+        true
+      );
+    }
+    if(!internalList.length&&!externalList.length){
+      sectionsHtml='<section class="sheet"><h1>ไม่พบข้อมูลผู้ลงทะเบียนตามเงื่อนไข</h1></section>';
+    }
+  }else{
+    const partitions=[
+      {name:'บุคลากรภายใน รพ.ธรรมศาสตร์เฉลิมพระเกียรติ',list:rows.filter(r=>String(r.ParticipantType).toUpperCase()==='INTERNAL')},
+      {name:'บุคคลภายนอก รพ.',list:rows.filter(r=>String(r.ParticipantType).toUpperCase()!=='INTERNAL')}
+    ];
+
+    partitions.forEach(part=>{
+      if(!part.list.length)return;
+      const groups={};
+      part.list.forEach(r=>{
+        const key=[r.OrganizationGroup,r.Institution||r.OrganizationUnit].filter(Boolean).join(' / ')||'ไม่ระบุหน่วยงาน';
+        (groups[key]||(groups[key]=[])).push(r);
+      });
+
+      Object.keys(groups).sort((a,b)=>a.localeCompare(b,'th')).forEach(g=>{
+        const gList=groups[g];
+        if(format==='GROUP_BY_ORG_NAME'){
+          gList.sort((a,b)=>String(a.FullName||'').localeCompare(String(b.FullName||''),'th'));
+        }else{
+          gList.sort((a,b)=>String(a.RegID||'').localeCompare(String(b.RegID||''),'th',{numeric:true}));
+        }
+        sectionsHtml+=renderTableSection(
+          `ใบเซ็นชื่อผู้ลงทะเบียน (${part.name})`,
+          `<b>สังกัด/ฝ่าย/หน่วยงาน:</b> ${esc(g)} &nbsp;|&nbsp; <b>กลุ่ม:</b> ${esc(part.name)}${format==='GROUP_BY_ORG_NAME'?' (เรียงตามชื่อ-สกุล)':' (เรียงตาม RegID)'}`,
+          gList,
+          false
+        );
+      });
+    });
+
+    if(!sectionsHtml){
+      sectionsHtml='<section class="sheet"><h1>ไม่พบข้อมูลผู้ลงทะเบียนตามเงื่อนไข</h1></section>';
+    }
+  }
+
+  win.document.open();
+  win.document.write(`<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ใบเซ็นชื่อผู้ลงทะเบียน</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4 landscape; margin: 7mm 8mm 7mm 8mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Prompt', sans-serif; color: #111; margin: 0; background: #fff; }
+    .sheet { margin-bottom: 20px; }
+    .sheet.break { page-break-after: always; }
+    .sheet:last-child { page-break-after: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr { page-break-inside: avoid; }
+    h1 { font-size: 14px; text-align: center; margin: 0 0 2px; color: #006D70; font-weight: 700; }
+    h2 { font-size: 12px; text-align: center; margin: 0 0 5px; color: #334155; font-weight: 600; }
+    .meta { font-size: 9.5px; margin: 4px 0; color: #1e293b; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.5px; }
+    th, td { border: 1px solid #333; padding: 2.5px 3.5px; vertical-align: middle; height: 23px; word-break: break-word; }
+    th { background: #f1f5f9; text-align: center; font-weight: 600; }
+    .header-repeat-row th, .header-repeat-cell { background: #fff !important; border: none !important; }
+    .c, .date, .na { text-align: center; }
+    .na { color: #94a3b8; background: #fafafa; }
+    .sign { min-width: 75px; }
+    .foot { text-align: right; font-size: 8px; margin-top: 4px; color: #64748b; }
+    @media print { 
+      button { display: none; } 
+      .sheet { margin-bottom: 0; }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      tr { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  ${sectionsHtml}
+  <script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script>
+</body>
+</html>`);
+  win.document.close();
 }
 
 async function loadPayments(){show('กำลังโหลดการเงิน');try{const rows=await rpc('adminListPayments',TOKEN,CID,{q:$('#paySearch').value,status:$('#payStatus').value});$('#payRows').innerHTML=rows.length?rows.map(p=>{const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);return `<tr><td>${esc(p.RegID)}</td><td><b>${esc(p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.Status)}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}">เปิดหลักฐาน</a>`:'<span class="muted">ยังไม่ส่งหลักฐาน</span>'}</td><td class="actions">${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:'-'}</td></tr>`}).join(''):'<tr><td colspan="6" class="muted">ไม่พบข้อมูล</td></tr>'}finally{hide()}}
@@ -1010,12 +1231,47 @@ async function verifyPay(id,decision){const returning=decision==='RETURN';const 
 async function loadWorks(){
   show('กำลังโหลดผลงาน');
   try{
-    const rows=await rpc('adminListWorks',TOKEN,CID,{q:$('#workSearch').value,status:$('#workStatus').value});
+    const searchVal = ($('#workSearch')?.value || '').trim();
+    const statusVal = ($('#workStatus')?.value || '').trim();
+    const ptVal = ($('#workPresentationType')?.value || '').trim();
+    
+    const rows = await rpc('adminListWorks', TOKEN, CID, {
+      q: searchVal,
+      status: statusVal,
+      presentationType: ptVal
+    });
     window.WORK_ROWS = rows;
-    $('#workRows').innerHTML=rows.length?rows.map(w=>`<tr>
+    
+    let filteredRows = rows || [];
+    if (ptVal) {
+      const ptf = ptVal.toLowerCase();
+      filteredRows = filteredRows.filter(w => {
+        const pt = (w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || '').toLowerCase();
+        if (ptf === 'บรรยาย' || ptf === 'oral') return pt.includes('บรรยาย') || pt.includes('oral');
+        if (ptf === 'แบบโปสเตอร์' || ptf === 'โปสเตอร์' || ptf === 'poster' || ptf === 'eposter') return pt.includes('โปสเตอร์') || pt.includes('poster') || pt.includes('eposter');
+        return pt.includes(ptf);
+      });
+    }
+
+    $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
+      let rawPt = (w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || '').trim();
+      let ptDisplay = rawPt;
+      let badgeClass = '';
+      if (/oral|บรรยาย/i.test(rawPt)) {
+        ptDisplay = 'บรรยาย';
+        badgeClass = 'ok';
+      } else if (/poster|โปสเตอร์|eposter/i.test(rawPt)) {
+        ptDisplay = 'แบบโปสเตอร์';
+        badgeClass = 'warn';
+      } else if (!ptDisplay) {
+        ptDisplay = '-';
+      }
+
+      return `<tr>
       <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
-      <td>${esc(w.ThaiTitle||w.EnglishTitle||w.TitleTH||w.TitleEN||'-')}<div class="muted" style="font-size:0.75rem">${esc(w.Theme||w.Field||'')}</div></td>
-      <td>${esc(w.WorkType||'-')}</td>
+      <td>${esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-')}${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}</td>
+      <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||w.WorkType||w.Field||w.Theme||'-')}</td>
+      <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
       <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
       <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
       <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
@@ -1039,7 +1295,8 @@ async function loadWorks(){
           return `<a target="_blank" href="${esc(f.FileUrl)}" class="btn btn-soft btn-sm" title="${t}"><i class="fa-solid ${i}"></i></a>`;
         }).join('')}
       </td>
-    </tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    </tr>`;
+    }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
   }finally{
     hide();
   }
