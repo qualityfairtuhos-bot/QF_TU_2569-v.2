@@ -1406,52 +1406,121 @@ async function openScoreSummary(wid){
     const critMap = {};
     criteria.forEach(c => critMap[c.CriteriaID] = c);
     
+    const MAIN_CATS = [
+      { id: 1, name: 'บทนำ/วัตถุประสงค์', maxScore: 10, items: [1, 2] },
+      { id: 2, name: 'วิธีดำเนินการ', maxScore: 30, items: [3, 4] },
+      { id: 3, name: 'ผลการศึกษา/ผลลัพธ์', maxScore: 30, items: [5] },
+      { id: 4, name: 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', maxScore: 20, items: [6, 7] },
+      { id: 5, name: 'การใช้ประโยชน์', maxScore: 10, items: [8] }
+    ];
+
+    function getCat(c) {
+      const itemNo = Number(c.ItemNo) || 0;
+      const desc = String(c.DescriptionTH || '').trim();
+      for (const cat of MAIN_CATS) {
+        if (desc && (desc.includes(cat.name) || cat.name.includes(desc))) return cat;
+        if (cat.items.includes(itemNo)) return cat;
+      }
+      return { id: 99, name: desc || 'หมวดอื่น ๆ', maxScore: Number(c.MaxScore) || 0, items: [itemNo] };
+    }
+    
     const completed = assignments.filter(a => ['COMPLETE', 'LOCKED'].includes(String(a.Status).toUpperCase()));
     
     let html = `<div style="text-align:left; font-size:0.9rem;">
-      <div style="margin-bottom:15px;">
-        <b>${esc(work.WorkCode || work.WorkID)}</b><br>
-        ${esc(work.TitleTH)}<br>
-        <small class="muted">${authors.map(x => esc(x.FullName)).join(', ')}</small>
+      <div style="margin-bottom:15px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
+        <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH)}</div>
+        <div style="margin-top:4px; color:#475569;"><small>ผู้ส่ง/ผู้แต่ง: ${authors.map(x => esc(x.FullName)).join(', ')}</small></div>
       </div>`;
     
     if (completed.length === 0) {
-      html += `<div class="muted" style="text-align:center; padding:20px;">ยังไม่มีกรรมการส่งคะแนน (0/${assignments.length})</div>`;
+      html += `<div class="muted" style="text-align:center; padding:25px; background:#f1f5f9; border-radius:8px;">ยังไม่มีกรรมการส่งคะแนน (ประเมินแล้ว 0/${assignments.length} ท่าน)</div>`;
     } else {
       let totalSum = 0;
+      const catAvgSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      
       completed.forEach((a, i) => {
         totalSum += Number(a.TotalScore) || 0;
         const myScores = scores.filter(s => s.AssignmentID === a.AssignmentID);
-        let scoreDetails = myScores.map(s => {
-          const c = critMap[s.CriteriaID] || {};
-          return `<div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:4px 0;">
-            <div style="flex:1; padding-right:10px;">${esc(c.CriteriaNameTH || 'เกณฑ์')}</div>
-            <div style="font-weight:bold; color:#006D70;">${Number(s.Score)} / ${Number(c.MaxScore)}</div>
-          </div>
-          ${s.Comment ? `<div style="font-size:0.8rem; color:#666; margin-bottom:8px; padding-left:10px; border-left:2px solid #ccc;">${esc(s.Comment)}</div>` : ''}`;
+        const myScoreMap = {};
+        myScores.forEach(s => myScoreMap[s.CriteriaID] = s);
+        
+        const catSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 99: 0 };
+        const groupedItems = {};
+        MAIN_CATS.forEach(c => groupedItems[c.id] = []);
+        groupedItems[99] = [];
+        
+        criteria.forEach(c => {
+          const cat = getCat(c);
+          const sc = myScoreMap[c.CriteriaID];
+          const val = sc ? (Number(sc.Score) || 0) : 0;
+          catSums[cat.id] = (catSums[cat.id] || 0) + val;
+          if (cat.id <= 5) catAvgSums[cat.id] = (catAvgSums[cat.id] || 0) + val;
+          groupedItems[cat.id].push({ criteria: c, scoreObj: sc, scoreVal: val });
+        });
+        
+        let catBlocksHtml = MAIN_CATS.map(cat => {
+          const items = groupedItems[cat.id] || [];
+          if (!items.length) return '';
+          const subItemsHtml = items.map(it => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 8px; border-bottom:1px dashed #e2e8f0; font-size:0.85rem;">
+              <span style="color:#334155;">ข้อ ${esc(it.criteria.ItemNo)}. ${esc(it.criteria.CriteriaNameTH)}</span>
+              <span style="font-weight:600; color:#006D70;">${it.scoreVal} / ${it.criteria.MaxScore}</span>
+            </div>
+            ${it.scoreObj && it.scoreObj.Comment ? `<div style="font-size:0.8rem; color:#64748b; margin:2px 0 6px 8px; padding-left:8px; border-left:2px solid #cbd5e1;">ข้อเสนอแนะ: ${esc(it.scoreObj.Comment)}</div>` : ''}
+          `).join('');
+          
+          return `
+            <div style="margin-bottom:8px; background:#fafafa; border:1px solid #eef2f6; border-radius:6px; overflow:hidden;">
+              <div style="background:#f1f5f9; padding:5px 10px; display:flex; justify-content:space-between; align-items:center; font-weight:600; font-size:0.88rem; color:#1e293b;">
+                <span>หมวด ${cat.id}: ${esc(cat.name)}</span>
+                <span style="color:#006D70; background:#fff; padding:1px 8px; border-radius:999px; border:1px solid #cbd5e1; font-size:0.82rem;">${catSums[cat.id]} / ${cat.maxScore}</span>
+              </div>
+              <div style="padding:4px 8px;">
+                ${subItemsHtml}
+              </div>
+            </div>
+          `;
         }).join('');
         
-        html += `<div style="margin-bottom:15px; border:1px solid #ddd; border-radius:6px; padding:10px;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-            <b>กรรมการท่านที่ ${i+1}</b>
-            <span class="badge" style="background:#e3f2fd; color:#0d47a1;">รวม ${Number(a.TotalScore)} คะแนน</span>
+        html += `<div style="margin-bottom:16px; border:1px solid #cbd5e1; border-radius:10px; padding:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+            <div>
+              <b style="font-size:0.95rem; color:#0f172a;">กรรมการท่านที่ ${i+1}</b>
+              <span style="margin-left:8px; font-size:0.8rem; color:#64748b;">(สถานะ: ${esc(a.Decision || 'ประเมินแล้ว')})</span>
+            </div>
+            <span style="background:#e0f2fe; color:#0369a1; padding:3px 12px; border-radius:999px; font-weight:700; font-size:0.95rem;">รวม ${Number(a.TotalScore)} / 100 คะแนน</span>
           </div>
-          ${scoreDetails}
-          ${a.RecommendationToAuthor ? `<div style="margin-top:10px; font-size:0.85rem;"><b>ข้อเสนอแนะ:</b><br>${esc(a.RecommendationToAuthor).replace(/\n/g, '<br>')}</div>` : ''}
+          ${catBlocksHtml}
+          ${a.RecommendationToAuthor ? `<div style="margin-top:10px; padding:8px 12px; background:#f0fdf4; border-radius:6px; border:1px solid #bbf7d0; font-size:0.85rem; color:#166534;"><b>ข้อเสนอแนะถึงผู้ส่งผลงาน:</b><br>${esc(a.RecommendationToAuthor).replace(/\n/g, '<br>')}</div>` : ''}
+          ${a.InternalComment ? `<div style="margin-top:6px; padding:8px 12px; background:#fffbeb; border-radius:6px; border:1px solid #fef3c7; font-size:0.85rem; color:#92400e;"><b>ความเห็นภายใน:</b><br>${esc(a.InternalComment).replace(/\n/g, '<br>')}</div>` : ''}
         </div>`;
       });
+      
       const avg = totalSum / completed.length;
-      html += `<div style="text-align:right; font-size:1.1rem; margin-top:15px;">
-        <b>คะแนนเฉลี่ย: <span style="color:#006D70;">${avg.toFixed(2)}</span></b>
-      </div>`;
+      html += `
+        <div style="background:linear-gradient(135deg, #073552 0%, #006D70 100%); color:#fff; border-radius:12px; padding:16px; margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px;">
+            <span style="font-size:1.05rem; font-weight:700;">📊 สรุปคะแนนเฉลี่ยรวม (${completed.length} ท่าน)</span>
+            <span style="font-size:1.4rem; font-weight:800; color:#ffd166;">${avg.toFixed(2)} <small style="font-size:0.9rem; font-weight:400; color:#fff;">/ 100 คะแนน</small></span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px; margin-top:12px;">
+            ${MAIN_CATS.map(cat => `
+              <div style="background:rgba(255,255,255,0.12); padding:8px; border-radius:8px; text-align:center;">
+                <div style="font-size:0.75rem; color:rgba(255,255,255,0.85);">${cat.id}. ${esc(cat.name)}</div>
+                <div style="font-size:1.1rem; font-weight:700; color:#fff; margin-top:2px;">${(catAvgSums[cat.id] / completed.length).toFixed(2)} <span style="font-size:0.75rem; opacity:0.8;">/${cat.maxScore}</span></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
     }
     
     html += `</div>`;
     
     Swal.fire({
-      title: 'สรุปคะแนนประเมินผลงาน',
+      title: 'สรุปคะแนนประเมินผลงาน (เกณฑ์ 5 หัวข้อ 100 คะแนน)',
       html: html,
-      width: 700,
+      width: 750,
       confirmButtonColor: '#006D70',
       confirmButtonText: 'ปิด'
     });

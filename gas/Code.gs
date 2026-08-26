@@ -335,6 +335,87 @@ function seedRegistrationTypes_(cid){
   });
 }
 
+function seedOrganizationUnits_(cid){
+  const groups=["ฝ่ายการพยาบาล", "ฝ่ายการแพทย์", "ฝ่ายทันตกรรม", "ฝ่ายบริหาร", "ฝ่ายบริหารแผนและการคลัง", "ฝ่ายบริหารโรงพยาบาล", "ฝ่ายสนับสนุนบริการ", "ศูนย์นวัตกรรมสุขภาพ ธรรมศาสตร์"];
+  const units=["งานการพยาบาลคัดกรองและรับผู้ป่วยใน", "งานการพยาบาลตรวจโรคกุมารเวชกรรม", "งานการพยาบาลตรวจโรคจักษุ", "งานการพยาบาลตรวจโรคหู คอ จมูก", "งานการพยาบาลผู้ป่วยจักษุ", "งานการพยาบาลผู้ป่วยผ่าตัด", "งานการพยาบาลผู้ป่วยพิเศษดุลโสภาคย์ 5", "งานการพยาบาลผู้ป่วยพิเศษยูงทอง 3", "งานการพยาบาลผู้ป่วยพิเศษยูงทอง 5", "งานการพยาบาลผู้ป่วยวิกฤตทารกแรกเกิด (NICU)", "งานการพยาบาลผู้ป่วยวิกฤตศัลยกรรมระบบประสาท", "งานการพยาบาลผู้ป่วยศัลยกรรม 1", "งานการพยาบาลผู้ป่วยโรคหัวใจและหลอดเลือด", "งานการพยาบาลผู้ป่วยโรคไตและไตเทียม", "งานการพยาบาลรังสีวิทยา", "งานการพยาบาลเวชศาสตร์การเจริญพันธ์ุ", "งานการเงิน", "งานควบคุมโรคติดเชื้อ", "งานนโยบายและแผน", "งานบริหารทรัพยากรมนุษย์", "งานบริหารทางทันตกรรม", "งานบัญชี", "งานสื่อสารองค์กรและลูกค้าสัมพันธ์", "งานอาชีวอนามัยและศูนย์บริการสุขภาพบุคลากร", "งานโภชนาการ", "ศูนย์ความเป็นเลิศทางการแพทย์", "ศูนย์วิศวกรรมและการจัดการสิ่งอำนวยความสะดวก", "สาขาการพยาบาลกุมารเวชกรรม", "สาขาการพยาบาลด่านหน้า", "สาขาการพยาบาลบริการพิเศษ", "สาขาการพยาบาลผู้ป่วยนอก 1", "สาขาการพยาบาลผู้ป่วยนอก 2", "สาขาการพยาบาลผู้ป่วยผ่าตัดและส่องกล้อง", "สาขาการพยาบาลศัลยกรรม", "สาขาการพยาบาลศัลยกรรมเฉพาะทางและควบคุมโรคติดเชื้อ", "สาขาการพยาบาลสูติ-นรีเวชกรรม", "สาขาการพยาบาลหอผู้ป่วยพิเศษ", "สาขาการพยาบาลหอผู้ป่วยวิกฤต", "สาขาการพยาบาลอายุรกรรม 1", "สาขาสูติ-นรีเวชกรรม", "สำนักงานฝ่ายบริหารแผนและการคลัง", "หน่วยการพยาบาลผู้ป่วยมะเร็งนรีเวช", "หน่วยรับบริจาค", "หน่วยวิจัยและนวัตกรรม"];
+  groups.forEach(function(n,i){if(!findOne_('OrganizationUnits',{ConferenceID:cid,UnitNameTH:n}))appendRecord_('OrganizationUnits',{UnitID:nextId_('UNIT'),ConferenceID:cid,ParticipantGroup:'INTERNAL',UnitLevel:'GROUP',UnitNameTH:n,Active:true,SortOrder:i+1});});
+  units.forEach(function(n,i){if(!findOne_('OrganizationUnits',{ConferenceID:cid,UnitNameTH:n}))appendRecord_('OrganizationUnits',{UnitID:nextId_('UNIT'),ConferenceID:cid,ParticipantGroup:'INTERNAL',UnitLevel:'UNIT',UnitNameTH:n,Active:true,SortOrder:i+1});});
+}
+
+function seedWorkCategories_(cid){
+  const rows=[
+    ['RESEARCH','ผลงานวิจัยด้านคุณภาพและความปลอดภัย','Quality and Safety Research'],
+    ['INNOVATION','ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย','Quality and Safety Innovation'],
+    ['SERVICE','Service Excellence','Service Excellence'],
+    ['CQI','CQI/ Best Practice','CQI/ Best Practice'],
+    ['PRIMARY','Primary Care & Community Network Development','Primary Care & Community Network Development']
+  ];
+  rows.forEach(function(r,i){ if(!findOne_('WorkCategories',{ConferenceID:cid,CategoryCode:r[0]})) appendRecord_('WorkCategories',{CategoryID:nextId_('CAT'),ConferenceID:cid,CategoryCode:r[0],CategoryNameTH:r[1],CategoryNameEN:r[2],Active:true,SortOrder:i+1}); });
+}
+
+function seedPresentationTypes_(cid){
+  const rows=[['ORAL','แบบบรรยาย','Oral Presentation',10,2,true,false],['EPOSTER','แบบโปสเตอร์ (e-poster)','e-Poster Presentation',4,1,false,true]];
+  rows.forEach(function(r,i){ if(!findOne_('PresentationTypes',{ConferenceID:cid,TypeCode:r[0]})) appendRecord_('PresentationTypes',{PresentationTypeID:nextId_('PT'),ConferenceID:cid,TypeCode:r[0],TypeNameTH:r[1],TypeNameEN:r[2],PresentationMinutes:r[3],QAMinutes:r[4],NeedsRoom:r[5],NeedsPoster:r[6],Active:true,SortOrder:i+1}); });
+}
+
+function seedReviewRounds_(cid){
+  if(!findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1})) appendRecord_('ReviewRounds',{ReviewRoundID:nextId_('RR'),ConferenceID:cid,RoundNo:1,RoundNameTH:'รอบประเมินผลงาน',RoundNameEN:'Main Review',MinReviewers:2,MaxReviewers:3,BlindReview:true,AllowEditAfterSubmit:false,AllowDecline:true,CalculationMethod:'AVERAGE',PassingScore:60,Status:'OPEN',SortOrder:1});
+}
+
+function seedScoringCriteria_(cid){
+  const round=findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1});
+  const roundId = round ? round.ReviewRoundID : '';
+  const rows=[
+    [1, 'กำหนดที่มาและความสำคัญของปัญหาชัดเจน', 'Clear background and problem significance', 'บทนำ/วัตถุประสงค์', 5, 100],
+    [2, 'ระบุวัตถุประสงค์อย่างชัดเจน', 'Clear statement of objectives', 'บทนำ/วัตถุประสงค์', 5, 100],
+    [3, 'ระบุขั้นตอนการดำเนินงานที่ชัดเจน', 'Clear operational procedures and workflow', 'วิธีดำเนินการ', 15, 100],
+    [4, 'รูปแบบการดำเนินงานสอดคล้องกับวัตถุประสงค์', 'Methodology aligned with objectives', 'วิธีดำเนินการ', 15, 100],
+    [5, 'การนำเสนอผลการศึกษาครบถ้วนชัดเจนและตรงตามวัตถุประสงค์', 'Comprehensive and clear study results aligned with objectives', 'ผลการศึกษา/ผลลัพธ์', 30, 100],
+    [6, 'การอภิปรายผล/บทเรียนที่ได้จากการวิเคราะห์ข้อมูลสมเหตุสมผลและน่าเชื่อถือ', 'Reasonable and credible discussion and lessons learned', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
+    [7, 'การสรุปผลสอดคล้องกับผลการศึกษา', 'Conclusions consistent with study findings', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
+    [8, 'การนำไปใช้แก้ปัญหา พัฒนาวิธีการ เทคนิค หรือเครื่องมือใหม่ ๆ ที่เป็นประโยชน์', 'Practical utilization for problem-solving or method development', 'การใช้ประโยชน์', 10, 100]
+  ];
+  rows.forEach(function(r){
+    const existing = findOne_('ScoringCriteria', { ConferenceID: cid, ItemNo: r[0] });
+    if (!existing) {
+      appendRecord_('ScoringCriteria', {
+        CriteriaID: nextId_('CRIT'),
+        ConferenceID: cid,
+        ReviewRoundID: roundId,
+        ItemNo: r[0],
+        CriteriaNameTH: r[1],
+        CriteriaNameEN: r[2],
+        DescriptionTH: r[3],
+        MaxScore: r[4],
+        WeightPercent: r[5],
+        RequiredComment: false,
+        Active: true,
+        SortOrder: r[0]
+      });
+    } else {
+      updateRecord_('ScoringCriteria', existing.__row, {
+        ReviewRoundID: roundId || existing.ReviewRoundID,
+        CriteriaNameTH: r[1],
+        CriteriaNameEN: r[2],
+        DescriptionTH: r[3],
+        MaxScore: r[4],
+        WeightPercent: r[5],
+        Active: true,
+        SortOrder: r[0]
+      });
+    }
+  });
+}
+
+function seedEmailTemplates_(cid){
+  const templates=[
+    ['REGISTRATION_CONFIRM','ยืนยันการลงทะเบียน','ยืนยันการลงทะเบียน {{REG_ID}}','Registration confirmation {{REG_ID}}'],
+    ['PAYMENT_APPROVED','ยืนยันการชำระเงิน','ยืนยันการชำระเงิน {{REG_ID}}','Payment approved {{REG_ID}}'],
+    ['REVIEW_ASSIGNMENT','แจ้งมอบหมายประเมินผลงาน','ได้รับมอบหมายประเมิน {{WORK_CODE}}','Review assignment {{WORK_CODE}}']
+  ];
+  templates.forEach(function(t){ if(!findOne_('EmailTemplates',{ConferenceID:cid,TemplateKey:t[0]})) appendRecord_('EmailTemplates',{EmailTemplateID:nextId_('ET'),ConferenceID:cid,TemplateKey:t[0],TemplateNameTH:t[1],SubjectTH:t[2],SubjectEN:t[3],HtmlBodyTH:'',HtmlBodyEN:'',Variables:'',Status:'ACTIVE',UpdatedAt:new Date(),UpdatedBy:'SYSTEM'}); });
+}
+
 function seedPaymentChannels_(cid){
   if(!findOne_('PaymentChannels',{ConferenceID:cid})){
     appendRecord_('PaymentChannels',{

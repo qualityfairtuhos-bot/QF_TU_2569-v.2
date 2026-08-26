@@ -274,15 +274,48 @@ function seedReviewRounds_(cid){
 }
 
 function seedScoringCriteria_(cid){
-  const round=findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1}); if(!round)return;
+  const round=findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1});
+  const roundId = round ? round.ReviewRoundID : '';
   const rows=[
-    ['ความสำคัญของปัญหาและวัตถุประสงค์','Problem significance and objectives',20],
-    ['วิธีดำเนินงานและความเหมาะสมของกระบวนการ','Methods and process',20],
-    ['ผลลัพธ์และหลักฐานเชิงประจักษ์','Results and evidence',25],
-    ['การนำไปใช้ประโยชน์และความยั่งยืน','Implementation and sustainability',20],
-    ['ความชัดเจนของการนำเสนอ','Clarity of presentation',15]
+    [1, 'กำหนดที่มาและความสำคัญของปัญหาชัดเจน', 'Clear background and problem significance', 'บทนำ/วัตถุประสงค์', 5, 100],
+    [2, 'ระบุวัตถุประสงค์อย่างชัดเจน', 'Clear statement of objectives', 'บทนำ/วัตถุประสงค์', 5, 100],
+    [3, 'ระบุขั้นตอนการดำเนินงานที่ชัดเจน', 'Clear operational procedures and workflow', 'วิธีดำเนินการ', 15, 100],
+    [4, 'รูปแบบการดำเนินงานสอดคล้องกับวัตถุประสงค์', 'Methodology aligned with objectives', 'วิธีดำเนินการ', 15, 100],
+    [5, 'การนำเสนอผลการศึกษาครบถ้วนชัดเจนและตรงตามวัตถุประสงค์', 'Comprehensive and clear study results aligned with objectives', 'ผลการศึกษา/ผลลัพธ์', 30, 100],
+    [6, 'การอภิปรายผล/บทเรียนที่ได้จากการวิเคราะห์ข้อมูลสมเหตุสมผลและน่าเชื่อถือ', 'Reasonable and credible discussion and lessons learned', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
+    [7, 'การสรุปผลสอดคล้องกับผลการศึกษา', 'Conclusions consistent with study findings', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
+    [8, 'การนำไปใช้แก้ปัญหา พัฒนาวิธีการ เทคนิค หรือเครื่องมือใหม่ ๆ ที่เป็นประโยชน์', 'Practical utilization for problem-solving or method development', 'การใช้ประโยชน์', 10, 100]
   ];
-  rows.forEach(function(r,i){if(!findOne_('ScoringCriteria',{ConferenceID:cid,ReviewRoundID:round.ReviewRoundID,ItemNo:i+1}))appendRecord_('ScoringCriteria',{CriteriaID:nextId_('CRIT'),ConferenceID:cid,ReviewRoundID:round.ReviewRoundID,ItemNo:i+1,CriteriaNameTH:r[0],CriteriaNameEN:r[1],MaxScore:r[2],WeightPercent:100,RequiredComment:false,Active:true,SortOrder:i+1});});
+  rows.forEach(function(r){
+    const existing = findOne_('ScoringCriteria', { ConferenceID: cid, ItemNo: r[0] });
+    if (!existing) {
+      appendRecord_('ScoringCriteria', {
+        CriteriaID: nextId_('CRIT'),
+        ConferenceID: cid,
+        ReviewRoundID: roundId,
+        ItemNo: r[0],
+        CriteriaNameTH: r[1],
+        CriteriaNameEN: r[2],
+        DescriptionTH: r[3],
+        MaxScore: r[4],
+        WeightPercent: r[5],
+        RequiredComment: false,
+        Active: true,
+        SortOrder: r[0]
+      });
+    } else {
+      updateRecord_('ScoringCriteria', existing.__row, {
+        ReviewRoundID: roundId || existing.ReviewRoundID,
+        CriteriaNameTH: r[1],
+        CriteriaNameEN: r[2],
+        DescriptionTH: r[3],
+        MaxScore: r[4],
+        WeightPercent: r[5],
+        Active: true,
+        SortOrder: r[0]
+      });
+    }
+  });
 }
 
 function seedEmailTemplates_(cid){
