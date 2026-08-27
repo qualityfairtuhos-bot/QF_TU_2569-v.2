@@ -1225,8 +1225,11 @@ function getDailyQuotaStatus_(cid) {
     typeMap[t.TypeCode] = bool_(t.IsInternal);
   });
 
-  const internalMax = num_(getSetting_(cid, 'INTERNAL_DAILY_QUOTA', '400'), 400);
-  const externalMax = num_(getSetting_(cid, 'EXTERNAL_DAILY_QUOTA', '200'), 200);
+  const internalQuotaSetting = getSetting_(cid, 'INTERNAL_DAILY_QUOTA', '') || getSetting_(cid, 'INTERNAL_QUOTA', '400');
+  const externalQuotaSetting = getSetting_(cid, 'EXTERNAL_DAILY_QUOTA', '') || getSetting_(cid, 'EXTERNAL_QUOTA', '200');
+
+  const internalMax = num_(internalQuotaSetting, 400);
+  const externalMax = num_(externalQuotaSetting, 200);
 
   const internal = { max: internalMax, day1: 0, day2: 0, day3: 0 };
   const external = { max: externalMax, day1: 0, day2: 0, day3: 0 };
@@ -2182,6 +2185,23 @@ function saveRegistrationEdit(conferenceId,regId,emailOrPhone,editCode,payload){
       UpdatedAt:new Date(),
       LastModifiedBy:'PARTICIPANT'
     };
+
+    const typeRow = findOne_('RegistrationTypes', {ConferenceID: cid, TypeCode: r.ParticipantType});
+    const isInternal = typeRow ? bool_(typeRow.IsInternal) : (r.ParticipantType === 'INTERNAL');
+    const dailyQuota = getDailyQuotaStatus_(cid);
+    const targetQuota = isInternal ? dailyQuota.internal : dailyQuota.external;
+    const typeLabel = isInternal ? 'บุคลากรภายใน' : 'บุคคลภายนอก';
+
+    if (patch.AttendanceDay1 && !bool_(r.AttendanceDay1) && targetQuota.day1 >= targetQuota.max) {
+      throw new Error('วันที่ 1 เต็มโควตาสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+    }
+    if (patch.AttendanceDay2 && !bool_(r.AttendanceDay2) && targetQuota.day2 >= targetQuota.max) {
+      throw new Error('วันที่ 2 เต็มโควตาสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+    }
+    if (patch.AttendanceDay3 && !bool_(r.AttendanceDay3) && targetQuota.day3 >= targetQuota.max) {
+      throw new Error('วันที่ 3 เต็มโควตาสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+    }
+
     updateRecord_('Registrations',r.__row,patch);invalidateCache_(cid);
     let mealPass={sent:false,reason:''};try{mealPass=maybeAutoIssueMealPass_(cid,r.RegID,'PARTICIPANT_EDIT');}catch(ignore){}
     return {RegID:r.RegID,warnings:duplicateWarnings_(patch,cid,r.RegID),mealPass:mealPass};
@@ -3559,10 +3579,38 @@ function exportWorksToExcel(token,conferenceId){
     return {url:ss.getUrl(), fileId:ss.getId(), fileName:ss.getName()};
   });
 }
-function exportRegistrationsToExcel(token,conferenceId){
+function exportRegistrationsToExcel(token,conferenceId,filters){
   return runSafely_('exportRegistrationsToExcel',function(){
     requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF'],conferenceId);
-    var rows=findMany_('Registrations',{ConferenceID:conferenceId});
+    filters = filters || {};
+    var rows = findMany_('Registrations',{ConferenceID:conferenceId});
+
+    if (filters.q) {
+      var q = clean_(filters.q).toLowerCase();
+      rows = rows.filter(function(r) {
+        return [r.RegID, r.FullName, r.Email, r.Phone, r.CID, r.Institution, r.OrganizationGroup, r.OrganizationUnit].join(' ').toLowerCase().indexOf(q) >= 0;
+      });
+    }
+    if (filters.status) {
+      rows = rows.filter(function(r) { return upper_(r.RegistrationStatus) === upper_(filters.status); });
+    }
+    if (filters.participantGroup) {
+      var pg = upper_(filters.participantGroup);
+      if (pg === 'INTERNAL') {
+        rows = rows.filter(function(r) { return upper_(r.ParticipantType) === 'INTERNAL'; });
+      } else if (pg === 'EXTERNAL') {
+        rows = rows.filter(function(r) { return upper_(r.ParticipantType) !== 'INTERNAL'; });
+      } else if (pg) {
+        rows = rows.filter(function(r) { return upper_(r.ParticipantType) === pg; });
+      }
+    }
+    if (filters.attendanceDay) {
+      var day = num_(filters.attendanceDay, 0);
+      if (day >= 1 && day <= 3) {
+        rows = rows.filter(function(r) { return bool_(r['AttendanceDay' + day]); });
+      }
+    }
+
     rows.sort(function(a,b){return String(a.RegID||'').localeCompare(String(b.RegID||''));});
     var headers=[
       'RegID','ParticipantType','Prefix','FirstName','LastName','FullName',
@@ -4072,7 +4120,9 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       participantTypes: participantTypes,
       chartRegByType: chartRegByType,
       chartWorksIntent: worksIntentByType,
-      chartWorksByStatus: chartWorksByStatus
+      chartWorksByStatus: chartWorksByStatus,
+      chartWorksByCategory: chartWorksByCategory,
+      dailyQuota: getDailyQuotaStatus_(cid)
     };
 
     try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), APP.CACHE_SECONDS); } catch (ignore) {}
@@ -4081,7 +4131,7 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
 }
 
 /**
- * adminListRegistrations â€” รายการผู้ลงทะเบียนทั้งหมดสำหรับ admin
+ * adminListRegistrations — รายการผู้ลงทะเบียนทั้งหมดสำหรับ admin
  */
 function adminListRegistrations(token, conferenceId, filters) {
   return runSafely_('adminListRegistrations', function() {
@@ -4092,11 +4142,27 @@ function adminListRegistrations(token, conferenceId, filters) {
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
       rows = rows.filter(function(r) {
-        return [r.RegID, r.FullName, r.Email, r.Phone, r.CID].join(' ').toLowerCase().indexOf(q) >= 0;
+        return [r.RegID, r.FullName, r.Email, r.Phone, r.CID, r.Institution, r.OrganizationGroup, r.OrganizationUnit].join(' ').toLowerCase().indexOf(q) >= 0;
       });
     }
     if (filters.status) {
       rows = rows.filter(function(r) { return upper_(r.RegistrationStatus) === upper_(filters.status); });
+    }
+    if (filters.participantGroup) {
+      var pg = upper_(filters.participantGroup);
+      if (pg === 'INTERNAL') {
+        rows = rows.filter(function(r) { return upper_(r.ParticipantType) === 'INTERNAL'; });
+      } else if (pg === 'EXTERNAL') {
+        rows = rows.filter(function(r) { return upper_(r.ParticipantType) !== 'INTERNAL'; });
+      } else if (pg) {
+        rows = rows.filter(function(r) { return upper_(r.ParticipantType) === pg; });
+      }
+    }
+    if (filters.attendanceDay) {
+      var day = num_(filters.attendanceDay, 0);
+      if (day >= 1 && day <= 3) {
+        rows = rows.filter(function(r) { return bool_(r['AttendanceDay' + day]); });
+      }
     }
 
     rows.sort(function(a, b) { return String(b.CreatedAt || '').localeCompare(String(a.CreatedAt || '')); });
