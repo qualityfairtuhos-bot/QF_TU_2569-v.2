@@ -105,7 +105,27 @@
       </div>
     </section>
 
-    <section class="page" id="page-import"><div class="card"><h3>นำเข้าข้อมูล Excel จาก Google Form<span class="en">Import Excel from Google Form</span></h3><p>รองรับไฟล์ .xlsx ระบบจะแสดง Preview ก่อนนำเข้าจริง</p><div class="field"><input type="file" id="importFile" accept=".xlsx,.xls"></div><button class="btn btn-primary" onclick="previewImport()">อัปโหลดและตรวจสอบ</button></div><div id="importResult"></div></section>
+    <section class="page" id="page-import">
+      <div class="card">
+        <h3><i class="fa-solid fa-file-excel"></i> นำเข้าข้อมูล Excel จาก Google Form<span class="en">Import Excel from Google Form</span></h3>
+        <div class="info-box">
+          <b><i class="fa-solid fa-circle-info"></i> คำแนะนำและนโยบายการนำเข้า:</b>
+          <ul style="margin: 6px 0 0 18px; padding: 0;">
+            <li>ตรวจจับและ<b>ตัดเว้นวรรคชื่อ-นามสกุลอัตโนมัติ</b>เพื่อป้องกันชื่อซ้ำ เช่น "นาย สมชาย ใจดี" กับ "สมชาย ใจดี" จะถือเป็นคนเดียวกัน</li>
+            <li>รายการที่มีชื่อ-นามสกุล หรือเลขบัตรประชาชนซ้ำกับระบบแล้ว จะถูก<b>ข้าม (Skip) ไม่นำเข้าซ้ำ</b></li>
+            <li>รองรับการระบุวันเข้าร่วมงาน เช่น "วันที่ 1", "วันที่ 2", "วันที่ 3", "ทั้ง 3 วัน" หรือ "ทุกวัน"</li>
+            <li>เมื่อนำเข้าจริงสำเร็จ <b>ระบบจะไม่ส่ง Email อัตโนมัติทันที</b> เพื่อให้เจ้าหน้าที่สามารถตรวจทานรายชื่อก่อน แล้วจึงกดปุ่มส่ง Email แจ้งผู้ลงทะเบียนเป็นชุดได้ในภายหลัง</li>
+          </ul>
+        </div>
+        <div class="field"><input type="file" id="importFile" accept=".xlsx,.xls"></div>
+        <button class="btn btn-primary" onclick="previewImport()"><i class="fa-solid fa-magnifying-glass"></i> อัปโหลดและตรวจสอบ</button>
+      </div>
+      <div id="importResult"></div>
+      <div class="card" style="margin-top:16px;">
+        <h3><i class="fa-solid fa-clock-rotate-left"></i> ประวัติการนำเข้าไฟล์ Excel (Import Batches)</h3>
+        <div id="importHistory"><p class="muted">กำลังโหลดประวัติการนำเข้า...</p></div>
+      </div>
+    </section>
 
     <section class="page" id="page-registrations"><div class="card"><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="regSearch" placeholder="RegID ชื่อ Email โทรศัพท์ CID" onkeydown="if(event.key==='Enter')loadRegistrations()"></div><div><label class="muted">สถานะ</label><select id="regStatus" onchange="loadRegistrations()"><option value="">ทั้งหมด</option><option>IMPORTED_INCOMPLETE</option><option>WAIT_REGISTRATION_CHECK</option><option>REGISTRATION_RETURNED</option><option>REGISTRATION_VERIFIED</option><option>COMPLETED</option></select></div><div><label class="muted">ประเภทบุคคล</label><select id="regParticipantType" onchange="loadRegistrations()"><option value="">ทุกประเภท</option><option value="INTERNAL">บุคลากรภายใน</option><option value="EXTERNAL">บุคคลภายนอก</option></select></div><div><label class="muted">วันเข้าร่วม</label><select id="regAttendanceDay" onchange="loadRegistrations()"><option value="">ทุกวัน</option><option value="1">วันที่ 1</option><option value="2">วันที่ 2</option><option value="3">วันที่ 3</option></select></div><div><button class="btn btn-primary" onclick="loadRegistrations()">ค้นหา</button><div id="regCountBadge" style="margin-top:4px; text-align:center;"></div></div><div><button class="btn btn-gold" onclick="openRegistrationSignSheet()">พิมพ์ใบเซ็นชื่อ</button></div><div><button class="btn btn-gold" onclick="exportRegistrations()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="print-note">พิมพ์แบบ A4 แนวนอน แยกตามฝ่าย/หน่วยงาน พร้อมช่องลายมือชื่อรายวัน</div><div class="top-scrollbar-wrap" id="regTopScrollbar" style="overflow-x:auto; overflow-y:hidden; height:14px; margin-bottom:4px; display:none;"><div id="regTopScrollbarInner" style="height:1px;"></div></div><div class="table-wrap" id="regTableWrap"><table class="table" id="regTable"><thead><tr><th>RegID</th><th>ชื่อ</th><th>ประเภท</th><th>CID</th><th>Email / Phone</th><th>ข้อมูล</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="regRows"></tbody></table></div></div></section>
 
@@ -319,7 +339,7 @@ async function boot(){
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
 }
-async function nav(p){const page=$('#page-'+p);if(!page)return;CURRENT=p;$$('.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');$$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));const b=$(`.menu button[data-page="${p}"]`);$('#topTitle').textContent=b?b.childNodes[0].textContent:p;const sidebar=$('#sidebar');if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();try{if(p==='dashboard')await loadDashboard();if(p==='settings')await loadSettings();if(p==='registrations')await loadRegistrations();if(p==='payments')await loadPayments();if(p==='works')await loadWorks();if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}if(p==='food')await loadFood();if(p==='users')await loadUsers()}catch(e){err(e)}}
+async function nav(p){const page=$('#page-'+p);if(!page)return;CURRENT=p;$$('.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');$$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));const b=$(`.menu button[data-page="${p}"]`);$('#topTitle').textContent=b?b.childNodes[0].textContent:p;const sidebar=$('#sidebar');if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();try{if(p==='dashboard')await loadDashboard();if(p==='settings')await loadSettings();if(p==='import')await loadImportBatches();if(p==='registrations')await loadRegistrations();if(p==='payments')await loadPayments();if(p==='works')await loadWorks();if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}if(p==='food')await loadFood();if(p==='users')await loadUsers()}catch(e){err(e)}}
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
 async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
@@ -515,8 +535,251 @@ async function loadDashboard(){
 async function loadSettings(){show('กำลังโหลดการตั้งค่า');try{const d=await rpc('getAdminSettings',TOKEN,CID),f=$('#settingsForm');['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>f.elements[k].value=d.conference[k]||'');DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));const sm={};d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>f.elements[k].value=sm[k]||'');f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);const o=d.optionConfig||{};f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');f.elements.POSITION_OPTIONS_JSON.value=(o.positions||[]).join('\n');f.elements.PROFESSION_OPTIONS_JSON.value=(o.professions||[]).join('\n');f.elements.ORGANIZATION_GROUP_OPTIONS_JSON.value=(o.organizationGroups||[]).join('\n');f.elements.ORGANIZATION_OPTIONS_JSON.value=(o.organizations||[]).join('\n');f.elements.FOOD_TYPE_OPTIONS_JSON.value=(o.foodTypes||[]).join('\n');$$('.date-input').forEach(el=>el.onblur=()=>warnGregorianInput(el))}finally{hide()}}
 $('#settingsForm').onsubmit=async e=>{e.preventDefault();try{const o=formObj(e.target),conf={};['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));const settings={};['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));show('กำลังบันทึกการตั้งค่า');await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});hide();await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',text:'ตัวเลือกใหม่จะแสดงในหน้าลงทะเบียนเมื่อรีเฟรชหน้าเว็บ',confirmButtonColor:'#006D70'});await loadSettings()}catch(x){err(x)}};
 
-async function previewImport(){show('กำลังอ่านไฟล์ Excel');try{const f=await fileObj($('#importFile'));if(!f)throw new Error('กรุณาเลือกไฟล์');const r=await rpc('uploadExcelForImport',TOKEN,CID,f);hide();$('#importResult').innerHTML=`<div class="card"><h3>ผลตรวจสอบไฟล์</h3><p>ทั้งหมด ${r.stats.totalRows} | พร้อม ${r.stats.readyRows} | ข้อมูลไม่ครบ ${r.stats.incompleteRows} | คำเตือน ${r.stats.warningRows}</p><button class="btn btn-primary" onclick="commitImport('${esc(r.batchId)}')">นำเข้าข้อมูลจริง</button></div>`}catch(e){err(e)}}
-async function commitImport(id){if(!(await Swal.fire({icon:'question',title:'ยืนยันนำเข้าข้อมูล?',showCancelButton:true,confirmButtonText:'นำเข้า'})).isConfirmed)return;show('กำลังนำเข้าข้อมูล');try{const r=await rpc('commitImportBatch',TOKEN,CID,id);hide();Swal.fire({icon:'success',title:'นำเข้าเรียบร้อย',html:`นำเข้า ${r.imported} ราย<br>ข้อมูลไม่ครบ ${r.importedIncomplete||0} ราย<br>ข้าม ${r.skipped} ราย`,confirmButtonColor:'#006D70'})}catch(e){err(e)}}
+async function previewImport(){
+  show('กำลังอ่านและวิเคราะห์ไฟล์ Excel...');
+  try {
+    const f = await fileObj($('#importFile'));
+    if(!f) throw new Error('กรุณาเลือกไฟล์ Excel');
+    const r = await rpc('uploadExcelForImport', TOKEN, CID, f);
+    hide();
+    const st = r.stats || {};
+    $('#importResult').innerHTML = `
+      <div class="card" style="border-left:5px solid #006D70; background:#f8fafc;">
+        <h3 style="margin:0 0 10px; color:#006D70;"><i class="fa-solid fa-list-check"></i> ผลการตรวจสอบไฟล์ Excel Pre-import</h3>
+        <div class="kpis" style="margin-bottom:15px; grid-template-columns:repeat(5,1fr);">
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span>ทั้งหมดในไฟล์</span><b>${st.totalRows||0}</b></div></div>
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span style="color:#2b6cb0;">พร้อมนำเข้า</span><b style="color:#2b6cb0;">${st.readyRows||0}</b></div></div>
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span style="color:#d69e2e;">ข้อมูลไม่ครบ</span><b style="color:#d69e2e;">${st.incompleteRows||0}</b></div></div>
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span style="color:#dd6b20;">มีคำเตือน</span><b style="color:#dd6b20;">${st.warningRows||0}</b></div></div>
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span style="color:#e53e3e;">ซ้ำ (จะถูกข้าม)</span><b style="color:#e53e3e;">${st.duplicateRows||0}</b></div></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <span class="muted" style="font-size:0.85rem;"><i class="fa-solid fa-shield-halved"></i> เมื่อกดนำเข้าจริง ข้อมูลทั้งหมดจะถูกสร้างขึ้นในระบบ<b>โดยยังไม่ส่ง Email ทันที</b></span>
+          <button class="btn btn-primary" onclick="commitImport('${esc(r.batchId)}')">
+            <i class="fa-solid fa-file-export"></i> ยืนยันนำเข้าข้อมูลจริงเข้าสู่ระบบ
+          </button>
+        </div>
+      </div>
+    `;
+    loadImportBatches();
+  } catch(e) { err(e); }
+}
+
+async function commitImport(id){
+  const confirm = await Swal.fire({
+    icon: 'question',
+    title: 'ยืนยันนำเข้าข้อมูลลงระบบ?',
+    text: 'ข้อมูลทั้งหมดจะถูกบันทึกเข้าฐานข้อมูลหลัก โดยไม่มีการส่ง Email อัตโนมัติทันที',
+    showCancelButton: true,
+    confirmButtonText: 'ยืนยันนำเข้า',
+    confirmButtonColor: '#006D70'
+  });
+  if(!confirm.isConfirmed) return;
+
+  show('กำลังนำเข้าข้อมูล...');
+  try {
+    const r = await rpc('commitImportBatch', TOKEN, CID, id);
+    hide();
+    await Swal.fire({
+      icon: 'success',
+      title: 'นำเข้าข้อมูลเรียบร้อยแล้ว',
+      html: `
+        <div style="text-align:left; font-size:0.9rem;">
+          <p><b>ผลการนำเข้า:</b></p>
+          <ul>
+            <li>นำเข้าสำเร็จ: <b style="color:#38a169">${r.imported}</b> ราย</li>
+            <li>ข้อมูลไม่ครบ (ต้องเติมภายหลัง): <b style="color:#d69e2e">${r.importedIncomplete||0}</b> ราย</li>
+            <li>ข้าม (ชื่อ/เลขบัตรซ้ำ หรือเคยนำเข้าแล้ว): <b style="color:#e53e3e">${r.skipped}</b> ราย</li>
+          </ul>
+          <p class="muted" style="font-size:0.8rem; margin-top:10px;">* ท่านสามารถเลือกส่ง Email ให้ผู้สมัครได้ในตารางประวัติการนำเข้าด้านล่าง</p>
+        </div>
+      `,
+      confirmButtonColor: '#006D70'
+    });
+    $('#importResult').innerHTML = '';
+    loadImportBatches();
+  } catch(e) { err(e); }
+}
+
+async function loadImportBatches(){
+  try {
+    const batches = await rpc('listImportBatches', TOKEN, CID);
+    const container = $('#importHistory');
+    if (!container) return;
+    if (!batches || !batches.length) {
+      container.innerHTML = '<p class="muted">ยังไม่มีประวัติการนำเข้า</p>';
+      return;
+    }
+    container.innerHTML = `<div class="table-wrap"><table class="table" style="font-size:0.85rem;">
+      <thead>
+        <tr>
+          <th>Batch ID</th>
+          <th>วันที่นำเข้า</th>
+          <th>ไฟล์ต้นทาง</th>
+          <th>ผู้ดำเนินการ</th>
+          <th>จำนวนทั้งหมด</th>
+          <th>นำเข้าสำเร็จ</th>
+          <th>สถานะ</th>
+          <th>จัดการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${batches.map(b => `<tr>
+          <td><b>${esc(b.ImportBatchID)}</b></td>
+          <td>${esc(formatBeDateTime(b.UploadedAt))}</td>
+          <td>${esc(b.SourceFileName)}</td>
+          <td>${esc(b.UploadedBy)}</td>
+          <td>${b.TotalRows}</td>
+          <td><b style="color:#006D70">${b.ImportedRows||0}</b></td>
+          <td>${statusBadge(b.Status)}</td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="viewImportBatchDetail('${esc(b.ImportBatchID)}')">
+              <i class="fa-solid fa-list-check"></i> ตรวจทาน & ส่ง Email
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  } catch(e) { console.error('loadImportBatches error:', e); }
+}
+
+async function viewImportBatchDetail(batchId){
+  show('กำลังโหลดรายละเอียด Batch...');
+  try {
+    const d = await rpc('adminGetImportBatchDetail', TOKEN, CID, batchId);
+    hide();
+    const batch = d.batch || {};
+    const importedRows = d.importedRows || [];
+    const failedRows = d.failedRows || [];
+    const emailLogs = d.emailLogs || [];
+
+    const html = `
+      <div style="text-align:left; font-size:0.9rem; max-height:75vh; overflow-y:auto; padding-right:6px;">
+        <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:14px;">
+          <h4 style="margin:0 0 6px; color:#006D70;"><i class="fa-solid fa-file-import"></i> รายละเอียดการนำเข้า Batch: ${esc(batch.ImportBatchID)}</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.85rem;">
+            <div><b>ชื่อไฟล์:</b> ${esc(batch.SourceFileName)}</div>
+            <div><b>วันที่นำเข้า:</b> ${esc(formatBeDateTime(batch.UploadedAt))}</div>
+            <div><b>ผู้นำเข้า:</b> ${esc(batch.UploadedBy)}</div>
+            <div><b>สถานะ:</b> ${statusBadge(batch.Status)}</div>
+            <div><b>นำเข้าสำเร็จ:</b> <span style="color:#38a169; font-weight:bold;">${importedRows.length}</span> ราย</div>
+            <div><b>ข้าม / นำเข้าไม่ได้:</b> <span style="color:#e53e3e; font-weight:bold;">${failedRows.length}</span> ราย</div>
+          </div>
+        </div>
+
+        <div style="background:#edf2f7; padding:12px; border-radius:8px; margin-bottom:14px;">
+          <h5 style="margin:0 0 8px; color:#2d3748;"><i class="fa-solid fa-paper-plane"></i> ควบคุมการส่ง Email แจ้งผู้ลงทะเบียนใน Batch นี้</h5>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="sendBatchEmails('${esc(batchId)}', 'IMPORTED')">
+              <i class="fa-solid fa-envelope-circle-check"></i> 1. ส่ง Email แจ้งผู้ที่นำเข้าสำเร็จ (${importedRows.length} ราย)
+            </button>
+            <button class="btn btn-gold btn-sm" onclick="sendBatchEmails('${esc(batchId)}', 'FAILED')">
+              <i class="fa-solid fa-envelope-open-text"></i> 2. ส่ง Email แจ้งผู้ที่ไม่สำเร็จให้ลงทะเบียนใหม่ (${failedRows.length} ราย)
+            </button>
+          </div>
+          ${emailLogs.length ? `<div style="margin-top:8px; font-size:0.8rem; color:#4a5568;"><i class="fa-solid fa-circle-check" style="color:#38a169"></i> เคยส่ง Email ให้ผู้สมัครใน Batch นี้แล้ว ${emailLogs.length} ฉบับ</div>` : ''}
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; border-bottom:2px solid #cbd5e1; gap:12px; font-weight:600;">
+            <button class="btn btn-soft" style="border-radius:6px 6px 0 0;" onclick="document.getElementById('detailImportedTab').style.display='block';document.getElementById('detailFailedTab').style.display='none';">
+              รายการที่นำเข้าสำเร็จ (${importedRows.length})
+            </button>
+            <button class="btn btn-soft" style="border-radius:6px 6px 0 0;" onclick="document.getElementById('detailImportedTab').style.display='none';document.getElementById('detailFailedTab').style.display='block';">
+              รายการที่ไม่สำเร็จ / ข้าม (${failedRows.length})
+            </button>
+          </div>
+        </div>
+
+        <div id="detailImportedTab">
+          <div class="table-wrap" style="max-height:250px;">
+            <table class="table" style="font-size:0.8rem;">
+              <thead>
+                <tr>
+                  <th>แถว</th>
+                  <th>RegID</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>ประเภท</th>
+                  <th>Email / เบอร์</th>
+                  <th>สถานะข้อมูล</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${importedRows.length ? importedRows.map(r => `<tr>
+                  <td>${r.sourceRowNo}</td>
+                  <td><b>${esc(r.regId)}</b></td>
+                  <td>${esc(r.fullName)}</td>
+                  <td>${esc(r.participantType)}</td>
+                  <td>${esc(r.email)}<br>${esc(r.phone)}</td>
+                  <td>${statusBadge(r.completeness)}</td>
+                </tr>`).join('') : '<tr><td colspan="6" class="muted">ไม่มีข้อมูลที่นำเข้าสำเร็จ</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="detailFailedTab" style="display:none;">
+          <div class="table-wrap" style="max-height:250px;">
+            <table class="table" style="font-size:0.8rem;">
+              <thead>
+                <tr>
+                  <th>แถว</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>Email ผู้ตอบแบบฟอร์ม</th>
+                  <th>สถานะ</th>
+                  <th>สาเหตุ / ข้อผิดพลาด</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${failedRows.length ? failedRows.map(r => `<tr>
+                  <td>${r.sourceRowNo}</td>
+                  <td><b>${esc(r.fullName)}</b></td>
+                  <td>${esc(r.respondentEmail)}</td>
+                  <td>${statusBadge(r.importStatus)}</td>
+                  <td style="color:#c53030;">${esc(r.reason)}</td>
+                </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่มีรายการข้ามหรือล้มเหลว</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    Swal.fire({
+      title: 'รายละเอียดการนำเข้า Batch',
+      html: html,
+      width: 900,
+      showConfirmButton: false,
+      showCloseButton: true
+    });
+  } catch(e) { err(e); }
+}
+
+async function sendBatchEmails(batchId, emailTarget){
+  const label = emailTarget === 'IMPORTED' ? 'ส่ง Email แจ้งรหัส RegID แก่ผู้ที่นำเข้าสำเร็จ' : 'ส่ง Email แจ้งผลที่ไม่ผ่านแก่ผู้สมัคร (แนะนำให้ลงทะเบียนใหม่)';
+  const confirm = await Swal.fire({
+    icon: 'question',
+    title: 'ยืนยันการส่ง Email?',
+    html: `คุณกำลังจะ<b>${label}</b><br><span style="color:#718096; font-size:0.85rem;">ระบบจะทยอยส่ง Email ไปยังผู้รับใน Batch นี้</span>`,
+    showCancelButton: true,
+    confirmButtonText: 'ยืนยันส่ง Email',
+    confirmButtonColor: '#006D70'
+  });
+  if (!confirm.isConfirmed) return;
+
+  show('กำลังส่ง Email...');
+  try {
+    const res = await rpc('adminSendBatchImportEmails', TOKEN, CID, batchId, emailTarget);
+    hide();
+    await Swal.fire({
+      icon: 'success',
+      title: 'ส่ง Email เรียบร้อยแล้ว',
+      html: `ส่งสำเร็จ: <b style="color:#38a169">${res.sentCount}</b> ฉบับ<br>ไม่สำเร็จ/ไม่มีอีเมล: <b style="color:#e53e3e">${res.failedCount}</b> ฉบับ`,
+      confirmButtonColor: '#006D70'
+    });
+    viewImportBatchDetail(batchId);
+  } catch(e) { err(e); }
+}
 async function loadRegistrations(){
   show('กำลังโหลดผู้ลงทะเบียน');
   try{

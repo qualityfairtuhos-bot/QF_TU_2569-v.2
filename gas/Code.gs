@@ -1350,6 +1350,41 @@ function normalizeImportedName_(fullName, prefix) {
   return full;
 }
 
+function normalizeNameKey_(fullName) {
+  if (!fullName) return '';
+  let name = String(fullName)
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, '')
+    .trim()
+    .toLowerCase();
+
+  const commonPrefixes = [
+    'นาย', 'นางสาว', 'น.ส.', 'น.ส', 'นาง', 'ดร.', 'ดร', 'ผศ.ดร.', 'ผศ.ดร', 'รศ.ดร.', 'รศ.ดร', 'ศาสตราจารย์', 
+    'ศ.ดร.', 'ศ.ดร', 'ศ.', 'ผศ.', 'ผศ', 'รศ.', 'รศ', 'นพ.', 'นพ', 'พญ.', 'พญ', 'สพ.ญ.', 'สพ.ญ', 'สัตวแพทย์',
+    'ว่าที่ร้อยตรี', 'ว่าที่ ร.ต.', 'ร.ต.', 'อาจารย์', 'อ.', 'คุณ'
+  ];
+
+  for (let i = 0; i < commonPrefixes.length; i++) {
+    const p = commonPrefixes[i].replace(/\s+/g, '').toLowerCase();
+    if (name.indexOf(p) === 0) {
+      name = name.substring(p.length);
+      break;
+    }
+  }
+  return name.trim();
+}
+
+function parseAttendanceDays_(text) {
+  const t = clean_(text);
+  const isAll = t.indexOf('ทั้ง 3') >= 0 || t.indexOf('ทั้ง3') >= 0 || t.indexOf('ทุกวัน') >= 0 || t.indexOf('ทุก วัน') >= 0;
+
+  const day1 = isAll || t.indexOf('วันที่ 1') >= 0 || t.indexOf('วันที่1') >= 0 || t.indexOf('Day 1') >= 0 || t.indexOf('day 1') >= 0;
+  const day2 = isAll || t.indexOf('วันที่ 2') >= 0 || t.indexOf('วันที่2') >= 0 || t.indexOf('Day 2') >= 0 || t.indexOf('day 2') >= 0;
+  const day3 = isAll || t.indexOf('วันที่ 3') >= 0 || t.indexOf('วันที่3') >= 0 || t.indexOf('Day 3') >= 0 || t.indexOf('day 3') >= 0;
+
+  return { day1: day1, day2: day2, day3: day3 };
+}
+
 function uploadExcelForImport(token, conferenceId, file) {
   return runSafely_('uploadExcelForImport', function() {
     const ctx = requireSession_(
@@ -1431,6 +1466,7 @@ function uploadExcelForImport(token, conferenceId, file) {
     });
 
     const seenCidInFile = {};
+    const seenNameInFile = {};
 
     sourceRows.forEach(function(item) {
       const raw = buildImportRawRow_(headers, item.values);
@@ -1440,6 +1476,8 @@ function uploadExcelForImport(token, conferenceId, file) {
       mapped.SourceRowNo = item.sourceRowNo;
 
       const issues = validateImportedRegistration_(mapped, cid);
+
+      const nameKey = normalizeNameKey_(mapped.FullName);
 
       if (mapped.CID) {
         if (seenCidInFile[mapped.CID]) {
@@ -1453,6 +1491,21 @@ function uploadExcelForImport(token, conferenceId, file) {
           });
         } else {
           seenCidInFile[mapped.CID] = item.sourceRowNo;
+        }
+      }
+
+      if (nameKey) {
+        if (seenNameInFile[nameKey]) {
+          issues.push({
+            type: 'DUPLICATE',
+            field: 'FullName',
+            th: 'ชื่อ-นามสกุล ("' + mapped.FullName + '") ซ้ำกันภายในไฟล์ Excel แถว ' +
+              seenNameInFile[nameKey] + ' และแถว ' + item.sourceRowNo,
+            en: 'Duplicate FullName inside the uploaded Excel file',
+            severity: 'ERROR'
+          });
+        } else {
+          seenNameInFile[nameKey] = item.sourceRowNo;
         }
       }
 
@@ -1604,7 +1657,7 @@ function mapTuhGoogleFormRow_(row, conferenceId) {
   const externalWork = importValue_(row, ['ส่งผลงานเข้าประกวด 2']);
   const wantsText = clean_(external ? (externalWork || internalWork) : (internalWork || externalWork));
 
-  const attendance = clean_(importValue_(row, ['วันเข้าร่วมงาน']));
+  const attendanceObj = parseAttendanceDays_(importValue_(row, ['วันเข้าร่วมงาน']));
 
   return {
     ConferenceID: conferenceId,
@@ -1637,9 +1690,9 @@ function mapTuhGoogleFormRow_(row, conferenceId) {
     Email: email,
     FoodType: clean_(external ? (externalFood || internalFood) : (internalFood || externalFood)),
     FoodAllergyDetail: '',
-    AttendanceDay1: attendance.indexOf('วันที่ 1') >= 0 || attendance.indexOf('ทั้ง 3') >= 0,
-    AttendanceDay2: attendance.indexOf('วันที่ 2') >= 0 || attendance.indexOf('ทั้ง 3') >= 0,
-    AttendanceDay3: attendance.indexOf('วันที่ 3') >= 0 || attendance.indexOf('ทั้ง 3') >= 0,
+    AttendanceDay1: attendanceObj.day1,
+    AttendanceDay2: attendanceObj.day2,
+    AttendanceDay3: attendanceObj.day3,
     WantsSubmitWork: !!wantsText && wantsText.indexOf('ไม่ส่ง') < 0,
     Note: 'Imported from Google Form response'
   };
@@ -1702,6 +1755,25 @@ function validateImportedRegistration_(mapped, conferenceId) {
       'Phone missing; imported as incomplete',
       'ERROR'
     );
+  }
+
+  const nameKey = normalizeNameKey_(mapped.FullName);
+  if (nameKey) {
+    const existingRegistrations = findMany_('Registrations', { ConferenceID: conferenceId });
+    const isNameDuplicate = existingRegistrations.some(function(record) {
+      if (upper_(record.RegistrationStatus) === 'CANCELLED') return false;
+      return normalizeNameKey_(record.FullName) === nameKey;
+    });
+
+    if (isNameDuplicate) {
+      add(
+        'DUPLICATE',
+        'FullName',
+        'ชื่อ-นามสกุล ("' + mapped.FullName + '") มีอยู่ในระบบแล้ว จึงจะข้าม (Skip) ไม่นำเข้าซ้ำ',
+        'Full name already exists in database and will be skipped during commit',
+        'ERROR'
+      );
+    }
   }
 
   if (
@@ -1787,13 +1859,17 @@ function commitImportBatch(token, conferenceId, batchId) {
           mapped.SourceBatchID = batchId;
           mapped.SourceRowNo = row.SourceRowNo;
 
-          if (
-            mapped.CID &&
-            findMany_('Registrations', { ConferenceID: conferenceId, CID: mapped.CID })
-              .some(function(record) {
-                return upper_(record.RegistrationStatus) !== 'CANCELLED';
-              })
-          ) {
+          const nameKey = normalizeNameKey_(mapped.FullName);
+          const isCidDuplicate = mapped.CID && findMany_('Registrations', { ConferenceID: conferenceId, CID: mapped.CID })
+            .some(function(record) { return upper_(record.RegistrationStatus) !== 'CANCELLED'; });
+
+          const isNameDuplicate = nameKey && findMany_('Registrations', { ConferenceID: conferenceId })
+            .some(function(record) {
+              if (upper_(record.RegistrationStatus) === 'CANCELLED') return false;
+              return normalizeNameKey_(record.FullName) === nameKey;
+            });
+
+          if (isCidDuplicate || isNameDuplicate) {
             updateRecord_('ImportRows', row.__row, {
               ImportStatus: 'SKIPPED_DUPLICATE'
             });
@@ -1811,7 +1887,7 @@ function commitImportBatch(token, conferenceId, batchId) {
             row.ValidationStatus
           );
 
-          if (mapped.Email) sendRegistrationEmail_(registration);
+          // ถอดการส่ง Email อัตโนมัติออก ให้แอดมินส่งแบบ Manual Trigger ภายหลังตรวจทาน
           try{ maybeAutoIssueMealPass_(conferenceId,registration.RegID,'IMPORT_COMPLETE'); }catch(mealError){ errors.push({sourceRowNo:row.SourceRowNo,message:'Meal pass: '+(mealError.message||String(mealError))}); }
 
           updateRecord_('ImportRows', row.__row, {
@@ -1885,6 +1961,178 @@ function listImportBatches(token, conferenceId) {
     return serialize_(
       findMany_('ImportBatches', { ConferenceID: conferenceId }).reverse()
     );
+  });
+}
+
+function adminGetImportBatchDetail(token, conferenceId, batchId) {
+  return runSafely_('adminGetImportBatchDetail', function() {
+    requireSession_(
+      token,
+      ['SUPERADMIN', 'CONFERENCE_ADMIN', 'REGISTRATION_STAFF'],
+      conferenceId
+    );
+
+    const batch = findOne_('ImportBatches', {
+      ImportBatchID: batchId,
+      ConferenceID: conferenceId
+    });
+    if (!batch) throw new Error('ไม่พบ Import Batch');
+
+    const rows = findMany_('ImportRows', { ImportBatchID: batchId, ConferenceID: conferenceId })
+      .sort(function(a, b) { return num_(a.SourceRowNo) - num_(b.SourceRowNo); });
+
+    const issues = findMany_('ImportIssues', { ImportBatchID: batchId, ConferenceID: conferenceId });
+    const emailLogs = findMany_('EmailLogs', { ConferenceID: conferenceId, RelatedType: 'ImportBatch', RelatedID: batchId });
+
+    const importedRows = [];
+    const failedRows = [];
+
+    rows.forEach(function(r) {
+      const mapped = jsonParse_(r.MappedDataJson, {});
+      const rowIssues = issues.filter(function(i) { return i.ImportRowID === r.ImportRowID; });
+
+      if (r.ImportStatus === 'IMPORTED') {
+        const reg = r.ImportedRegID ? findOne_('Registrations', { RegID: r.ImportedRegID, ConferenceID: conferenceId }) : null;
+        importedRows.push({
+          importRowId: r.ImportRowID,
+          sourceRowNo: r.SourceRowNo,
+          regId: r.ImportedRegID || '',
+          fullName: mapped.FullName || (reg ? reg.FullName : ''),
+          email: mapped.Email || (reg ? reg.Email : ''),
+          phone: mapped.Phone || (reg ? reg.Phone : ''),
+          participantType: mapped.ParticipantType || (reg ? reg.ParticipantType : ''),
+          completeness: reg ? reg.DataCompletenessStatus : r.ValidationStatus,
+          issuesCount: rowIssues.length
+        });
+      } else {
+        const issueMsgs = rowIssues.map(function(i) { return i.MessageTH; }).join('; ');
+        failedRows.push({
+          importRowId: r.ImportRowID,
+          sourceRowNo: r.SourceRowNo,
+          fullName: mapped.FullName || 'ไม่ระบุ',
+          respondentEmail: mapped.SourceRespondentEmail || mapped.Email || '',
+          importStatus: r.ImportStatus,
+          validationStatus: r.ValidationStatus,
+          reason: issueMsgs || (r.ImportStatus === 'SKIPPED_DUPLICATE' ? 'ชื่อหรือเลขบัตรประชาชนซ้ำในระบบ' : 'นำเข้าไม่สำเร็จ')
+        });
+      }
+    });
+
+    return {
+      batch: serialize_(batch),
+      importedRows: importedRows,
+      failedRows: failedRows,
+      emailLogs: serialize_(emailLogs)
+    };
+  });
+}
+
+function adminSendBatchImportEmails(token, conferenceId, batchId, emailTarget) {
+  return runSafely_('adminSendBatchImportEmails', function() {
+    const ctx = requireSession_(
+      token,
+      ['SUPERADMIN', 'CONFERENCE_ADMIN', 'REGISTRATION_STAFF'],
+      conferenceId
+    );
+
+    const batch = findOne_('ImportBatches', {
+      ImportBatchID: batchId,
+      ConferenceID: conferenceId
+    });
+    if (!batch) throw new Error('ไม่พบ Import Batch');
+
+    const conf = findOne_('Conferences', { ConferenceID: conferenceId });
+    const confName = conf ? conf.ConferenceNameTH : 'TUH Quality Fair 2569';
+
+    const rows = findMany_('ImportRows', { ImportBatchID: batchId, ConferenceID: conferenceId });
+    const issues = findMany_('ImportIssues', { ImportBatchID: batchId, ConferenceID: conferenceId });
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    if (emailTarget === 'IMPORTED') {
+      rows.forEach(function(r) {
+        if (r.ImportStatus !== 'IMPORTED' || !r.ImportedRegID) return;
+        const reg = findOne_('Registrations', { RegID: r.ImportedRegID, ConferenceID: conferenceId });
+        if (!reg) return;
+
+        const recipientEmail = reg.Email || jsonParse_(r.MappedDataJson, {}).SourceRespondentEmail;
+        if (!recipientEmail) return;
+
+        const completenessText = reg.DataCompletenessStatus === 'INCOMPLETE'
+          ? '<span style="color: #d69e2e; font-weight: bold;">ข้อมูลไม่ครบถ้วน (ต้องกรอกเพิ่มเติม)</span>'
+          : '<span style="color: #38a169; font-weight: bold;">ข้อมูลครบถ้วน</span>';
+
+        const subject = '[' + confName + '] แจ้งรหัสการลงทะเบียนและคำแนะนำเข้าใช้งาน - ' + reg.RegID;
+        const html = '<div style="font-family: \'Sarabun\', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">' +
+          '<div style="text-align: center; border-bottom: 2px solid #006D70; padding-bottom: 12px; margin-bottom: 16px;">' +
+          '<h2 style="color: #006D70; margin: 0; font-size: 1.25rem;">' + esc(confName) + '</h2>' +
+          '<p style="color: #4a5568; margin: 4px 0 0; font-size: 0.9rem;">แจ้งผลการนำเข้าข้อมูลการลงทะเบียนเข้าร่วมงาน</p>' +
+          '</div>' +
+          '<p style="font-size: 0.95rem; color: #2d3748;">เรียน คุณ <strong>' + esc(reg.FullName) + '</strong></p>' +
+          '<p style="font-size: 0.9rem; color: #4a5568;">คณะกรรมการได้ดำเนินการนำเข้าข้อมูลการลงทะเบียนของท่านจาก Google Form เข้าสู่ระบบลงทะเบียนหลักเรียบร้อยแล้ว โดยมีข้อมูลดังนี้:</p>' +
+          '<div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-left: 4px solid #006D70; border-radius: 6px; padding: 14px; margin: 16px 0;">' +
+          '<p style="margin: 4px 0; font-size: 0.95rem;"><strong>รหัสการลงทะเบียน (RegID):</strong> <span style="font-size: 1.15rem; color: #006D70; font-weight: bold;">' + esc(reg.RegID) + '</span></p>' +
+          '<p style="margin: 4px 0; font-size: 0.9rem;"><strong>ประเภทผู้เข้าร่วม:</strong> ' + esc(reg.ParticipantType) + '</p>' +
+          '<p style="margin: 4px 0; font-size: 0.9rem;"><strong>สถานะข้อมูล:</strong> ' + completenessText + '</p>' +
+          '</div>' +
+          '<p style="font-size: 0.9rem; color: #4a5568;">ขอความกรุณาท่านเข้าสู่ระบบผ่านเว็บไซต์หลัก เพื่อตรวจสอบข้อมูล เลือกวันเข้าร่วมงาน รอบอาหาร หรือเติมข้อมูลที่ยังไม่สมบูรณ์:</p>' +
+          '<div style="text-align: center; margin: 24px 0;">' +
+          '<a href="https://qf-2569.vercel.app/" target="_blank" style="background-color: #006D70; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.95rem; display: inline-block;">เข้าสู่ระบบจัดการการลงทะเบียน (qf-2569.vercel.app)</a>' +
+          '</div>' +
+          '<p style="font-size: 0.82rem; color: #718096;">* ท่านสามารถเข้าสู่ระบบด้วยเลขบัตรประชาชน (13 หลัก) หรือรหัส RegID ของท่าน</p>' +
+          '<hr style="border: none; border-top: 1px solid #edf2f7; margin: 20px 0;" />' +
+          '<p style="font-size: 0.8rem; color: #a0aec0; text-align: center;">โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ</p>' +
+          '</div>';
+
+        const ok = sendEmailLogged_(conferenceId, recipientEmail, subject, html, 'ImportBatch', batchId, ctx.user);
+        if (ok) sentCount++; else failedCount++;
+      });
+    } else if (emailTarget === 'FAILED') {
+      rows.forEach(function(r) {
+        if (r.ImportStatus === 'IMPORTED') return;
+        const mapped = jsonParse_(r.MappedDataJson, {});
+        const recipientEmail = mapped.SourceRespondentEmail || mapped.Email;
+        if (!recipientEmail) return;
+
+        const rowIssues = issues.filter(function(i) { return i.ImportRowID === r.ImportRowID; });
+        const issueMsgs = rowIssues.map(function(i) { return i.MessageTH; }).join(', ');
+        const reasonText = issueMsgs || (r.ImportStatus === 'SKIPPED_DUPLICATE' ? 'ชื่อ-นามสกุล หรือเลขบัตรประชาชนมีซ้ำอยู่ในระบบเรียบร้อยแล้ว' : 'ข้อมูลไม่สมบูรณ์หรือไม่ผ่านเกณฑ์การนำเข้า');
+
+        const subject = '[' + confName + '] แจ้งผลการตรวจสอบข้อมูลการลงทะเบียน Google Form';
+        const html = '<div style="font-family: \'Sarabun\', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">' +
+          '<div style="text-align: center; border-bottom: 2px solid #e53e3e; padding-bottom: 12px; margin-bottom: 16px;">' +
+          '<h2 style="color: #c53030; margin: 0; font-size: 1.25rem;">' + esc(confName) + '</h2>' +
+          '<p style="color: #4a5568; margin: 4px 0 0; font-size: 0.9rem;">แจ้งผลการตรวจสอบการลงทะเบียนผ่าน Google Form</p>' +
+          '</div>' +
+          '<p style="font-size: 0.95rem; color: #2d3748;">เรียน คุณ <strong>' + esc(mapped.FullName || 'ผู้ลงทะเบียน') + '</strong></p>' +
+          '<p style="font-size: 0.9rem; color: #4a5568;">ตามที่ท่านได้ส่งแบบฟอร์มลงทะเบียนผ่าน Google Form นั้น จากการตรวจสอบข้อมูลพบว่า:</p>' +
+          '<div style="background-color: #fff5f5; border: 1px solid #fed7d7; border-left: 4px solid #e53e3e; border-radius: 6px; padding: 14px; margin: 16px 0;">' +
+          '<p style="margin: 0; font-size: 0.9rem; color: #9b2c2c;"><strong>เหตุผลที่ไม่สามารถนำเข้าข้อมูลอัตโนมัติได้:</strong> ' + esc(reasonText) + '</p>' +
+          '</div>' +
+          '<p style="font-size: 0.9rem; color: #4a5568;">เพื่อให้การลงทะเบียนของท่านเสร็จสมบูรณ์และได้รับสิทธิ์เข้าร่วมงานอย่างถูกต้อง ขอความกรุณาท่านทำรายการลงทะเบียนด้วยตนเองผ่านทางเว็บไซต์หลัก:</p>' +
+          '<div style="text-align: center; margin: 24px 0;">' +
+          '<a href="https://qf-2569.vercel.app/" target="_blank" style="background-color: #e53e3e; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.95rem; display: inline-block;">ลงทะเบียนใหม่ทางเว็บไซต์ https://qf-2569.vercel.app/</a>' +
+          '</div>' +
+          '<hr style="border: none; border-top: 1px solid #edf2f7; margin: 20px 0;" />' +
+          '<p style="font-size: 0.8rem; color: #a0aec0; text-align: center;">คณะกรรมการจัดงานประชุมวิชาการ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ</p>' +
+          '</div>';
+
+        const ok = sendEmailLogged_(conferenceId, recipientEmail, subject, html, 'ImportBatch', batchId, ctx.user);
+        if (ok) sentCount++; else failedCount++;
+      });
+    }
+
+    logAudit_(conferenceId, ctx.user, ctx.role, 'BATCH_EMAIL_SEND', 'ImportBatch', batchId, {
+      emailTarget: emailTarget,
+      sentCount: sentCount,
+      failedCount: failedCount
+    });
+
+    return {
+      sentCount: sentCount,
+      failedCount: failedCount
+    };
   });
 }
 
