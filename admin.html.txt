@@ -74,10 +74,10 @@
           </div>
           <canvas id="chartDailyQuotaCanvas" style="max-height:280px;"></canvas>
         </div>
-        <div class="card" style="margin-bottom:0;"><canvas id="chartRegByTypeCanvas"></canvas></div>
-        <div class="card" style="margin-bottom:0;"><canvas id="chartWorksIntentCanvas"></canvas></div>
-        <div class="card" style="margin-bottom:0;"><canvas id="chartWorksByCategoryCanvas"></canvas></div>
-        <div class="card" style="margin-bottom:0;"><canvas id="chartWorksByStatusCanvas"></canvas></div>
+        <div class="card" style="margin-bottom:0;"><canvas id="chartRegByTypeCanvas" style="max-height:280px; width:100%;"></canvas></div>
+        <div class="card" style="margin-bottom:0;"><canvas id="chartWorksIntentCanvas" style="max-height:280px; width:100%;"></canvas></div>
+        <div class="card" style="margin-bottom:0;"><canvas id="chartWorksByCategoryCanvas" style="max-height:280px; width:100%;"></canvas></div>
+        <div class="card" style="margin-bottom:0;"><canvas id="chartWorksByStatusCanvas" style="max-height:280px; width:100%;"></canvas></div>
       </div>
     </section>
 
@@ -107,7 +107,7 @@
 
     <section class="page" id="page-import"><div class="card"><h3>นำเข้าข้อมูล Excel จาก Google Form<span class="en">Import Excel from Google Form</span></h3><p>รองรับไฟล์ .xlsx ระบบจะแสดง Preview ก่อนนำเข้าจริง</p><div class="field"><input type="file" id="importFile" accept=".xlsx,.xls"></div><button class="btn btn-primary" onclick="previewImport()">อัปโหลดและตรวจสอบ</button></div><div id="importResult"></div></section>
 
-    <section class="page" id="page-registrations"><div class="card"><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="regSearch" placeholder="RegID ชื่อ Email โทรศัพท์ CID" onkeydown="if(event.key==='Enter')loadRegistrations()"></div><div><label class="muted">สถานะ</label><select id="regStatus" onchange="loadRegistrations()"><option value="">ทั้งหมด</option><option>IMPORTED_INCOMPLETE</option><option>WAIT_REGISTRATION_CHECK</option><option>REGISTRATION_RETURNED</option><option>REGISTRATION_VERIFIED</option><option>COMPLETED</option></select></div><div><label class="muted">ประเภทบุคคล</label><select id="regParticipantType" onchange="loadRegistrations()"><option value="">ทุกประเภท</option><option value="INTERNAL">บุคลากรภายใน</option><option value="EXTERNAL">บุคคลภายนอก</option></select></div><div><label class="muted">วันเข้าร่วม</label><select id="regAttendanceDay" onchange="loadRegistrations()"><option value="">ทุกวัน</option><option value="1">วันที่ 1</option><option value="2">วันที่ 2</option><option value="3">วันที่ 3</option></select></div><div><button class="btn btn-primary" onclick="loadRegistrations()">ค้นหา</button></div><div><button class="btn btn-gold" onclick="openRegistrationSignSheet()">พิมพ์ใบเซ็นชื่อ</button></div><div><button class="btn btn-gold" onclick="exportRegistrations()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="print-note">พิมพ์แบบ A4 แนวนอน แยกตามฝ่าย/หน่วยงาน พร้อมช่องลายมือชื่อรายวัน</div><div class="table-wrap"><table class="table"><thead><tr><th>RegID</th><th>ชื่อ</th><th>ประเภท</th><th>CID</th><th>Email / Phone</th><th>ข้อมูล</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="regRows"></tbody></table></div></div></section>
+    <section class="page" id="page-registrations"><div class="card"><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="regSearch" placeholder="RegID ชื่อ Email โทรศัพท์ CID" onkeydown="if(event.key==='Enter')loadRegistrations()"></div><div><label class="muted">สถานะ</label><select id="regStatus" onchange="loadRegistrations()"><option value="">ทั้งหมด</option><option>IMPORTED_INCOMPLETE</option><option>WAIT_REGISTRATION_CHECK</option><option>REGISTRATION_RETURNED</option><option>REGISTRATION_VERIFIED</option><option>COMPLETED</option></select></div><div><label class="muted">ประเภทบุคคล</label><select id="regParticipantType" onchange="loadRegistrations()"><option value="">ทุกประเภท</option><option value="INTERNAL">บุคลากรภายใน</option><option value="EXTERNAL">บุคคลภายนอก</option></select></div><div><label class="muted">วันเข้าร่วม</label><select id="regAttendanceDay" onchange="loadRegistrations()"><option value="">ทุกวัน</option><option value="1">วันที่ 1</option><option value="2">วันที่ 2</option><option value="3">วันที่ 3</option></select></div><div><button class="btn btn-primary" onclick="loadRegistrations()">ค้นหา</button><div id="regCountBadge" style="margin-top:4px; text-align:center;"></div></div><div><button class="btn btn-gold" onclick="openRegistrationSignSheet()">พิมพ์ใบเซ็นชื่อ</button></div><div><button class="btn btn-gold" onclick="exportRegistrations()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="print-note">พิมพ์แบบ A4 แนวนอน แยกตามฝ่าย/หน่วยงาน พร้อมช่องลายมือชื่อรายวัน</div><div class="top-scrollbar-wrap" id="regTopScrollbar" style="overflow-x:auto; overflow-y:hidden; height:14px; margin-bottom:4px; display:none;"><div id="regTopScrollbarInner" style="height:1px;"></div></div><div class="table-wrap" id="regTableWrap"><table class="table" id="regTable"><thead><tr><th>RegID</th><th>ชื่อ</th><th>ประเภท</th><th>CID</th><th>Email / Phone</th><th>ข้อมูล</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="regRows"></tbody></table></div></div></section>
 
     <section class="page" id="page-payments"><div class="card"><div class="info-box"><b>ข้อมูลจะแสดงตั้งแต่ผู้สมัครประเภทที่ต้องชำระเงินลงทะเบียนเข้าระบบ</b> โดยสถานะ UNPAID หมายถึงยังไม่ส่งหลักฐาน และ PENDING_VERIFY หมายถึงส่งหลักฐานแล้วรอฝ่ายการเงินตรวจสอบ</div><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="paySearch" placeholder="RegID ชื่อ Email"></div><div><label class="muted">สถานะ</label><select id="payStatus"><option value="">ทั้งหมด</option><option>UNPAID</option><option>PENDING_VERIFY</option><option>APPROVED</option><option>RETURNED</option><option>REJECTED</option></select></div><div><button class="btn btn-primary" onclick="loadPayments()">ค้นหา</button></div><div><button class="btn btn-gold" onclick="printPaymentReport()"><i class="fa-solid fa-print"></i> พิมพ์รายงาน A4</button></div><div><button class="btn btn-gold" onclick="exportPayments()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>RegID</th><th>ชื่อ - นามสกุล</th><th>จำนวน</th><th>สถานะชำระเงิน</th><th>ต้องการใบแจ้งหนี้</th><th>สถานะใบเสร็จ</th><th>หลักฐาน</th><th>จัดการ</th></tr></thead><tbody id="payRows"></tbody></table></div></div></section>
 
@@ -388,10 +388,108 @@ function renderDashboardUi(d, filterType){
       });
     }
   }
-  if(d.chartRegByType) { const labels = Object.keys(d.chartRegByType); const data = Object.values(d.chartRegByType); if(chartRegByType) chartRegByType.destroy(); chartRegByType = new Chart($('#chartRegByTypeCanvas'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'จำนวนผู้สมัคร', data: data, backgroundColor: '#aecbe2' }] }, options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'ผู้สมัครแยกรายประเภท' } } } }); }
-  if(d.chartWorksIntent) { const labels = Object.keys(d.chartWorksIntent); const dataIntent = labels.map(l => d.chartWorksIntent[l].intent); const dataActual = labels.map(l => d.chartWorksIntent[l].actual); if(chartWorksIntent) chartWorksIntent.destroy(); chartWorksIntent = new Chart($('#chartWorksIntentCanvas'), { type: 'bar', data: { labels: labels, datasets: [ { label: 'แจ้งส่งผลงาน', data: dataIntent, backgroundColor: '#fdcdac' }, { label: 'ส่งผลงานจริง', data: dataActual, backgroundColor: '#b3e2cd' } ]}, options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'การส่งผลงานแยกรายประเภทบุคลากร' } } } }); }
-  if(d.chartWorksByStatus) { const labels = Object.keys(d.chartWorksByStatus); const data = Object.values(d.chartWorksByStatus); if(chartWorksByStatus) chartWorksByStatus.destroy(); chartWorksByStatus = new Chart($('#chartWorksByStatusCanvas'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'จำนวนผลงาน', data: data, backgroundColor: ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2'] }] }, options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทบุคลากร (INTERNAL/EXTERNAL)' } } } }); }
-  if(d.chartWorksByCategory) { const labels = Object.keys(d.chartWorksByCategory); const data = Object.values(d.chartWorksByCategory); if(chartWorksByCategory) chartWorksByCategory.destroy(); chartWorksByCategory = new Chart($('#chartWorksByCategoryCanvas'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'จำนวนผลงาน', data: data, backgroundColor: ['#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2','#fbb4ae','#b3cde3','#ccebc5'] }] }, options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทผลงาน (Work Category)' } } } }); }
+  if(d.chartRegByType) {
+    try {
+      const labels = Object.keys(d.chartRegByType);
+      const data = Object.values(d.chartRegByType);
+      if(chartRegByType) chartRegByType.destroy();
+      const canvas = $('#chartRegByTypeCanvas');
+      if (canvas) {
+        chartRegByType = new Chart(canvas, {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'จำนวนผู้สมัคร', data: data, backgroundColor: '#aecbe2' }] },
+          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'ผู้สมัครแยกรายประเภท' } } }
+        });
+      }
+    } catch(e) { console.error('chartRegByType error:', e); }
+  }
+  if(d.chartWorksIntent) {
+    try {
+      const labels = Object.keys(d.chartWorksIntent);
+      const dataIntent = labels.map(l => d.chartWorksIntent[l] ? d.chartWorksIntent[l].intent : 0);
+      const dataActual = labels.map(l => d.chartWorksIntent[l] ? d.chartWorksIntent[l].actual : 0);
+      if(chartWorksIntent) chartWorksIntent.destroy();
+      const canvas = $('#chartWorksIntentCanvas');
+      if (canvas) {
+        chartWorksIntent = new Chart(canvas, {
+          type: 'bar',
+          data: { labels: labels, datasets: [ { label: 'แจ้งส่งผลงาน', data: dataIntent, backgroundColor: '#fdcdac' }, { label: 'ส่งผลงานจริง', data: dataActual, backgroundColor: '#b3e2cd' } ]},
+          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'การส่งผลงานแยกรายประเภทบุคลากร' } } }
+        });
+      }
+    } catch(e) { console.error('chartWorksIntent error:', e); }
+  }
+  if(d.chartWorksByStatus) {
+    try {
+      const labels = Object.keys(d.chartWorksByStatus);
+      const data = Object.values(d.chartWorksByStatus);
+      if(chartWorksByStatus) chartWorksByStatus.destroy();
+      const canvas = $('#chartWorksByStatusCanvas');
+      if (canvas) {
+        chartWorksByStatus = new Chart(canvas, {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'จำนวนผลงาน', data: data, backgroundColor: ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2'] }] },
+          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทบุคลากร (INTERNAL/EXTERNAL)' } } }
+        });
+      }
+    } catch(e) { console.error('chartWorksByStatus error:', e); }
+  }
+  if(d.chartWorksByCategory) {
+    try {
+      const labels = Object.keys(d.chartWorksByCategory);
+      const data = Object.values(d.chartWorksByCategory);
+      if(chartWorksByCategory) chartWorksByCategory.destroy();
+      const canvas = $('#chartWorksByCategoryCanvas');
+      if (canvas) {
+        chartWorksByCategory = new Chart(canvas, {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'จำนวนผลงาน', data: data, backgroundColor: ['#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2','#fbb4ae','#b3cde3','#ccebc5'] }] },
+          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทผลงาน (Work Category)' } } }
+        });
+      }
+    } catch(e) { console.error('chartWorksByCategory error:', e); }
+  }
+}
+
+function updateRegTopScrollbar(){
+  const topWrap = $('#regTopScrollbar');
+  const topInner = $('#regTopScrollbarInner');
+  const tableWrap = $('#regTableWrap');
+  const table = $('#regTable');
+  if(!topWrap || !topInner || !tableWrap || !table) return;
+  
+  const scrollWidth = table.scrollWidth;
+  const clientWidth = tableWrap.clientWidth;
+  if(scrollWidth > clientWidth){
+    topWrap.style.display = 'block';
+    topInner.style.width = scrollWidth + 'px';
+  } else {
+    topWrap.style.display = 'none';
+  }
+}
+
+let regScrollSyncInited = false;
+function initRegScrollSync(){
+  if (regScrollSyncInited) return;
+  const topWrap = $('#regTopScrollbar');
+  const tableWrap = $('#regTableWrap');
+  if(!topWrap || !tableWrap) return;
+  regScrollSyncInited = true;
+  let syncing = false;
+  topWrap.onscroll = () => {
+    if(!syncing){
+      syncing = true;
+      tableWrap.scrollLeft = topWrap.scrollLeft;
+      syncing = false;
+    }
+  };
+  tableWrap.onscroll = () => {
+    if(!syncing){
+      syncing = true;
+      topWrap.scrollLeft = tableWrap.scrollLeft;
+      syncing = false;
+    }
+  };
 }
 
 async function loadDashboard(){
@@ -419,7 +517,23 @@ $('#settingsForm').onsubmit=async e=>{e.preventDefault();try{const o=formObj(e.t
 
 async function previewImport(){show('กำลังอ่านไฟล์ Excel');try{const f=await fileObj($('#importFile'));if(!f)throw new Error('กรุณาเลือกไฟล์');const r=await rpc('uploadExcelForImport',TOKEN,CID,f);hide();$('#importResult').innerHTML=`<div class="card"><h3>ผลตรวจสอบไฟล์</h3><p>ทั้งหมด ${r.stats.totalRows} | พร้อม ${r.stats.readyRows} | ข้อมูลไม่ครบ ${r.stats.incompleteRows} | คำเตือน ${r.stats.warningRows}</p><button class="btn btn-primary" onclick="commitImport('${esc(r.batchId)}')">นำเข้าข้อมูลจริง</button></div>`}catch(e){err(e)}}
 async function commitImport(id){if(!(await Swal.fire({icon:'question',title:'ยืนยันนำเข้าข้อมูล?',showCancelButton:true,confirmButtonText:'นำเข้า'})).isConfirmed)return;show('กำลังนำเข้าข้อมูล');try{const r=await rpc('commitImportBatch',TOKEN,CID,id);hide();Swal.fire({icon:'success',title:'นำเข้าเรียบร้อย',html:`นำเข้า ${r.imported} ราย<br>ข้อมูลไม่ครบ ${r.importedIncomplete||0} ราย<br>ข้าม ${r.skipped} ราย`,confirmButtonColor:'#006D70'})}catch(e){err(e)}}
-async function loadRegistrations(){show('กำลังโหลดผู้ลงทะเบียน');try{const rows=await rpc('adminListRegistrations',TOKEN,CID,{q:$('#regSearch')?$('#regSearch').value:'',status:$('#regStatus')?$('#regStatus').value:'',participantGroup:$('#regParticipantType')?$('#regParticipantType').value:'',attendanceDay:$('#regAttendanceDay')?$('#regAttendanceDay').value:''});$('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>'}finally{hide()}}
+async function loadRegistrations(){
+  show('กำลังโหลดผู้ลงทะเบียน');
+  try{
+    const rows=await rpc('adminListRegistrations',TOKEN,CID,{
+      q:$('#regSearch')?$('#regSearch').value:'',
+      status:$('#regStatus')?$('#regStatus').value:'',
+      participantGroup:$('#regParticipantType')?$('#regParticipantType').value:'',
+      attendanceDay:$('#regAttendanceDay')?$('#regAttendanceDay').value:''
+    });
+    if ($('#regCountBadge')) {
+      $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
+    }
+    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    initRegScrollSync();
+    setTimeout(updateRegTopScrollbar, 50);
+  }finally{hide()}
+}
 async function setRegStatus(id,status){const returning=status==='REGISTRATION_RETURNED';const x=await Swal.fire({icon:returning?'warning':'question',title:returning?'ส่งคืนข้อมูลให้ผู้สมัคร':'ยืนยันตรวจผ่าน',input:'textarea',inputLabel:returning?'ระบุเหตุผลที่ต้องแก้ไข':'หมายเหตุ (ถ้ามี)',inputPlaceholder:returning?'กรุณาระบุให้ชัดเจนเพื่อส่งไปทาง Email':'',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืนและแจ้ง Email':'ตรวจผ่าน',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังอัปเดตสถานะ');try{const r=await rpc('adminUpdateRegistrationStatus',TOKEN,CID,id,status,x.value||'');hide();await Swal.fire({icon:'success',title:'ดำเนินการเรียบร้อย',html:`สถานะใหม่: <b>${esc(r.newStatus)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});loadRegistrations()}catch(e){err(e)}}
 async function openRegistrationView(id){
   show('กำลังเปิดข้อมูล');

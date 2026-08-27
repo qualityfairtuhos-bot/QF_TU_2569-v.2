@@ -4042,22 +4042,24 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     });
 
     var categories = {};
+    var chartWorksByCategory = {};
     findMany_('WorkCategories', { ConferenceID: cid }).forEach(function(c) {
       categories[c.CategoryID] = c;
+      var catName = c.CategoryNameTH || c.CategoryNameEN || c.CategoryID;
+      chartWorksByCategory[catName] = 0;
     });
 
     // Chart 3: Works by INTERNAL / EXTERNAL
-    var chartWorksByStatus = {};
-    var chartWorksByCategory = {};
+    var chartWorksByStatus = { 'บุคลากรภายใน (INTERNAL)': 0, 'บุคคลภายนอก (EXTERNAL)': 0 };
     worksData.forEach(function(w) {
       var pt = regTypeMap[w.RegID] || 'ไม่ระบุ';
-      var s = pt.toUpperCase().indexOf('INTERNAL') >= 0 ? 'INTERNAL' : (pt.toUpperCase().indexOf('EXTERNAL') >= 0 ? 'EXTERNAL' : pt);
-      if (!chartWorksByStatus[s]) chartWorksByStatus[s] = 0;
+      var s = pt.toUpperCase().indexOf('INTERNAL') >= 0 ? 'บุคลากรภายใน (INTERNAL)' : (pt.toUpperCase().indexOf('EXTERNAL') >= 0 ? 'บุคคลภายนอก (EXTERNAL)' : pt);
+      if (chartWorksByStatus[s] === undefined) chartWorksByStatus[s] = 0;
       chartWorksByStatus[s]++;
       
       // Works by Category
       var cat = w.CategoryID ? (categories[w.CategoryID] ? categories[w.CategoryID].CategoryNameTH : w.CategoryID) : 'ไม่ระบุ';
-      if (!chartWorksByCategory[cat]) chartWorksByCategory[cat] = 0;
+      if (chartWorksByCategory[cat] === undefined) chartWorksByCategory[cat] = 0;
       chartWorksByCategory[cat]++;
       
       // Actual works by type
