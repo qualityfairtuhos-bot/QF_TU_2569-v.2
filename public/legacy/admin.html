@@ -102,7 +102,7 @@
 
     <section class="page" id="page-registrations"><div class="card"><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="regSearch" placeholder="RegID ชื่อ Email โทรศัพท์ CID"></div><div><label class="muted">สถานะ</label><select id="regStatus"><option value="">ทั้งหมด</option><option>IMPORTED_INCOMPLETE</option><option>WAIT_REGISTRATION_CHECK</option><option>REGISTRATION_RETURNED</option><option>REGISTRATION_VERIFIED</option><option>COMPLETED</option></select></div><div><button class="btn btn-primary" onclick="loadRegistrations()">ค้นหา</button></div><div><button class="btn btn-gold" onclick="openRegistrationSignSheet()">พิมพ์ใบเซ็นชื่อ</button></div><div><button class="btn btn-gold" onclick="exportRegistrations()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="print-note">พิมพ์แบบ A4 แนวนอน แยกตามฝ่าย/หน่วยงาน พร้อมช่องลายมือชื่อรายวัน</div><div class="table-wrap"><table class="table"><thead><tr><th>RegID</th><th>ชื่อ</th><th>ประเภท</th><th>CID</th><th>Email / Phone</th><th>ข้อมูล</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="regRows"></tbody></table></div></div></section>
 
-    <section class="page" id="page-payments"><div class="card"><div class="info-box"><b>ข้อมูลจะแสดงตั้งแต่ผู้สมัครประเภทที่ต้องชำระเงินลงทะเบียนเข้าระบบ</b> โดยสถานะ UNPAID หมายถึงยังไม่ส่งหลักฐาน และ PENDING_VERIFY หมายถึงส่งหลักฐานแล้วรอฝ่ายการเงินตรวจสอบ</div><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="paySearch" placeholder="RegID ชื่อ Email"></div><div><label class="muted">สถานะ</label><select id="payStatus"><option value="">ทั้งหมด</option><option>UNPAID</option><option>PENDING_VERIFY</option><option>APPROVED</option><option>RETURNED</option><option>REJECTED</option></select></div><div><button class="btn btn-primary" onclick="loadPayments()">ค้นหา</button></div><div><button class="btn btn-gold" onclick="exportPayments()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>RegID</th><th>ชื่อ</th><th>จำนวน</th><th>สถานะ</th><th>หลักฐาน</th><th>จัดการ</th></tr></thead><tbody id="payRows"></tbody></table></div></div></section>
+    <section class="page" id="page-payments"><div class="card"><div class="info-box"><b>ข้อมูลจะแสดงตั้งแต่ผู้สมัครประเภทที่ต้องชำระเงินลงทะเบียนเข้าระบบ</b> โดยสถานะ UNPAID หมายถึงยังไม่ส่งหลักฐาน และ PENDING_VERIFY หมายถึงส่งหลักฐานแล้วรอฝ่ายการเงินตรวจสอบ</div><div class="toolbar"><div class="wide"><label class="muted">ค้นหา</label><input id="paySearch" placeholder="RegID ชื่อ Email"></div><div><label class="muted">สถานะ</label><select id="payStatus"><option value="">ทั้งหมด</option><option>UNPAID</option><option>PENDING_VERIFY</option><option>APPROVED</option><option>RETURNED</option><option>REJECTED</option></select></div><div><button class="btn btn-primary" onclick="loadPayments()">ค้นหา</button></div><div><button class="btn btn-gold" onclick="openPrintPaymentsReport()"><i class="fa-solid fa-print"></i> พิมพ์รายงาน</button></div><div><button class="btn btn-gold" onclick="exportPayments()"><i class="fa-solid fa-file-excel"></i> Export Excel</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>RegID</th><th>ชื่อ</th><th>จำนวน</th><th>ต้องการใบแจ้งหนี้</th><th>สถานะชำระ</th><th>หลักฐาน</th><th>สถานะใบเสร็จ</th><th>จัดการ</th></tr></thead><tbody id="payRows"></tbody></table></div></div></section>
 
     <section class="page" id="page-works">
       <div class="card">
@@ -1225,8 +1225,399 @@ function renderSignSheetWindow(win,d,filters){
   win.document.close();
 }
 
-async function loadPayments(){show('กำลังโหลดการเงิน');try{const rows=await rpc('adminListPayments',TOKEN,CID,{q:$('#paySearch').value,status:$('#payStatus').value});$('#payRows').innerHTML=rows.length?rows.map(p=>{const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);return `<tr><td>${esc(p.RegID)}</td><td><b>${esc(p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.Status)}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}">เปิดหลักฐาน</a>`:'<span class="muted">ยังไม่ส่งหลักฐาน</span>'}</td><td class="actions">${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:'-'}</td></tr>`}).join(''):'<tr><td colspan="6" class="muted">ไม่พบข้อมูล</td></tr>'}finally{hide()}}
+async function loadPayments(){
+  show('กำลังโหลดการเงิน');
+  try{
+    const rows = await rpc('adminListPayments', TOKEN, CID, { q: $('#paySearch')?.value, status: $('#payStatus')?.value });
+    window.LAST_PAYMENTS_DATA = rows || [];
+    $('#payRows').innerHTML = rows.length ? rows.map(p => {
+      const canAct = !!p.PaymentID && ['PENDING_VERIFY','RETURNED'].includes(p.Status);
+      const needInvoice = bool_(p.NeedInvoice || (p.Registration && p.Registration.NeedInvoice));
+      const invoiceBadge = needInvoice
+        ? `<span class="badge ${p.InvoiceStatus==='ISSUED_INVOICE'?'approved':'warn'}">ต้องการใบแจ้งหนี้${p.InvoiceStatus==='ISSUED_INVOICE'?' (ออกแล้ว)':''}</span>`
+        : `<span class="muted">ไม่ต้องการ</span>`;
+      
+      const receiptIssued = (p.ReceiptStatus === 'ISSUED_RECEIPT' || p.ReceiptStatus === 'ออกใบเสร็จแล้ว');
+      const receiptBtn = receiptIssued
+        ? `<button class="btn btn-sm" style="background:#2e7d32;color:#fff;border:none;white-space:nowrap" title="กดเปลี่ยนเป็นรอออกใบเสร็จ" onclick="toggleReceiptStatus('${esc(p.RegID)}','${esc(p.PaymentID||'')}','WAIT_RECEIPT')"><i class="fa-solid fa-circle-check"></i> ออกใบเสร็จแล้ว</button>`
+        : `<button class="btn btn-sm" style="background:#c62828;color:#fff;border:none;white-space:nowrap" title="กดเปลี่ยนเป็นออกใบเสร็จแล้ว" onclick="toggleReceiptStatus('${esc(p.RegID)}','${esc(p.PaymentID||'')}','ISSUED_RECEIPT')"><i class="fa-solid fa-hourglass-half"></i> รอออกใบเสร็จ</button>`;
+
+      const docCount = (p.FinanceDocs || []).filter(d => d.Active).length;
+
+      return `<tr>
+        <td><b>${esc(p.RegID)}</b></td>
+        <td><b>${esc(p.Registration?.FullName||'')}</b><br><span class="muted" style="font-size:0.75rem">${esc(p.Registration?.Email||'')}</span></td>
+        <td><b>${Number(p.RequiredAmount||p.Amount||0).toLocaleString('th-TH')}</b> บาท</td>
+        <td>${invoiceBadge}</td>
+        <td>${statusBadge(p.Status)}</td>
+        <td>${p.SlipFileUrl ? `<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-soft btn-sm"><i class="fa-solid fa-file-invoice"></i> เปิดหลักฐาน</a>` : '<span class="muted">ยังไม่ส่งหลักฐาน</span>'}</td>
+        <td>${receiptBtn}</td>
+        <td class="actions" style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-blue btn-sm" title="ดูข้อมูลผู้ลงทะเบียน" onclick="openRegistrationView('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button>
+          <button class="btn btn-soft btn-sm" title="แก้ไขข้อมูลการออกใบเสร็จ" onclick="openEditReceiptInfo('${esc(p.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button>
+          ${canAct ? `<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>` : ''}
+          <button class="btn btn-gold btn-sm" title="แนบไฟล์เอกสารการเงิน" onclick="openUploadFinanceDocModal('${esc(p.RegID)}','${esc(p.PaymentID||'')}')"><i class="fa-solid fa-file-arrow-up"></i> เอกสาร (${docCount})</button>
+          <button class="btn btn-soft btn-sm" title="ส่งอีเมลหาผู้สมัคร" onclick="openFinanceEmailModal('${esc(p.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่ง Email</button>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+  }finally{ hide(); }
+}
+
 async function verifyPay(id,decision){const returning=decision==='RETURN';const x=await Swal.fire({title:returning?'ส่งคืนหลักฐาน':'อนุมัติการชำระเงิน',input:'textarea',inputLabel:returning?'เหตุผลที่ส่งคืน':'หมายเหตุ (ถ้ามี)',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืน':'อนุมัติ',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังบันทึกผลการเงิน');try{const r=await rpc('adminVerifyPayment',TOKEN,CID,id,decision,x.value||'',{});hide();await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',html:`สถานะ: <b>${esc(r.status)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});loadPayments()}catch(e){err(e)}}
+
+async function openEditReceiptInfo(regId){
+  show('กำลังโหลดข้อมูลใบเสร็จ');
+  try{
+    const d = await rpc('adminGetRegistration', TOKEN, CID, regId);
+    const r = d.registration || {};
+    const payments = window.LAST_PAYMENTS_DATA || [];
+    const p = payments.find(x => x.RegID === regId) || {};
+    hide();
+
+    const needRec = r.ReceiptRequirement === 'NEED_RECEIPT';
+    const needInv = !!(r.NeedInvoice || p.NeedInvoice);
+
+    const html = `<div style="text-align:left">
+      <div style="background:#f1f5f9;padding:10px;border-radius:6px;margin-bottom:12px;font-weight:600;font-size:0.9rem">
+        แก้ไขข้อมูลการออกใบเสร็จ & ใบแจ้งหนี้สำหรับ ${esc(regId)} (${esc(r.FullName||'')})
+      </div>
+      <div class="field"><label>ความประสงค์ออกใบเสร็จ</label>
+        <select id="editRecReq" class="field" style="width:100%" onchange="$('#recDetailsWrap').style.display=this.value==='NEED_RECEIPT'?'block':'none'">
+          <option value="NO_RECEIPT" ${!needRec?'selected':''}>ไม่ออกใบเสร็จ</option>
+          <option value="NEED_RECEIPT" ${needRec?'selected':''}>ต้องการออกใบเสร็จ</option>
+        </select>
+      </div>
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0">
+        <input type="checkbox" id="editNeedInv" ${needInv?'checked':''}>
+        <b>ต้องการใบแจ้งหนี้ (Invoice)</b>
+      </label></div>
+      <div id="recDetailsWrap" style="display:${needRec?'block':'none'};border-top:1px dashed #cbd5e1;padding-top:10px;margin-top:10px">
+        <div class="field"><label>ชื่อออกใบเสร็จ<input id="editRecName" class="field" style="width:100%" value="${esc(r.ReceiptName||'')}"></label></div>
+        <div class="field"><label>เลขประจำตัวผู้เสียภาษี/บัตรประชาชน<input id="editRecTaxID" class="field" style="width:100%" value="${esc(r.ReceiptTaxID||r.ReceiptTaxId||'')}"></label></div>
+        <div class="field"><label>เบอร์โทรศัพท์ใบเสร็จ<input id="editRecPhone" class="field" style="width:100%" value="${esc(r.ReceiptPhone||'')}"></label></div>
+        <div class="field"><label>ที่อยู่ออกใบเสร็จ<textarea id="editRecAddr" class="field" style="width:100%;height:60px">${esc(r.ReceiptAddress||'')}</textarea></label></div>
+        <div class="field"><label>รหัสไปรษณีย์<input id="editRecPost" class="field" style="width:100%" value="${esc(r.ReceiptPostalCode||'')}"></label></div>
+      </div>
+      <div style="border-top:1px dashed #cbd5e1;padding-top:10px;margin-top:10px" class="grid2">
+        <div class="field"><label>เลขที่ใบเสร็จ<input id="editRecNo" class="field" style="width:100%" value="${esc(p.ReceiptNo||'')}"></label></div>
+        <div class="field"><label>วันที่ออกใบเสร็จ<input id="editRecDate" type="date" class="field" style="width:100%" value="${p.ReceiptDate?p.ReceiptDate.slice(0,10):''}"></label></div>
+      </div>
+    </div>`;
+
+    const res = await Swal.fire({
+      title: `แก้ไขข้อมูลใบเสร็จ ${esc(regId)}`,
+      html,
+      width: '550px',
+      showCancelButton: true,
+      confirmButtonText: 'บันทึกข้อมูลใบเสร็จ',
+      confirmButtonColor: '#006D70',
+      preConfirm: () => {
+        return {
+          ReceiptRequirement: $('#editRecReq').value,
+          NeedInvoice: $('#editNeedInv').checked,
+          ReceiptName: $('#editRecName')?.value || '',
+          ReceiptTaxID: $('#editRecTaxID')?.value || '',
+          ReceiptPhone: $('#editRecPhone')?.value || '',
+          ReceiptAddress: $('#editRecAddr')?.value || '',
+          ReceiptPostalCode: $('#editRecPost')?.value || '',
+          ReceiptNo: $('#editRecNo')?.value || '',
+          ReceiptDate: $('#editRecDate')?.value || ''
+        };
+      }
+    });
+
+    if (res.isConfirmed) {
+      show('กำลังบันทึก...');
+      await rpc('adminUpdateReceiptInfo', TOKEN, CID, regId, res.value);
+      hide();
+      toast('บันทึกข้อมูลใบเสร็จเรียบร้อย');
+      loadPayments();
+    }
+  }catch(e){err(e);}
+}
+
+async function toggleReceiptStatus(regId, paymentId, newStatus){
+  show('กำลังอัปเดตสถานะใบเสร็จ');
+  try{
+    const r = await rpc('adminToggleReceiptStatus', TOKEN, CID, regId, paymentId, newStatus);
+    hide();
+    toast('อัปเดตสถานะใบเสร็จเรียบร้อย');
+    loadPayments();
+    if (newStatus === 'ISSUED_RECEIPT') {
+      const ask = await Swal.fire({
+        icon: 'success',
+        title: 'ออกใบเสร็จเรียบร้อย',
+        text: 'คุณต้องการแนบไฟล์ใบเสร็จ/ใบแจ้งหนี้ให้ผู้ลงทะเบียนทันทีหรือไม่?',
+        showCancelButton: true,
+        confirmButtonText: '📁 แนบไฟล์เอกสาร',
+        cancelButtonText: 'ไว้ทีหลัง',
+        confirmButtonColor: '#006D70'
+      });
+      if (ask.isConfirmed) {
+        openUploadFinanceDocModal(regId, paymentId);
+      }
+    }
+  }catch(e){err(e);}
+}
+
+async function openUploadFinanceDocModal(regId, paymentId){
+  show('กำลังดึงรายการเอกสาร');
+  try{
+    const docs = await rpc('adminListFinanceDocuments', TOKEN, CID, regId);
+    hide();
+
+    const usedDocs = [];
+    const slots = [
+      { key: 'INVOICE_1', label: 'ใบแจ้งหนี้ ไฟล์ที่ 1 (Invoice 1)', category: 'INVOICE' },
+      { key: 'INVOICE_2', label: 'ใบแจ้งหนี้ ไฟล์ที่ 2 (Invoice 2)', category: 'INVOICE' },
+      { key: 'RECEIPT_1', label: 'ใบเสร็จรับเงิน ไฟล์ที่ 1 (Receipt 1)', category: 'RECEIPT' },
+      { key: 'RECEIPT_2', label: 'ใบเสร็จรับเงิน ไฟล์ที่ 2 (Receipt 2)', category: 'RECEIPT' },
+      { key: 'OTHER_1', label: 'เอกสารอื่นๆ ไฟล์ที่ 1', category: 'OTHER' },
+      { key: 'OTHER_2', label: 'เอกสารอื่นๆ ไฟล์ที่ 2', category: 'OTHER' },
+      { key: 'OTHER_3', label: 'เอกสารอื่นๆ ไฟล์ที่ 3', category: 'OTHER' },
+      { key: 'OTHER_4', label: 'เอกสารอื่นๆ ไฟล์ที่ 4', category: 'OTHER' }
+    ];
+
+    let html = `<div style="text-align:left;max-height:450px;overflow-y:auto;padding-right:5px">
+      <div style="background:#f1f5f9;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:0.9rem">
+        <b>อัปโหลดเอกสารการเงินสำหรับ:</b> ${esc(regId)}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">`;
+      
+    slots.forEach(slot => {
+      const existing = (docs||[]).find(d => (d.DocType === slot.key || d.DocType === slot.category) && d.Active && !usedDocs.includes(d.DocumentID));
+      if(existing) usedDocs.push(existing.DocumentID);
+      
+      html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff">
+        <div style="font-weight:600;font-size:0.85rem;color:#334155;margin-bottom:6px">${esc(slot.label)}</div>`;
+      if(existing) {
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1">
+          <div style="font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:360px"><i class="fa-solid fa-file-pdf" style="color:#ef4444"></i> <a href="${esc(existing.FileUrl)}" target="_blank" style="font-weight:500;color:#0284c7">${esc(existing.FileName)}</a></div>
+          <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none" onclick="deleteFinanceDoc('${esc(existing.DocumentID)}','${esc(regId)}','${esc(paymentId)}')"><i class="fa-solid fa-trash"></i> ลบ</button>
+        </div>`;
+      } else {
+        html += `<div style="display:flex;gap:8px;align-items:center">
+          <input type="file" id="file_${slot.key}" style="font-size:0.8rem;flex:1" accept=".pdf,.png,.jpg,.jpeg">
+          <button class="btn btn-primary btn-sm" onclick="uploadSingleFinanceDoc('${esc(regId)}','${esc(paymentId)}','${slot.key}','file_${slot.key}')">อัปโหลด</button>
+        </div>`;
+      }
+      html += `</div>`;
+    });
+    
+    html += `</div></div>`;
+
+    await Swal.fire({
+      title: `จัดการไฟล์เอกสารการเงิน (${esc(regId)})`,
+      html,
+      width: '650px',
+      showConfirmButton: false,
+      showCloseButton: true
+    });
+  }catch(e){err(e);}
+}
+
+async function uploadSingleFinanceDoc(regId, paymentId, docType, inputId){
+  const el = $('#' + inputId);
+  if(!el || !el.files || !el.files[0]) return Swal.fire({icon:'warning', title:'กรุณาเลือกไฟล์ก่อนกดอัปโหลด'});
+  const file = el.files[0];
+  show('กำลังอัปโหลดไฟล์...');
+  try{
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try{
+        const base64 = e.target.result.split(',')[1];
+        await rpc('adminUploadFinanceDocument', TOKEN, CID, regId, paymentId, {
+          file: {
+            name: file.name,
+            mimeType: file.type,
+            base64: base64
+          },
+          docType: docType
+        });
+        hide();
+        toast('อัปโหลดไฟล์สำเร็จ');
+        openUploadFinanceDocModal(regId, paymentId);
+        loadPayments();
+      }catch(errExp){err(errExp);}
+    };
+    reader.readAsDataURL(file);
+  }catch(e){err(e);}
+}
+
+async function deleteFinanceDoc(docId, regId, paymentId){
+  const c = await Swal.fire({title:'ยืนยันการลบไฟล์เอกสารนี้?', showCancelButton:true, confirmButtonText:'ลบไฟล์', confirmButtonColor:'#ef4444'});
+  if(!c.isConfirmed) return;
+  show('กำลังลบไฟล์');
+  try{
+    await rpc('adminDeleteFinanceDocument', TOKEN, CID, docId);
+    hide();
+    toast('ลบไฟล์สำเร็จ');
+    openUploadFinanceDocModal(regId, paymentId);
+    loadPayments();
+  }catch(e){err(e);}
+}
+
+async function openFinanceEmailModal(regId){
+  show('กำลังเตรียมอีเมล');
+  try{
+    const regRes = await rpc('adminGetRegistration', TOKEN, CID, regId);
+    const r = regRes.registration || {};
+    const docs = await rpc('adminListFinanceDocuments', TOKEN, CID, regId);
+    hide();
+
+    const recipient = r.Email || '';
+    const subject = `[TUH Conference] แจ้งเอกสารการเงิน / ใบเสร็จรับเงิน (${r.RegID})`;
+    const body = `เรียนคุณ ${r.FullName}\n\nฝ่ายการเงินขอส่งเอกสารเกี่ยวกับการลงทะเบียนเข้าร่วมงาน TUH Conference (${r.RegID})\nรายละเอียดเอกสารแนบตามรายการด้านล่าง\n\nขอบคุณครับ/ค่ะ\nฝ่ายการเงิน งานประชุมวิชาการ TUH`;
+
+    let html = `<div style="text-align:left">
+      <div class="field"><label>ถึง (Email)<input id="finEmTo" class="field" style="width:100%" value="${esc(recipient)}"></label></div>
+      <div class="field"><label>หัวข้อ (Subject)<input id="finEmSubj" class="field" style="width:100%" value="${esc(subject)}"></label></div>
+      <div class="field"><label>ข้อความ (Message)<textarea id="finEmBody" class="field" style="width:100%;height:110px">${esc(body)}</textarea></label></div>
+      <div style="font-weight:600;margin-top:10px;margin-bottom:6px;font-size:0.9rem">เลือกไฟล์แนบในระบบ (Attachments):</div>
+      <div style="max-height:140px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc">`;
+      
+    if(docs && docs.length){
+      docs.filter(d=>d.Active).forEach(d => {
+        html += `<label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.85rem;cursor:pointer">
+          <input type="checkbox" class="fin-att-check" value="${esc(d.FileUrl)}" data-name="${esc(d.FileName)}">
+          <span>[${esc(d.DocType)}] <b>${esc(d.FileName)}</b></span>
+        </label>`;
+      });
+    } else {
+      html += `<div class="muted" style="font-size:0.85rem">ไม่พบบันทึกไฟล์เอกสารการเงินในระบบ (คุณยังไม่ได้อัปโหลดเอกสาร)</div>`;
+    }
+    html += `</div></div>`;
+
+    const res = await Swal.fire({
+      title: `ส่ง Email หาผู้ลงทะเบียน (${esc(regId)})`,
+      html,
+      width: '600px',
+      showCancelButton: true,
+      confirmButtonText: '📧 ส่ง Email',
+      confirmButtonColor: '#006D70',
+      preConfirm: () => {
+        const to = $('#finEmTo')?.value;
+        const subj = $('#finEmSubj')?.value;
+        const msg = $('#finEmBody')?.value;
+        if(!to || !subj) {
+          Swal.showValidationMessage('กรุณากรอกอีเมลผู้รับและหัวข้อ');
+          return false;
+        }
+        const atts = $$('.fin-att-check:checked').map(el => ({
+          url: el.value,
+          name: el.getAttribute('data-name')
+        }));
+        return { to, subj, msg, atts };
+      }
+    });
+
+    if(res.isConfirmed){
+      show('กำลังส่งอีเมล');
+      await rpc('adminSendDirectEmail', TOKEN, CID, res.value.to, res.value.subj, res.value.msg, res.value.atts);
+      hide();
+      await Swal.fire({icon:'success', title:'ส่ง Email สำเร็จ', confirmButtonColor:'#006D70'});
+    }
+  }catch(e){err(e);}
+}
+
+function openPrintPaymentsReport(){
+  const payments = window.LAST_PAYMENTS_DATA || [];
+  if(!payments.length) return Swal.fire({icon:'warning', title:'ไม่พบข้อมูลสำหรับพิมพ์รายงาน'});
+
+  const win = window.open('', '_blank');
+  if(!win) return Swal.fire({icon:'warning', title:'เบราว์เซอร์บล็อกหน้าต่างใหม่', text:'กรุณาอนุญาต Pop-up แล้วลองใหม่อีกครั้ง'});
+
+  let totalAmount = 0;
+  let paidCount = 0;
+  let needInvoiceCount = 0;
+  let receiptIssuedCount = 0;
+
+  payments.forEach(p => {
+    totalAmount += Number(p.RequiredAmount || p.Amount || 0);
+    if(p.Status === 'APPROVED') paidCount++;
+    if(p.NeedInvoice || p.Registration?.NeedInvoice) needInvoiceCount++;
+    if(p.ReceiptStatus === 'ISSUED_RECEIPT' || p.ReceiptStatus === 'ออกใบเสร็จแล้ว') receiptIssuedCount++;
+  });
+
+  const confName = BOOT.conference?.ConferenceNameTH || 'TUH Quality Fair 2569';
+  const nowStr = new Date().toLocaleDateString('th-TH', {year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'});
+
+  const rowsHtml = payments.map((p, i) => {
+    const reg = p.Registration || {};
+    const needInv = !!(p.NeedInvoice || reg.NeedInvoice);
+    const recIssued = (p.ReceiptStatus === 'ISSUED_RECEIPT' || p.ReceiptStatus === 'ออกใบเสร็จแล้ว');
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td><b>${esc(p.RegID)}</b></td>
+      <td>${esc(reg.FullName||'-')}</td>
+      <td>${esc(reg.Institution||reg.OrganizationUnit||'-')}</td>
+      <td style="text-align:right">${Number(p.RequiredAmount||p.Amount||0).toLocaleString('th-TH')}</td>
+      <td style="text-align:center">${statusBadge(p.Status)}</td>
+      <td style="text-align:center">${needInv?'ต้องการ':'ไม่ต้องการ'}</td>
+      <td style="text-align:center">${recIssued?'ออกแล้ว':'ยังไม่ออก'}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>รายงานการเงินและใบเสร็จ - ${esc(confName)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    body { font-family: 'Sarabun', sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 15px; }
+    h2, h4 { margin: 0 0 5px 0; }
+    .summary-box { display: flex; gap: 20px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin: 15px 0; }
+    .stat-item { flex: 1; }
+    .stat-val { font-size: 1.1rem; font-weight: bold; color: #006D70; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; }
+    th { background: #f1f5f9; text-align: left; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; display: inline-block; }
+    .badge.approved { background: #dcfce7; color: #166534; }
+    .badge.pending { background: #fef9c3; color: #854d0e; }
+    .badge.returned { background: #fed7aa; color: #9a3412; }
+    .badge.unpaid { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <h2>รายงานการเงินและการออกใบเสร็จ / ใบแจ้งหนี้</h2>
+  <div>${esc(confName)} | ข้อมูล ณ วันที่: ${esc(nowStr)}</div>
+  
+  <div class="summary-box">
+    <div class="stat-item">รายการทั้งหมด: <div class="stat-val">${payments.length} รายการ</div></div>
+    <div class="stat-item">อนุมัติการชำระแล้ว: <div class="stat-val">${paidCount} รายการ</div></div>
+    <div class="stat-item">ต้องการใบแจ้งหนี้: <div class="stat-val">${needInvoiceCount} รายการ</div></div>
+    <div class="stat-item">ออกใบเสร็จแล้ว: <div class="stat-val">${receiptIssuedCount} รายการ</div></div>
+    <div class="stat-item">ยอดรวมประมาณการ: <div class="stat-val">${totalAmount.toLocaleString('th-TH')} บาท</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th>RegID</th>
+        <th>ชื่อ-นามสกุล</th>
+        <th>หน่วยงาน/สถาบัน</th>
+        <th style="text-align:right">จำนวนเงิน</th>
+        <th style="text-align:center">สถานะชำระ</th>
+        <th style="text-align:center">ใบแจ้งหนี้</th>
+        <th style="text-align:center">สถานะใบเสร็จ</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+  <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
+</body>
+</html>`;
+
+  win.document.write(html);
+  win.document.close();
+}
 
 async function loadWorks(){
   show('กำลังโหลดผลงาน');

@@ -2397,6 +2397,32 @@ function adminDeleteFinanceDocument(token, conferenceId, docId) {
   });
 }
 
+function adminSendDirectEmail(token, conferenceId, to, subject, body, attachments) {
+  return runSafely_('adminSendDirectEmail', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN','CONFERENCE_ADMIN','FINANCE_STAFF','REGISTRATION_STAFF','ACADEMIC_STAFF'], conferenceId);
+    if (!to || !subject) throw new Error('กรุณาระบุผู้รับและหัวข้ออีเมล');
+    let emailHtml = '<div style="font-family:Prompt,sans-serif;line-height:1.6;color:#333;">' +
+      '<div style="background:#006D70;color:#fff;padding:12px 18px;border-radius:6px 6px 0 0;font-size:16px;font-weight:bold;">TUH Quality Fair</div>' +
+      '<div style="padding:18px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;">' +
+      String(body || '').replace(/\n/g, '<br>') +
+      '</div></div>';
+
+    if (attachments && attachments.length) {
+      emailHtml += '<br><div style="font-size:13px;color:#666;"><b>เอกสารแนบในระบบ / ลิงก์ดาวน์โหลด:</b><ul>';
+      (attachments || []).forEach(function(att) {
+        if (att.url) {
+          emailHtml += '<li><a href="' + htmlEscape_(att.url) + '" target="_blank">' + htmlEscape_(att.name || att.url) + '</a></li>';
+        }
+      });
+      emailHtml += '</ul></div>';
+    }
+
+    sendEmailLogged_(conferenceId, to, subject, emailHtml, 'DIRECT_EMAIL', to, ctx.user);
+    logAudit_(conferenceId, ctx.user, ctx.role, 'SEND_DIRECT_EMAIL', 'Email', to, {subject: subject, attachmentsCount: (attachments||[]).length});
+    return {success: true};
+  });
+}
+
 function getPublicFinanceDocuments(conferenceId, regId, emailOrPhone) {
   return runSafely_('getPublicFinanceDocuments', function() {
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
