@@ -4437,7 +4437,154 @@ function registerNewUser(payload, conferenceId) {
   });
 }
 
+function adminToggleReceiptStatus(token, conferenceId, regId) {
+  return runSafely_('adminToggleReceiptStatus', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'FINANCE_STAFF'], conferenceId);
+    const r = findOne_('Registrations', { ConferenceID: conferenceId, RegID: regId });
+    if (!r) throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน ' + regId);
 
+    const currentStatus = clean_(r.InvoiceStatus || r.ReceiptStatus || '');
+    const isIssued = currentStatus === 'ISSUED' || bool_(r.ReceiptIssued);
+    const newStatus = isIssued ? 'NOT_ISSUED' : 'ISSUED';
+    const newIssuedBool = !isIssued;
+
+    const patch = {
+      InvoiceStatus: newStatus,
+      ReceiptIssued: newIssuedBool,
+      ReceiptStatus: newStatus,
+      UpdatedAt: new Date(),
+      LastModifiedBy: ctx.user.Email
+    };
+
+    updateRecord_('Registrations', r.__row, patch);
+
+    const p = findOne_('Payments', { ConferenceID: conferenceId, RegID: regId });
+    if (p) {
+      updateRecord_('Payments', p.__row, {
+        ReceiptStatus: newStatus,
+        ReceiptIssued: newIssuedBool,
+        UpdatedAt: new Date()
+      });
+    }
+
+    invalidateCache_(conferenceId);
+    logAudit_(conferenceId, ctx.user, ctx.role, 'TOGGLE_RECEIPT_STATUS', 'Registration', regId, { newStatus: newStatus, isIssued: newIssuedBool });
+
+    return { success: true, regId: regId, status: newStatus, isIssued: newIssuedBool };
+  });
+}
+
+function adminUpdateReceiptInfo(token, conferenceId, regId, payload) {
+  return runSafely_('adminUpdateReceiptInfo', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'FINANCE_STAFF'], conferenceId);
+    const r = findOne_('Registrations', { ConferenceID: conferenceId, RegID: regId });
+    if (!r) throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน ' + regId);
+
+    payload = payload || {};
+    const patch = {
+      ReceiptRequirement: clean_(payload.ReceiptRequirement !== undefined ? payload.ReceiptRequirement : r.ReceiptRequirement),
+      ReceiptName: clean_(payload.ReceiptName !== undefined ? payload.ReceiptName : r.ReceiptName),
+      ReceiptTaxID: clean_(payload.ReceiptTaxID !== undefined ? payload.ReceiptTaxID : r.ReceiptTaxID),
+      ReceiptAddress: clean_(payload.ReceiptAddress !== undefined ? payload.ReceiptAddress : r.ReceiptAddress),
+      ReceiptPostalCode: clean_(payload.ReceiptPostalCode !== undefined ? payload.ReceiptPostalCode : r.ReceiptPostalCode),
+      ReceiptPhone: normalizePhone_(payload.ReceiptPhone !== undefined ? payload.ReceiptPhone : r.ReceiptPhone),
+      NeedInvoice: payload.NeedInvoice !== undefined ? bool_(payload.NeedInvoice) : bool_(r.NeedInvoice),
+      InvoiceStatus: clean_(payload.InvoiceStatus !== undefined ? payload.InvoiceStatus : r.InvoiceStatus),
+      ReceiptNo: clean_(payload.ReceiptNo !== undefined ? payload.ReceiptNo : r.ReceiptNo),
+      UpdatedAt: new Date(),
+      LastModifiedBy: ctx.user.Email
+    };
+
+    updateRecord_('Registrations', r.__row, patch);
+
+    const p = findOne_('Payments', { ConferenceID: conferenceId, RegID: regId });
+    if (p) {
+      updateRecord_('Payments', p.__row, {
+        ReceiptNo: patch.ReceiptNo || p.ReceiptNo,
+        ReceiptName: patch.ReceiptName,
+        ReceiptTaxID: patch.ReceiptTaxID,
+        ReceiptAddress: patch.ReceiptAddress,
+        ReceiptPhone: patch.ReceiptPhone,
+        UpdatedAt: new Date()
+      });
+    }
+
+    invalidateCache_(conferenceId);
+    logAudit_(conferenceId, ctx.user, ctx.role, 'UPDATE_RECEIPT_INFO', 'Registration', regId, patch);
+
+    return { success: true, regId: regId, data: patch };
+  });
+}
+
+function adminUploadFinanceDocument(token, conferenceId, regId, payload) {
+  return runSafely_('adminUploadFinanceDocument', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'FINANCE_STAFF'], conferenceId);
+    if (!regId) throw new Error('กรุณาระบุ RegID');
+
+    payload = payload || {};
+    const docType = payload.docType || 'RECEIPT';
+    const folder = ensureRegFolder_(conferenceId, regId, 'FINANCE_DOCS');
+    let fileUrl = '', fileId = '', fileName = payload.fileName || (docType + '_' + regId);
+
+    if (payload.base64) {
+      const blob = Utilities.newBlob(Utilities.base64Decode(payload.base64), payload.mimeType || 'application/pdf', fileName);
+      const newFile = folder.createFile(blob);
+      fileUrl = newFile.getUrl();
+      fileId = newFile.getId();
+    } else if (payload.url || payload.fileId) {
+      fileId = extractDriveId_(payload.fileId || payload.url);
+      fileUrl = payload.url || ('https://drive.google.com/file/d/' + fileId + '/view');
+    } else {
+      throw new Error('กรุณาเลือกไฟล์ที่ต้องการอัปโหลด');
+    }
+
+    const docId = nextId_('FINDOC');
+    appendRecord_('FinanceDocuments', {
+      DocumentID: docId,
+      ConferenceID: conferenceId,
+      RegID: regId,
+      DocType: docType,
+      FileName: fileName,
+      FileId: fileId,
+      FileUrl: fileUrl,
+      MimeType: payload.mimeType || 'application/pdf',
+      UploadedBy: ctx.user.Email || ctx.user.UserID,
+      UploadedAt: new Date(),
+      Active: true,
+      Note: clean_(payload.note || '')
+    });
+
+    logAudit_(conferenceId, ctx.user, ctx.role, 'UPLOAD_FINANCE_DOC', 'FinanceDocuments', docId, { RegID: regId, docType: docType, fileName: fileName });
+
+    return { success: true, documentId: docId, fileUrl: fileUrl, fileName: fileName };
+  });
+}
+
+function adminListFinanceDocuments(token, conferenceId, regId) {
+  return runSafely_('adminListFinanceDocuments', function() {
+    requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'FINANCE_STAFF'], conferenceId);
+    const docs = findMany_('FinanceDocuments', { ConferenceID: conferenceId, RegID: regId }).filter(function(d) {
+      return bool_(d.Active);
+    });
+    docs.sort(function(a, b) { return new Date(b.UploadedAt).getTime() - new Date(a.UploadedAt).getTime(); });
+    return serialize_(docs);
+  });
+}
+
+function adminDeleteFinanceDocument(token, conferenceId, documentId) {
+  return runSafely_('adminDeleteFinanceDocument', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'FINANCE_STAFF'], conferenceId);
+    const doc = findOne_('FinanceDocuments', { ConferenceID: conferenceId, DocumentID: documentId });
+    if (!doc) throw new Error('ไม่พบเอกสารที่ต้องการลบ');
+    updateRecord_('FinanceDocuments', doc.__row, {
+      Active: false,
+      UpdatedAt: new Date(),
+      DeletedBy: ctx.user.Email
+    });
+    logAudit_(conferenceId, ctx.user, ctx.role, 'DELETE_FINANCE_DOC', 'FinanceDocuments', documentId, { RegID: doc.RegID, FileName: doc.FileName });
+    return { success: true };
+  });
+}
 
 /** ===== Combined from gas/ApiActions.gs ===== **/
 /** Actions discovered from the production frontends. Do not expose arbitrary globals. */
