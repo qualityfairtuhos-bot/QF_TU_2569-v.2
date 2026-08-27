@@ -71,9 +71,13 @@ function apiError_(code,message) {
 }
 
 function apiClaimRequest_(requestId) {
+  if (!requestId) return '';
   const cache = CacheService.getScriptCache();
   const key = 'api_request_' + requestId;
-  if (cache.get(key)) throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลแล้ว');
+  const status = cache.get(key);
+  if (status === 'PROCESSING') throw apiError_('DUPLICATE_REQUEST','คำขอนี้กำลังถูกประมวลผลอยู่ กรุณารอสักครู่');
+  if (status === 'DONE') throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลเสร็จสิ้นแล้ว');
+  if (status) throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลแล้ว');
   cache.put(key, 'PROCESSING', 600);
   return key;
 }

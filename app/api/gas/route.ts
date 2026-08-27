@@ -111,7 +111,7 @@ export async function POST(request:NextRequest){
   if(!secret)return failure("ยังไม่ได้ตั้งค่าการเชื่อมต่อ Backend","SERVER_NOT_CONFIGURED",503,requestId);
   const outbound={action,args,requestId:typeof input.requestId==="string"?input.requestId:requestId,timestamp:Date.now(),secret};
   try{
-    const result=await callGas(outbound,READ_ACTIONS.has(action)?3:2);
+    const result=await callGas(outbound,READ_ACTIONS.has(action)?3:1);
     if(result.success){
       setCachedResponse(action,args,result);
       invalidateServerCache(action);
