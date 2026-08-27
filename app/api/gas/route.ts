@@ -74,7 +74,19 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
         signal:controller.signal
       });
       if(!response.ok)throw new Error(`GAS_HTTP_${response.status}`);
-      const result=JSON.parse(await response.text()) as ApiResponse<unknown>;
+      const rawText=await response.text();
+      let result:ApiResponse<unknown>;
+      try{
+        result=JSON.parse(rawText) as ApiResponse<unknown>;
+      }catch{
+        if(rawText.includes("accounts.google.com")||rawText.includes("Authorization required")||rawText.includes("google.com/auth")){
+          throw new Error("กรุณากดจัดทำเวอร์ชันใหม่ (New Version Deployment) และยินยอมสิทธิ์ใน Google Apps Script");
+        }
+        if(rawText.includes("<!DOCTYPE")||rawText.includes("<html")){
+          throw new Error("Google Apps Script คืนค่าเป็นหน้า HTML (อาจเกิดจากสิทธิ์การใช้งาน หรือ Script Error)");
+        }
+        throw new Error(`คำตอบจากส่วนกลางไม่ถูกต้อง (${rawText.slice(0, 80)})`);
+      }
       if(typeof result.success!=="boolean")throw new Error("GAS_INVALID_RESPONSE");
       return result;
     }catch(error){if(attempt+1>=attempts)throw error}finally{clearTimeout(timeout)}
@@ -125,12 +137,13 @@ export async function POST(request:NextRequest){
     const response=NextResponse.json(result,{status:result.success?200:400});
     if(action==="logoutUser")clearSessionCookie(response);
     return response;
-  }catch{
+  }catch(err:unknown){
+    const errorMsg=err instanceof Error?err.message:String(err);
     // If upstream call fails, check if we have a last known good cached response for read actions
     if(lastKnownGood.has(cacheKey)){
       const fallback=lastKnownGood.get(cacheKey)!;
       return NextResponse.json(fallback,{status:200,headers:{"X-Fallback":"true"}});
     }
-    return failure("ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ กรุณาลองใหม่","UPSTREAM_ERROR",502,requestId);
+    return failure(`ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ (${errorMsg})`,"UPSTREAM_ERROR",502,requestId);
   }
 }

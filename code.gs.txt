@@ -848,7 +848,7 @@ function uploadExcelForImport(token, conferenceId, file) {
       const folderMap = jsonParse_(getSetting_(cid, 'DRIVE_FOLDERS_JSON', '{}'), {});
       const fileName = 'IMPORT_' + Date.now() + '_' + (file.name || 'registration.xlsx');
 
-      if (typeof Drive.Files.insert === 'function') {
+      if (typeof Drive !== 'undefined' && Drive.Files && typeof Drive.Files.insert === 'function') {
         // Drive API v2 (Default in Google Apps Script UI)
         const resource = {
           title: fileName,
@@ -857,15 +857,25 @@ function uploadExcelForImport(token, conferenceId, file) {
         if (folderMap['01_Import_Temp']) {
           resource.parents = [{ id: folderMap['01_Import_Temp'] }];
         }
-        converted = Drive.Files.insert(resource, blob, { convert: true });
-      } else if (typeof Drive.Files.create === 'function') {
+        try {
+          converted = Drive.Files.insert(resource, blob, { convert: true });
+        } catch (errInsert) {
+          delete resource.parents;
+          converted = Drive.Files.insert(resource, blob, { convert: true });
+        }
+      } else if (typeof Drive !== 'undefined' && Drive.Files && typeof Drive.Files.create === 'function') {
         // Drive API v3
         const metadata = {
           name: fileName,
           mimeType: 'application/vnd.google-apps.spreadsheet'
         };
         if (folderMap['01_Import_Temp']) metadata.parents = [folderMap['01_Import_Temp']];
-        converted = Drive.Files.create(metadata, blob, { fields: 'id,name' });
+        try {
+          converted = Drive.Files.create(metadata, blob, { fields: 'id,name' });
+        } catch (errCreate) {
+          delete metadata.parents;
+          converted = Drive.Files.create(metadata, blob, { fields: 'id,name' });
+        }
       } else {
         throw new Error('ADVANCED_DRIVE_REQUIRED');
       }
@@ -879,7 +889,19 @@ function uploadExcelForImport(token, conferenceId, file) {
       throw error;
     }
 
-    const source = SpreadsheetApp.openById(converted.id);
+    const fileId = converted && (converted.id || (typeof converted.getId === 'function' ? converted.getId() : null));
+    if (!fileId) throw new Error('ไม่สามารถแปลงไฟล์เป็น Google Sheet ได้');
+
+    let source = null;
+    for (let retry = 0; retry < 3; retry++) {
+      try {
+        source = SpreadsheetApp.openById(fileId);
+        if (source) break;
+      } catch (e) {
+        Utilities.sleep(1000);
+      }
+    }
+    if (!source) source = SpreadsheetApp.openById(fileId);
     const sheet = source.getSheets()[0];
     const data = sheet.getDataRange().getDisplayValues();
 
