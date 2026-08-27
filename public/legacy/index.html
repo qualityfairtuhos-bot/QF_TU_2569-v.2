@@ -223,7 +223,7 @@
 
       <!-- ส่วนที่ 3: ข้อมูลสำหรับออกใบเสร็จรับเงิน -->
       <div class="form-section">
-        <div class="form-section-header"><span class="sec-badge">3</span><span>ข้อมูลสำหรับออกใบเสร็จรับเงิน</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Receipt & Tax Invoice</span></div>
+        <div class="form-section-header"><span class="sec-badge">3</span><span>ข้อมูลสำหรับออกใบเสร็จรับเงิน & ใบแจ้งหนี้</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Receipt & Tax Invoice</span></div>
         <div class="grid">
           <div class="field"><label>ความประสงค์ออกใบเสร็จ<span class="en">Receipt requirement</span></label><select name="ReceiptRequirement" id="receiptRequirementSelect"><option value="NO_RECEIPT">ไม่ออกใบเสร็จ / No receipt</option><option value="NEED_RECEIPT">ต้องการออกใบเสร็จรับเงิน / Request receipt</option></select></div>
           <div class="field"><label>ชื่อบุคคล/หน่วยงานสำหรับออกใบเสร็จ<span class="en">Receipt name / Entity name</span></label><input name="ReceiptName" placeholder="เช่น โรงพยาบาล... หรือ ชื่อ-สกุล"></div>
@@ -231,6 +231,15 @@
           <div class="field"><label>เบอร์โทรศัพท์สำหรับใบเสร็จ<span class="en">Receipt contact phone</span></label><input name="ReceiptPhone" inputmode="tel" placeholder="เบอร์โทรศัพท์สำหรับประสานงาน"></div>
           <div class="field"><label>ที่อยู่สำหรับออกใบเสร็จ<span class="en">Receipt address</span></label><textarea name="ReceiptAddress" rows="2" placeholder="เลขที่ อาคาร ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด"></textarea></div>
           <div class="field"><label>รหัสไปรษณีย์สำหรับใบเสร็จ<span class="en">Receipt postal code</span></label><input name="ReceiptPostalCode" inputmode="numeric" maxlength="5" placeholder="รหัสไปรษณีย์ 5 หลัก"></div>
+          <div class="field grid-full" style="margin-top:2px;">
+            <label style="cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-weight:600;color:#073552;background:#f0fdf4;padding:10px 14px;border:1px solid #bbf7d0;border-radius:8px;">
+              <input type="checkbox" name="NeedInvoice" value="true" id="needInvoiceCheckbox" style="width:18px;height:18px;margin-top:2px;accent-color:#006D70;cursor:pointer;">
+              <span>
+                ต้องการใบแจ้งหนี้ (Request Invoice)
+                <span class="en" style="font-weight:400;color:#64748b;font-size:0.85rem;display:block;margin-top:2px;">(ติ๊กเครื่องหมายถูก หากต้องการใบแจ้งหนี้เพื่อใช้ในการทำเรื่องเบิกจ่ายงบประมาณ ฝ่ายการเงินจะออกใบแจ้งหนี้และแนบไฟล์ให้ท่าน)</span>
+              </span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -453,8 +462,8 @@ async function init(){
 }
 
 $('#regForm').addEventListener('submit',async e=>{e.preventDefault();const consent=$('#consentAccepted');if(!PDPA_READ||!consent||!consent.checked)return Swal.fire({icon:'warning',title:'กรุณาอ่านและให้ความยินยอม',text:'โปรดกดเปิดอ่านข้อความขอความยินยอม อ่านรายละเอียด แล้วเลือกช่องให้ความยินยอมก่อนบันทึก',confirmButtonColor:'#006D70'});const selected=[...e.target.querySelectorAll('#attendanceDates input[type=checkbox]')].some(x=>x.checked);if(!selected)return Swal.fire({icon:'warning',title:'กรุณาเลือกวันเข้าร่วมงาน',confirmButtonColor:'#006D70'});load('กำลังบันทึกการลงทะเบียน');try{const r=await rpc('submitRegistration',CID,formObj(e.target));done();await Swal.fire({icon:'success',title:'ลงทะเบียนสำเร็จ',html:`เลขลงทะเบียน <b>${esc(r.RegID)}</b><br>รหัสแก้ไข <b>${esc(r.EditCode)}</b>${r.warnings?.length?'<br><small>'+r.warnings.map(esc).join('<br>')+'</small>':''}`,confirmButtonColor:'#006D70'});e.target.reset();renderAttendanceDates();resetConsentState();go('status');$('#statusRegId').value=r.RegID}catch(x){alertErr(x)}});
-async function lookupStatus(){load('กำลังค้นหาข้อมูล');try{const r=await rpc('lookupRegistrationForEdit',CID,$('#statusRegId').value,$('#statusKey').value,$('#statusCode').value);done();renderStatus(r)}catch(e){alertErr(e)}}
-function renderStatus(r){
+async function lookupStatus(){load('กำลังค้นหาข้อมูล');try{const r=await rpc('lookupRegistrationForEdit',CID,$('#statusRegId').value,$('#statusKey').value,$('#statusCode').value);let docs=[];try{docs=await rpc('getPublicFinanceDocuments',CID,$('#statusRegId').value,$('#statusKey').value)}catch(ignore){}done();renderStatus(r,docs)}catch(e){alertErr(e)}}
+function renderStatus(r,docs){
   const prefixes=settingOptions('PREFIX_OPTIONS_JSON',['นาย','นาง','นางสาว','นพ.','พญ.','ทพ.','ทพญ.','ภก.','ภญ.']),positions=settingOptions('POSITION_OPTIONS_JSON',[]),professions=settingOptions('PROFESSION_OPTIONS_JSON',['แพทย์','ทันตแพทย์','เภสัชกร','พยาบาล','นักวิชาการ']);
   const cg=settingOptions('ORGANIZATION_GROUP_OPTIONS_JSON',[]),co=settingOptions('ORGANIZATION_OPTIONS_JSON',[]);
   const groups=cg.length?cg:(BOOT.organizationUnits||[]).filter(x=>x.UnitLevel==='GROUP').map(x=>x.UnitNameTH);
@@ -465,10 +474,13 @@ function renderStatus(r){
   const input=(name,value,list='',type='text',maxlength='')=>`<input type="${type}" name="${name}" value="${esc(value||'')}" ${list?`list="${list}"`:''} ${maxlength?`maxlength="${maxlength}"`:''}>`;
   const locked = r.RegistrationStatus === 'REGISTRATION_VERIFIED' || r.RegistrationStatus === 'COMPLETED';
 
+  const docsHtml=(docs&&docs.length)?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin-bottom:14px;"><div style="font-weight:600;color:#166534;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-file-invoice-dollar"></i> เอกสารทางการเงินจากเจ้าหน้าที่ (Finance Documents)</div><div style="display:flex;flex-direction:column;gap:6px">${docs.map(d=>{const catLabel=d.DocCategory==='INVOICE'?'ใบแจ้งหนี้ (Invoice)':(d.DocCategory==='RECEIPT'?'ใบเสร็จรับเงิน (Receipt)':'เอกสารอื่นๆ');const badgeStyle=d.DocCategory==='INVOICE'?'color:#92400e;background:#fef3c7;border:1px solid #fde68a;':(d.DocCategory==='RECEIPT'?'color:#15803d;background:#dcfce7;border:1px solid #86efac;':'color:#1e40af;background:#dbeafe;border:1px solid #bfdbfe;');return `<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #e2e8f0;font-size:0.88rem;flex-wrap:wrap;gap:8px;"><div><span style="font-size:0.75rem;padding:2px 8px;border-radius:4px;font-weight:600;margin-right:6px;${badgeStyle}">${catLabel}</span><b>${esc(d.FileName)}</b>${d.Note?`<span class="muted" style="margin-left:6px">(${esc(d.Note)})</span>`:''}</div><a href="${esc(d.FileUrl)}" target="_blank" class="btn btn-sm btn-primary" style="padding:4px 12px;font-size:0.8rem;text-decoration:none;"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดดู / ดาวน์โหลด</a></div>`}).join('')}</div></div>`:'';
+
   $('#statusResult').innerHTML=`<div class="card">
     <div class="notice ${r.DataCompletenessStatus==='COMPLETE'?'success':''}" style="margin-bottom:14px">
       สถานะข้อมูล: <b>${esc(r.DataCompletenessStatus)}</b> | สถานะลงทะเบียน: <b>${esc(r.RegistrationStatus)}</b> | การเงิน: <b>${esc(r.PaymentStatus)}</b>
     </div>
+    ${docsHtml}
     ${locked?'<div class="notice" style="margin-bottom:14px;color:#d32f2f;background:#fdeded;border:1px solid #ebccd1"><b>ข้อมูลได้รับการตรวจสอบแล้ว ไม่สามารถแก้ไขได้</b></div>':''}
     <form id="editForm">
       <fieldset ${locked?'disabled':''} style="border:none;padding:0;margin:0">
@@ -500,7 +512,7 @@ function renderStatus(r){
 
         <!-- 3. ข้อมูลสำหรับออกใบเสร็จรับเงิน -->
         <div class="form-section">
-          <div class="form-section-header"><span class="sec-badge">3</span><span>ข้อมูลสำหรับออกใบเสร็จรับเงิน</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Receipt & Tax Invoice</span></div>
+          <div class="form-section-header"><span class="sec-badge">3</span><span>ข้อมูลสำหรับออกใบเสร็จรับเงิน & ใบแจ้งหนี้</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Receipt & Tax Invoice</span></div>
           <div class="grid">
             <div class="field"><label>ความประสงค์ออกใบเสร็จ<span class="en">Receipt requirement</span></label><select name="ReceiptRequirement"><option value="NO_RECEIPT" ${r.ReceiptRequirement==='NO_RECEIPT'?'selected':''}>ไม่ออกใบเสร็จ / No receipt</option><option value="NEED_RECEIPT" ${r.ReceiptRequirement==='NEED_RECEIPT'?'selected':''}>ต้องการออกใบเสร็จรับเงิน / Request receipt</option></select></div>
             <div class="field"><label>ชื่อบุคคล/หน่วยงานสำหรับออกใบเสร็จ<span class="en">Receipt name / Entity name</span></label>${input('ReceiptName',r.ReceiptName||'')}</div>
@@ -508,6 +520,15 @@ function renderStatus(r){
             <div class="field"><label>เบอร์โทรศัพท์สำหรับใบเสร็จ<span class="en">Receipt contact phone</span></label>${input('ReceiptPhone',r.ReceiptPhone||'','','tel')}</div>
             <div class="field"><label>ที่อยู่สำหรับออกใบเสร็จ<span class="en">Receipt address</span></label><textarea name="ReceiptAddress" rows="2" placeholder="เลขที่ อาคาร ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด">${esc(r.ReceiptAddress||'')}</textarea></div>
             <div class="field"><label>รหัสไปรษณีย์สำหรับใบเสร็จ<span class="en">Receipt postal code</span></label>${input('ReceiptPostalCode',r.ReceiptPostalCode||'','','text','5')}</div>
+            <div class="field grid-full" style="margin-top:2px;">
+              <label style="cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-weight:600;color:#073552;background:#f0fdf4;padding:10px 14px;border:1px solid #bbf7d0;border-radius:8px;">
+                <input type="checkbox" name="NeedInvoice" value="true" ${r.NeedInvoice ? 'checked' : ''} style="width:18px;height:18px;margin-top:2px;accent-color:#006D70;cursor:pointer;">
+                <span>
+                  ต้องการใบแจ้งหนี้ (Request Invoice)
+                  <span class="en" style="font-weight:400;color:#64748b;font-size:0.85rem;display:block;margin-top:2px;">(ติ๊กเครื่องหมายถูก หากต้องการใบแจ้งหนี้เพื่อใช้ในการทำเรื่องเบิกจ่ายงบประมาณ ฝ่ายการเงินจะออกใบแจ้งหนี้และแนบไฟล์ให้ท่าน)</span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 

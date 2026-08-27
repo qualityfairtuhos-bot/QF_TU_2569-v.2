@@ -5,7 +5,7 @@
   "engines": { "node": ">=20.9.0" },
   "scripts": {
     "predev": "node tools/prepare-legacy.mjs",
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3000 -H 0.0.0.0",
     "prebuild": "node tools/prepare-legacy.mjs",
     "build": "next build",
     "start": "next start -p 3000 -H 0.0.0.0",
