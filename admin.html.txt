@@ -631,16 +631,34 @@ async function loadImportBatches(){
           <td>${esc(b.UploadedBy)}</td>
           <td>${b.TotalRows}</td>
           <td><b style="color:#006D70">${b.ImportedRows||0}</b></td>
-          <td>${statusBadge(b.Status)}</td>
+          <td>${statusBadge(b.Status === 'PREVIEW' ? 'รอการยืนยัน (PREVIEW)' : b.Status)}</td>
           <td>
-            <button class="btn btn-primary btn-sm" onclick="viewImportBatchDetail('${esc(b.ImportBatchID)}')">
-              <i class="fa-solid fa-list-check"></i> ตรวจทาน & ส่ง Email
-            </button>
+            ${b.Status === 'PREVIEW' ? `
+              <button class="btn btn-primary btn-sm" style="margin-right:4px;" onclick="commitImport('${esc(b.ImportBatchID)}')">
+                <i class="fa-solid fa-file-export"></i> ยืนยันนำเข้าข้อมูล
+              </button>
+              <button class="btn btn-soft btn-sm" onclick="viewImportBatchDetail('${esc(b.ImportBatchID)}')">
+                <i class="fa-solid fa-eye"></i> รายละเอียด
+              </button>
+            ` : `
+              <button class="btn btn-primary btn-sm" onclick="viewImportBatchDetail('${esc(b.ImportBatchID)}')">
+                <i class="fa-solid fa-list-check"></i> ตรวจทาน & ส่ง Email
+              </button>
+            `}
           </td>
         </tr>`).join('')}
       </tbody>
     </table></div>`;
-  } catch(e) { console.error('loadImportBatches error:', e); }
+  } catch(e) {
+    console.error('loadImportBatches error:', e);
+    const container = $('#importHistory');
+    if (container) {
+      container.innerHTML = `<div style="padding:15px; color:#e53e3e; background:#fff5f5; border:1px solid #feb2b2; border-radius:8px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> ไม่สามารถโหลดประวัติการนำเข้าได้: ${esc(e.message||String(e))}
+        <button class="btn btn-soft btn-sm" style="margin-left:10px;" onclick="loadImportBatches()"><i class="fa-solid fa-rotate-right"></i> ลองใหม่</button>
+      </div>`;
+    }
+  }
 }
 
 async function viewImportBatchDetail(batchId){
@@ -655,6 +673,18 @@ async function viewImportBatchDetail(batchId){
 
     const html = `
       <div style="text-align:left; font-size:0.9rem; max-height:75vh; overflow-y:auto; padding-right:6px;">
+        ${batch.Status === 'PREVIEW' ? `
+          <div style="background:#fffaf0; border:1px solid #fbd38d; padding:12px; border-radius:8px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <h5 style="margin:0 0 4px; color:#c05621;"><i class="fa-solid fa-triangle-exclamation"></i> Batch นี้ยังอยู่ในขั้นตอนรอการยืนยัน (Pre-import Preview)</h5>
+              <span style="font-size:0.85rem; color:#744210;">ข้อมูลถูกตรวจสอบเรียบร้อยแล้ว ท่านสามารถกดปุ่ม "ยืนยันนำเข้าข้อมูล" เพื่อสร้างรายชื่อจริงเข้าสู่ระบบได้ทันที</span>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="Swal.close(); commitImport('${esc(batch.ImportBatchID)}');">
+              <i class="fa-solid fa-file-export"></i> ยืนยันนำเข้าข้อมูล Batch นี้
+            </button>
+          </div>
+        ` : ''}
+
         <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:14px;">
           <h4 style="margin:0 0 6px; color:#006D70;"><i class="fa-solid fa-file-import"></i> รายละเอียดการนำเข้า Batch: ${esc(batch.ImportBatchID)}</h4>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.85rem;">

@@ -1085,6 +1085,26 @@ function appendRecord_(name,obj){
   clearTableCache_(name);
   return next;
 }
+function appendRecords_(name, objects) {
+  if (!objects || !objects.length) return 0;
+  const sh = getSheet_(name), hm = headerMap_(name);
+  const rows = objects.map(function(obj) {
+    return hm.headers.map(function(h) {
+      return obj[h] !== undefined ? obj[h] : '';
+    });
+  });
+  const next = sh.getLastRow() + 1;
+  sh.getRange(next, 1, rows.length, hm.headers.length).setValues(rows);
+  PLAIN_TEXT_FIELDS.forEach(function(k) {
+    if (hm.map[k] !== undefined) {
+      const colIdx = hm.map[k] + 1;
+      sh.getRange(next, colIdx, rows.length, 1).setNumberFormat('@');
+    }
+  });
+  clearRequestCache_();
+  clearTableCache_(name);
+  return next;
+}
 function updateRecord_(name,rowNumber,patch){
   const sh=getSheet_(name), hm=headerMap_(name); 
   Object.keys(patch).forEach(function(k){ 
@@ -1505,6 +1525,8 @@ function uploadExcelForImport(token, conferenceId, file) {
 
     const seenCidInFile = {};
     const seenNameInFile = {};
+    const importRowsToInsert = [];
+    const importIssuesToInsert = [];
 
     sourceRows.forEach(function(item) {
       const raw = buildImportRawRow_(headers, item.values);
@@ -1562,7 +1584,7 @@ function uploadExcelForImport(token, conferenceId, file) {
 
       const importRowId = nextId_('IMPR');
 
-      appendRecord_('ImportRows', {
+      importRowsToInsert.push({
         ImportRowID: importRowId,
         ImportBatchID: batchId,
         ConferenceID: cid,
@@ -1578,7 +1600,7 @@ function uploadExcelForImport(token, conferenceId, file) {
       });
 
       issues.forEach(function(issue) {
-        appendRecord_('ImportIssues', {
+        importIssuesToInsert.push({
           ImportIssueID: nextId_('ISS'),
           ImportBatchID: batchId,
           ImportRowID: importRowId,
@@ -1592,6 +1614,9 @@ function uploadExcelForImport(token, conferenceId, file) {
         });
       });
     });
+
+    appendRecords_('ImportRows', importRowsToInsert);
+    appendRecords_('ImportIssues', importIssuesToInsert);
 
     const batch = findOne_('ImportBatches', {
       ImportBatchID: batchId,
