@@ -846,13 +846,29 @@ function uploadExcelForImport(token, conferenceId, file) {
       }
 
       const folderMap = jsonParse_(getSetting_(cid, 'DRIVE_FOLDERS_JSON', '{}'), {});
-      const metadata = {
-        name: 'IMPORT_' + Date.now() + '_' + (file.name || 'registration.xlsx'),
-        mimeType: 'application/vnd.google-apps.spreadsheet'
-      };
-      if (folderMap['01_Import_Temp']) metadata.parents = [folderMap['01_Import_Temp']];
+      const fileName = 'IMPORT_' + Date.now() + '_' + (file.name || 'registration.xlsx');
 
-      converted = Drive.Files.create(metadata, blob, { fields: 'id,name' });
+      if (typeof Drive.Files.insert === 'function') {
+        // Drive API v2 (Default in Google Apps Script UI)
+        const resource = {
+          title: fileName,
+          mimeType: 'application/vnd.google-apps.spreadsheet'
+        };
+        if (folderMap['01_Import_Temp']) {
+          resource.parents = [{ id: folderMap['01_Import_Temp'] }];
+        }
+        converted = Drive.Files.insert(resource, blob, { convert: true });
+      } else if (typeof Drive.Files.create === 'function') {
+        // Drive API v3
+        const metadata = {
+          name: fileName,
+          mimeType: 'application/vnd.google-apps.spreadsheet'
+        };
+        if (folderMap['01_Import_Temp']) metadata.parents = [folderMap['01_Import_Temp']];
+        converted = Drive.Files.create(metadata, blob, { fields: 'id,name' });
+      } else {
+        throw new Error('ADVANCED_DRIVE_REQUIRED');
+      }
     } catch (error) {
       if (
         String(error.message).indexOf('ADVANCED_DRIVE_REQUIRED') >= 0 ||
