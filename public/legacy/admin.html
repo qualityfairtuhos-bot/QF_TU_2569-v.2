@@ -1821,6 +1821,18 @@ async function openRegEmailModal(regId, fallbackEmail, fallbackName){
   if (!reg && window.LAST_VIEWED_REG_DATA?.registration?.RegID === regId) {
     reg = window.LAST_VIEWED_REG_DATA.registration;
   }
+  if (!reg) {
+    try {
+      show('กำลังค้นหาข้อมูลผู้ลงทะเบียน...');
+      const r = await rpc('adminGetRegistration', TOKEN, CID, regId);
+      hide();
+      if (r && r.registration) {
+        reg = r.registration;
+      }
+    } catch(e) {
+      hide();
+    }
+  }
   const toEmail = (reg && reg.Email) || fallbackEmail || '';
   const recipientName = (reg && (reg.FullName || (reg.FirstName ? (reg.FirstName + ' ' + (reg.LastName || '')) : ''))) || fallbackName || '';
 

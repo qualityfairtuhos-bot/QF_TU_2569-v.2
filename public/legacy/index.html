@@ -459,31 +459,6 @@ async function init(){
       alertErr(e);
     }
   }
-
-  // รองรับการเปิดลิงก์ตรงจาก Email แจ้งเตือน เช่น ?page=status&regId=REGxxx&key=user@example.com
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const targetPage = params.get('page');
-    const urlRegId = params.get('regId') || params.get('id');
-    const urlKey = params.get('key') || params.get('email') || params.get('phone');
-    const urlCode = params.get('code');
-
-    if (targetPage === 'status' || urlRegId) {
-      go('status');
-      if (urlRegId && $('#statusRegId')) $('#statusRegId').value = urlRegId;
-      if (urlKey && $('#statusKey')) $('#statusKey').value = urlKey;
-      if (urlCode && $('#statusCode')) $('#statusCode').value = urlCode;
-      if (urlRegId && (urlKey || urlCode)) {
-        setTimeout(function() {
-          lookupStatus();
-        }, 400);
-      }
-    } else if (targetPage && $('#page-' + targetPage)) {
-      go(targetPage);
-    }
-  } catch(routeErr) {
-    console.error('URL route error:', routeErr);
-  }
 }
 
 $('#regForm').addEventListener('submit',async e=>{e.preventDefault();const consent=$('#consentAccepted');if(!PDPA_READ||!consent||!consent.checked)return Swal.fire({icon:'warning',title:'กรุณาอ่านและให้ความยินยอม',text:'โปรดกดเปิดอ่านข้อความขอความยินยอม อ่านรายละเอียด แล้วเลือกช่องให้ความยินยอมก่อนบันทึก',confirmButtonColor:'#006D70'});const selected=[...e.target.querySelectorAll('#attendanceDates input[type=checkbox]')].some(x=>x.checked);if(!selected)return Swal.fire({icon:'warning',title:'กรุณาเลือกวันเข้าร่วมงาน',confirmButtonColor:'#006D70'});load('กำลังบันทึกการลงทะเบียน');try{const r=await rpc('submitRegistration',CID,formObj(e.target));done();await Swal.fire({icon:'success',title:'ลงทะเบียนสำเร็จ',html:`เลขลงทะเบียน <b>${esc(r.RegID)}</b><br>รหัสแก้ไข <b>${esc(r.EditCode)}</b>${r.warnings?.length?'<br><small>'+r.warnings.map(esc).join('<br>')+'</small>':''}`,confirmButtonColor:'#006D70'});e.target.reset();renderAttendanceDates();resetConsentState();go('status');$('#statusRegId').value=r.RegID}catch(x){alertErr(x)}});
@@ -502,8 +477,8 @@ function renderStatus(r,docs){
   const docsHtml=(docs&&docs.length)?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin-bottom:14px;"><div style="font-weight:600;color:#166534;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-file-invoice-dollar"></i> เอกสารทางการเงินจากเจ้าหน้าที่ (Finance Documents)</div><div style="display:flex;flex-direction:column;gap:6px">${docs.map(d=>{const catLabel=d.DocCategory==='INVOICE'?'ใบแจ้งหนี้ (Invoice)':(d.DocCategory==='RECEIPT'?'ใบเสร็จรับเงิน (Receipt)':'เอกสารอื่นๆ');const badgeStyle=d.DocCategory==='INVOICE'?'color:#92400e;background:#fef3c7;border:1px solid #fde68a;':(d.DocCategory==='RECEIPT'?'color:#15803d;background:#dcfce7;border:1px solid #86efac;':'color:#1e40af;background:#dbeafe;border:1px solid #bfdbfe;');return `<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #e2e8f0;font-size:0.88rem;flex-wrap:wrap;gap:8px;"><div><span style="font-size:0.75rem;padding:2px 8px;border-radius:4px;font-weight:600;margin-right:6px;${badgeStyle}">${catLabel}</span><b>${esc(d.FileName)}</b>${d.Note?`<span class="muted" style="margin-left:6px">(${esc(d.Note)})</span>`:''}</div><a href="${esc(d.FileUrl)}" target="_blank" class="btn btn-sm btn-primary" style="padding:4px 12px;font-size:0.8rem;text-decoration:none;"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดดู / ดาวน์โหลด</a></div>`}).join('')}</div></div>`:'';
 
   $('#statusResult').innerHTML=`<div class="card">
-    <div class="notice ${r.DataCompletenessStatus==='COMPLETE'?'success':''}" style="margin-bottom:14px;${r.DataCompletenessStatus==='INCOMPLETE'?'background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;':''}">
-      สถานะข้อมูล: <b>${esc(r.DataCompletenessStatus)}</b> ${r.DataCompletenessStatus==='INCOMPLETE'?'<span style="display:inline-block;margin-left:8px;padding:2px 8px;background:#fef2f2;color:#991b1b;border-radius:4px;font-weight:bold;border:1px solid #fecaca;"><i class="fa-solid fa-triangle-exclamation"></i> ข้อมูลยังไม่สมบูรณ์ (กรุณากรอกเลขบัตรประชาชน 13 หลักให้ครบถ้วน)</span>':''} | สถานะลงทะเบียน: <b>${esc(r.RegistrationStatus)}</b> | การเงิน: <b>${esc(r.PaymentStatus)}</b>
+    <div class="notice ${r.DataCompletenessStatus==='COMPLETE'?'success':''}" style="margin-bottom:14px">
+      สถานะข้อมูล: <b>${esc(r.DataCompletenessStatus)}</b> | สถานะลงทะเบียน: <b>${esc(r.RegistrationStatus)}</b> | การเงิน: <b>${esc(r.PaymentStatus)}</b>
     </div>
     ${docsHtml}
     ${locked?'<div class="notice" style="margin-bottom:14px;color:#d32f2f;background:#fdeded;border:1px solid #ebccd1"><b>ข้อมูลได้รับการตรวจสอบแล้ว ไม่สามารถแก้ไขได้</b></div>':''}
@@ -513,7 +488,7 @@ function renderStatus(r,docs){
         <div class="form-section">
           <div class="form-section-header"><span class="sec-badge">1</span><span>ข้อมูลผู้สมัครและสังกัดหน่วยงาน</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Participant & Organization</span></div>
           <div class="grid">
-            <div class="field"><label>เลขบัตรประชาชน<span class="en">CID</span> ${!r.CID ? '<span style="color:#dc2626;font-size:0.82rem;font-weight:bold;margin-left:6px;"><i class="fa-solid fa-asterisk"></i> จำเป็นต้องกรอก</span>' : ''}</label>${input('CID',r.CID,'','text','13')}</div>
+            <div class="field"><label>เลขบัตรประชาชน<span class="en">CID</span></label>${input('CID',r.CID,'','text','13')}</div>
             <div class="field"><label>คำนำหน้า<span class="en">Prefix</span></label>${select('Prefix',prefixes,r.Prefix)}</div>
             <div class="field"><label>ชื่อ<span class="en">First name</span></label>${input('FirstName',r.FirstName)}</div>
             <div class="field"><label>นามสกุล<span class="en">Last name</span></label>${input('LastName',r.LastName)}</div>

@@ -19,7 +19,7 @@
     .login-brand:before,.login-brand:after{content:"";position:absolute;border-radius:50%;z-index:-1}.login-brand:before{width:370px;height:370px;right:-180px;top:-190px;background:rgba(0,203,215,.12)}.login-brand:after{width:290px;height:290px;left:-120px;bottom:-170px;background:rgba(200,178,120,.18)}
     .brand-pair{display:flex;align-items:center;gap:18px;margin-bottom:34px}.brand-pair img{width:128px;height:92px;object-fit:contain;filter:drop-shadow(0 7px 15px rgba(0,0,0,.24))}.brand-pair img:last-child{width:96px}.login-brand h1{font-size:2.05rem;line-height:1.25;margin:0 0 12px}.login-brand p{margin:5px 0}.login-form{padding:48px;background:#fff}.login-form h2{margin-top:8px}
     .field{margin:10px 0}.field label{font-weight:600}.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid #BFCBD3;border-radius:11px;margin-top:5px;background:#fff}.field textarea{min-height:110px;resize:vertical}.field small{display:block;color:#71808d;margin-top:4px}.date-input{font-variant-numeric:tabular-nums}.invalid-year{border-color:#e53935!important;background:#fff3f3!important}
-    .btn{border:0;border-radius:11px;padding:10px 14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none}.btn:disabled{opacity:.48;cursor:not-allowed}.btn-primary{background:var(--teal);color:#fff}.btn-blue{background:var(--blue);color:#fff}.btn-gold{background:var(--gold);color:#172B3A}.btn-soft{background:#E6EEF2;color:var(--blue)}.btn-danger{background:#FEE4E2;color:var(--danger)}.btn-sm{padding:7px 10px;font-size:.78rem}
+    .btn{border:0;border-radius:11px;padding:10px 14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none}.btn:disabled{opacity:.48;cursor:not-allowed}.btn-primary{background:var(--teal);color:#fff}.btn-blue{background:var(--blue);color:#fff}.btn-gold{background:var(--gold);color:#172B3A}.btn-soft{background:#E6EEF2;color:var(--blue)}.btn-danger{background:#FEE4E2;color:var(--danger)}.btn-email{background:#0284c7;color:#fff}.btn-email:hover{background:#0369a1;color:#fff}.btn-sm{padding:7px 10px;font-size:.78rem}
     .btn-sq{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid #DCE5EA;background:#fff;border-radius:8px;text-decoration:none;cursor:pointer;transition:background 0.2s}.btn-sq:hover{background:#F4F7F8}
     .app{display:none}.sidebar{position:fixed;inset:0 auto 0 0;width:250px;background:linear-gradient(180deg,#071A2D,#0B2941 62%,#073942);color:#fff;overflow:auto;border-right:1px solid rgba(255,255,255,.08);transition:transform 0.25s ease;z-index:90}.sidebar.open{transform:translateX(0)!important}.hamburger{display:none;background:transparent;border:0;font-size:1.4rem;cursor:pointer;color:var(--ink);padding:5px 12px 5px 0;margin-right:8px}.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:80;opacity:0;transition:opacity 0.25s ease}.overlay.show{display:block;opacity:1}
     .brand{padding:14px 12px;border-bottom:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:108px;background:linear-gradient(135deg,rgba(0,109,112,.38),rgba(12,56,91,.1))}.brand-logos{display:flex;align-items:center;justify-content:center;gap:9px}.brand img{width:92px;height:52px;object-fit:contain;filter:drop-shadow(0 5px 10px rgba(0,0,0,.25))}.brand img:last-child{width:58px}.brand-label{font-size:.78rem;font-weight:600;color:#fff;text-align:center;white-space:nowrap}.user{padding:16px;border-bottom:1px solid rgba(255,255,255,.12)}.menu{padding:10px}.menu button{width:100%;text-align:left;border:0;background:transparent;color:#C7D2DC;padding:12px;border-radius:10px;margin:2px 0}.menu button.active,.menu button:hover{background:#0D6670;color:#fff}
@@ -928,7 +928,8 @@ async function loadRegistrations(){
     if ($('#regCountBadge')) {
       $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
     }
-    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    window.REGISTRATION_ROWS = rows;
+    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
     initRegScrollSync();
     setTimeout(updateRegTopScrollbar, 50);
   }finally{hide()}
@@ -959,6 +960,7 @@ async function openRegistrationView(id){
         <div style="display:flex;gap:6px;align-items:center">
           ${statusBadge(r.RegistrationStatus)} ${statusBadge(r.PaymentStatus)}
           <button type="button" class="btn btn-primary btn-sm" onclick="printRegistrationSheet(LAST_VIEWED_REG_DATA)" style="padding:4px 10px;font-size:0.8rem;margin-left:4px">🖨️ พิมพ์ (A4)</button>
+          <button type="button" class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')" style="padding:4px 10px;font-size:0.8rem;margin-left:4px"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
@@ -1816,6 +1818,208 @@ async function toggleReceiptStatus(regId){show('กำลังเปลี่�
 async function openFinanceDocModal(regId){show('กำลังโหลดเอกสารการเงิน');let docs=[];try{docs=await rpc('adminListFinanceDocuments',TOKEN,CID,regId)}catch(e){console.warn(e)}hide();const docRows=(docs||[]).map(d=>`<tr><td>${esc(d.DocType)}</td><td><a href="${esc(d.FileUrl)}" target="_blank">${esc(d.FileName)}</a></td><td>${esc(formatBeDateTime(d.UploadedAt))}</td><td><button class="btn btn-sm btn-danger" onclick="deleteFinanceDoc('${esc(d.DocumentID)}','${esc(regId)}')"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');const html=`<div style="text-align:left;font-size:0.9rem;"><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #cbd5e1;margin-bottom:14px;"><h4 style="margin:0 0 8px;color:#006D70;">➕ อัปโหลดเอกสารการเงินใหม่</h4><div style="margin-bottom:8px;"><label style="font-weight:600;display:block;margin-bottom:4px;">ประเภทเอกสาร:</label><select id="swalDocType" class="swal2-select" style="width:100%;margin:0;"><option value="RECEIPT">ใบเสร็จรับเงิน (Receipt)</option><option value="INVOICE">ใบแจ้งหนี้ (Invoice)</option><option value="OTHER">เอกสารการเงินอื่นๆ</option></select></div><div style="margin-bottom:8px;"><label style="font-weight:600;display:block;margin-bottom:4px;">เลือกไฟล์ (PDF / รูปภาพ):</label><input type="file" id="swalDocFile" accept=".pdf,.png,.jpg,.jpeg" style="width:100%;font-size:0.9rem;"></div></div><h4 style="margin:0 0 6px;color:#1e293b;">รายการเอกสารการเงินในระบบ</h4><div style="max-height:200px;overflow-y:auto;border:1px solid #cbd5e1;border-radius:6px;"><table class="table" style="font-size:0.85rem;margin:0;"><thead><tr><th>ประเภท</th><th>ชื่อไฟล์</th><th>อัปโหลดเมื่อ</th><th>จัดการ</th></tr></thead><tbody>${docRows||'<tr><td colspan="4" class="muted">ยังไม่มีเอกสารแนบ</td></tr>'}</tbody></table></div></div>`;const x=await Swal.fire({title:`จัดการเอกสารการเงิน (${esc(regId)})`,html,showCancelButton:true,confirmButtonText:'อัปโหลดไฟล์',confirmButtonColor:'#006D70',cancelButtonText:'ปิด',preConfirm:()=>{const fileEl=$('#swalDocFile');if(!fileEl||!fileEl.files||!fileEl.files[0]){Swal.showValidationMessage('กรุณาเลือกไฟล์ก่อนกดอัปโหลด');return false}return {file:fileEl.files[0],docType:$('#swalDocType').value}}});if(!x.isConfirmed||!x.value)return;const file=x.value.file,docType=x.value.docType;show('กำลังอัปโหลดเอกสารการเงิน...');const reader=new FileReader();reader.onload=async function(e){try{const base64=e.target.result.split(',')[1];await rpc('adminUploadFinanceDocument',TOKEN,CID,regId,{base64,fileName:file.name,mimeType:file.type,docType});hide();await Swal.fire({icon:'success',title:'อัปโหลดเอกสารเรียบร้อย',confirmButtonColor:'#006D70'});openFinanceDocModal(regId)}catch(errEv){err(errEv)}};reader.readAsDataURL(file)}
 
 async function deleteFinanceDoc(docId,regId){const confirm=await Swal.fire({title:'ยืนยันการลบเอกสาร?',text:'เมื่อลบแล้วจะไม่สามารถกู้คืนได้',icon:'warning',showCancelButton:true,confirmButtonText:'ลบเอกสาร',confirmButtonColor:'#dc2626'});if(!confirm.isConfirmed)return;show('กำลังลบเอกสาร');try{await rpc('adminDeleteFinanceDocument',TOKEN,CID,docId);hide();openFinanceDocModal(regId)}catch(e){err(e)}}
+
+async function openRegEmailModal(regId, fallbackEmail, fallbackName){
+  let reg = (window.REGISTRATION_ROWS || []).find(x => x.RegID === regId);
+  if (!reg && window.LAST_VIEWED_REG_DATA?.registration?.RegID === regId) {
+    reg = window.LAST_VIEWED_REG_DATA.registration;
+  }
+  if (!reg) {
+    try {
+      show('กำลังค้นหาข้อมูลผู้ลงทะเบียน...');
+      const r = await rpc('adminGetRegistration', TOKEN, CID, regId);
+      hide();
+      if (r && r.registration) {
+        reg = r.registration;
+      }
+    } catch(e) {
+      hide();
+    }
+  }
+  const toEmail = (reg && reg.Email) || fallbackEmail || '';
+  const recipientName = (reg && (reg.FullName || (reg.FirstName ? (reg.FirstName + ' ' + (reg.LastName || '')) : ''))) || fallbackName || '';
+
+  const defaultSubject = `[TUH Quality Fair 2026] แจ้งข้อมูลสำหรับผู้ลงทะเบียน (${regId})`;
+  const defaultBody = `เรียน คุณ ${recipientName}\nหมายเลขลงทะเบียนของท่านคือ ${regId}\n\n\n\nฝ่ายทะเบียน งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และ\nงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569\n\nพร้อมลิงก์เข้าระบบ https://sites.google.com/view/qafairtuh2026/home`;
+
+  const html = `<div style="text-align:left;font-size:0.9rem;font-family:'Prompt',sans-serif;">
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
+        <i class="fa-solid fa-user-check" style="color:#006D70;"></i> ผู้รับ (Email):
+      </label>
+      <input id="swalRegEmailTo" class="swal2-input" style="width:100%;margin:0;font-size:0.9rem;padding:8px 12px;box-sizing:border-box;" value="${esc(toEmail)}" placeholder="ระบุอีเมลผู้รับ">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
+        <i class="fa-solid fa-list-check" style="color:#006D70;"></i> เลือกเทมเพลตข้อความ:
+      </label>
+      <select id="swalRegEmailTpl" class="swal2-select" style="width:100%;margin:0;font-size:0.88rem;padding:6px;" onchange="applyRegEmailTemplate(this.value,'${esc(regId)}','${esc(recipientName)}')">
+        <option value="DEFAULT">ข้อความเริ่มต้น (แจ้งรหัสลงทะเบียน - ค่าเริ่มต้น)</option>
+        <option value="RETURNED">แจ้งส่งคืนข้อมูลให้ตรวจสอบ/แก้ไข</option>
+        <option value="VERIFIED">แจ้งผลการตรวจสอบข้อมูลผ่านเรียบร้อย</option>
+        <option value="CUSTOM">ข้อความว่าง (เขียนเองทั้งหมด)</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
+        <i class="fa-solid fa-heading" style="color:#006D70;"></i> หัวข้ออีเมล (Subject):
+      </label>
+      <input id="swalRegEmailSubject" class="swal2-input" style="width:100%;margin:0;font-size:0.9rem;padding:8px 12px;box-sizing:border-box;" value="${esc(defaultSubject)}">
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label style="font-weight:600;color:#1e293b;margin:0;">
+          <i class="fa-solid fa-message" style="color:#006D70;"></i> ข้อความอีเมล (Body):
+        </label>
+        <span class="muted" style="font-size:0.75rem;color:#64748b;">สามารถพิมพ์ข้อความเพิ่มเติมในช่องว่างได้</span>
+      </div>
+      <textarea id="swalRegEmailBody" class="swal2-textarea" style="width:100%;margin:0;height:185px;font-family:'Prompt',sans-serif;font-size:0.88rem;line-height:1.55;padding:10px;box-sizing:border-box;resize:vertical;">${esc(defaultBody)}</textarea>
+    </div>
+    <div style="margin-top:10px;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px dashed #94a3b8;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <label style="font-weight:600;font-size:0.84rem;color:#334155;margin:0;">
+          <i class="fa-solid fa-paperclip" style="color:#0284c7;"></i> แนบไฟล์ (ถ้าต้องการ, สูงสุด 3MB):
+        </label>
+        <button type="button" id="btnCancelRegAttachment" style="display:none;background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.78rem;font-weight:600;padding:0;">
+          <i class="fa-solid fa-xmark"></i> ยกเลิกไฟล์แนบ
+        </button>
+      </div>
+      <input type="file" id="swalRegEmailAttachment" style="width:100%;font-size:0.84rem;padding:5px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+      <div id="swalRegAttachmentInfo" style="font-size:0.8rem;color:#006D70;margin-top:4px;display:none;font-weight:500;"></div>
+    </div>
+  </div>`;
+
+  const x = await Swal.fire({
+    title: `<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:1.15rem;color:#006D70;"><i class="fa-solid fa-envelope"></i> ส่งอีเมลถึงผู้ลงทะเบียน (${esc(regId)})</div>`,
+    html,
+    width: '640px',
+    showCancelButton: true,
+    confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> ส่งอีเมล',
+    confirmButtonColor: '#006D70',
+    cancelButtonText: 'ยกเลิก',
+    cancelButtonColor: '#64748b',
+    didOpen: () => {
+      const fileInput = document.getElementById('swalRegEmailAttachment');
+      const fileInfo = document.getElementById('swalRegAttachmentInfo');
+      const clearBtn = document.getElementById('btnCancelRegAttachment');
+      if (fileInput) {
+        fileInput.addEventListener('change', function() {
+          if (this.files && this.files[0]) {
+            const f = this.files[0];
+            if (f.size > 3.5 * 1024 * 1024) {
+              Swal.showValidationMessage('ไฟล์มีขนาดใหญ่เกินไป (จำกัดไม่เกิน 3MB)');
+              this.value = '';
+              fileInfo.style.display = 'none';
+              clearBtn.style.display = 'none';
+              return;
+            }
+            Swal.resetValidationMessage();
+            const kb = Math.round(f.size / 1024);
+            const sizeStr = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB';
+            fileInfo.innerHTML = `<i class="fa-solid fa-circle-check"></i> พร้อมแนบ: <b>${esc(f.name)}</b> (${sizeStr})`;
+            fileInfo.style.display = 'block';
+            clearBtn.style.display = 'inline-block';
+          } else {
+            fileInfo.style.display = 'none';
+            clearBtn.style.display = 'none';
+          }
+        });
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+          if (fileInput) fileInput.value = '';
+          fileInfo.style.display = 'none';
+          clearBtn.style.display = 'none';
+          Swal.resetValidationMessage();
+        });
+      }
+    },
+    preConfirm: () => {
+      const to = (document.getElementById('swalRegEmailTo')?.value || '').trim();
+      const subject = (document.getElementById('swalRegEmailSubject')?.value || '').trim();
+      const body = (document.getElementById('swalRegEmailBody')?.value || '').trim();
+      const fileInput = document.getElementById('swalRegEmailAttachment');
+      const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+      if (!to) {
+        Swal.showValidationMessage('กรุณาระบุอีเมลผู้รับ');
+        return false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        Swal.showValidationMessage('รูปแบบอีเมลไม่ถูกต้อง');
+        return false;
+      }
+      if (!subject) {
+        Swal.showValidationMessage('กรุณาระบุหัวข้ออีเมล');
+        return false;
+      }
+      if (!body) {
+        Swal.showValidationMessage('กรุณาระบุข้อความอีเมล');
+        return false;
+      }
+      return { to, subject, body, file };
+    }
+  });
+
+  if (!x.isConfirmed || !x.value) return;
+
+  show('กำลังส่งอีเมล...');
+  let attachments = [];
+  if (x.value.file) {
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(x.value.file);
+      });
+      attachments.push({
+        name: x.value.file.name,
+        mimeType: x.value.file.type || 'application/octet-stream',
+        base64: base64
+      });
+    } catch(errFile) {
+      hide();
+      return Swal.fire({ icon: 'error', title: 'ไม่สามารถอ่านไฟล์แนบได้', text: String(errFile) });
+    }
+  }
+
+  try {
+    await rpc('adminSendDirectEmail', TOKEN, CID, x.value.to, x.value.subject, x.value.body, attachments);
+    hide();
+    await Swal.fire({
+      icon: 'success',
+      title: 'ส่งอีเมลเรียบร้อยแล้ว',
+      html: `ส่งอีเมลถึง <b>${esc(x.value.to)}</b> สำเร็จแล้ว${attachments.length ? '<br>พร้อมไฟล์แนบ: <b>' + esc(attachments[0].name) + '</b>' : ''}`,
+      confirmButtonColor: '#006D70'
+    });
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
+
+function applyRegEmailTemplate(type, regId, name){
+  const subj = document.getElementById('swalRegEmailSubject');
+  const body = document.getElementById('swalRegEmailBody');
+  if(!subj || !body) return;
+
+  const closing = `ฝ่ายทะเบียน งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และ\nงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569\n\nพร้อมลิงก์เข้าระบบ https://sites.google.com/view/qafairtuh2026/home`;
+
+  if (type === 'DEFAULT') {
+    subj.value = `[TUH Quality Fair 2026] แจ้งข้อมูลสำหรับผู้ลงทะเบียน (${regId})`;
+    body.value = `เรียน คุณ ${name}\nหมายเลขลงทะเบียนของท่านคือ ${regId}\n\n\n\n${closing}`;
+  } else if (type === 'RETURNED') {
+    subj.value = `[TUH Quality Fair 2026] แจ้งแก้ไขข้อมูลการลงทะเบียน (${regId})`;
+    body.value = `เรียน คุณ ${name}\nหมายเลขลงทะเบียนของท่านคือ ${regId}\n\nเนื่องจากฝ่ายทะเบียนได้ตรวจสอบข้อมูลของท่านแล้ว พบว่ามีข้อมูลหรือเอกสารที่ต้องขอความกรุณาปรับปรุงแก้ไขเพิ่มเติม\nท่านสามารถเข้าสู่ระบบผ่านลิงก์ด้านล่างเพื่อดำเนินการแก้ไขข้อมูลให้สมบูรณ์ได้ทันที\n\n${closing}`;
+  } else if (type === 'VERIFIED') {
+    subj.value = `[TUH Quality Fair 2026] แจ้งผลการตรวจสอบข้อมูลการลงทะเบียนเรียบร้อย (${regId})`;
+    body.value = `เรียน คุณ ${name}\nหมายเลขลงทะเบียนของท่านคือ ${regId}\n\nฝ่ายทะเบียนขอแจ้งว่าข้อมูลการลงทะเบียนของท่านได้รับการตรวจสอบและอนุมัติผ่านเรียบร้อยแล้ว\nขอขอบพระคุณที่ให้ความร่วมมือและเข้าร่วมงานในครั้งนี้\n\n${closing}`;
+  } else if (type === 'CUSTOM') {
+    subj.value = `[TUH Quality Fair 2026] แจ้งข้อมูลถึงผู้ลงทะเบียน (${regId})`;
+    body.value = `เรียน คุณ ${name}\n\n\n\n${closing}`;
+  }
+}
 
 async function openSendEmailModal(regId,toEmail,recipientName){const html=`<div style="text-align:left;font-size:0.9rem;"><div style="margin-bottom:10px;"><label style="font-weight:600;display:block;margin-bottom:4px;">ผู้รับ (Email):</label><input id="swalEmailTo" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(toEmail||'')}"></div><div style="margin-bottom:10px;"><label style="font-weight:600;display:block;margin-bottom:4px;">เลือกเทมเพลตข้อความ:</label><select id="swalEmailTpl" class="swal2-select" style="width:100%;margin:0;" onchange="applyEmailTemplate(this.value,'${esc(regId)}','${esc(recipientName)}')"><option value="CUSTOM">-- เขียนข้อความเอง --</option><option value="PAYMENT_APPROVED">แจ้งอนุมัติการชำระเงินและส่งคูปองอาหาร</option><option value="RECEIPT_ISSUED">แจ้งออกใบเสร็จรับเงินเรียบร้อยแล้ว</option><option value="INVOICE_ISSUED">แจ้งออกใบแจ้งหนี้เรียบร้อยแล้ว</option></select></div><div style="margin-bottom:10px;"><label style="font-weight:600;display:block;margin-bottom:4px;">หัวข้ออีเมล (Subject):</label><input id="swalEmailSubject" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="[TUH Quality Fair] แจ้งข้อมูลการชำระเงิน / ใบเสร็จ (${esc(regId)})"></div><div><label style="font-weight:600;display:block;margin-bottom:4px;">รายละเอียดข้อความ (Body):</label><textarea id="swalEmailBody" class="swal2-textarea" style="width:100%;margin:0;height:120px;box-sizing:border-box;">เรียน คุณ ${esc(recipientName)}\n\nฝ่ายการเงิน งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแจ้งข้อมูลการชำระเงินของคุณ (${esc(regId)})\n\nขอบคุณครับ</textarea></div></div>`;const x=await Swal.fire({title:`ส่งอีเมลถึงผู้ลงทะเบียน (${esc(regId)})`,html,showCancelButton:true,confirmButtonText:'ส่งอีเมล',confirmButtonColor:'#006D70',cancelButtonText:'ยกเลิก',preConfirm:()=>({to:$('#swalEmailTo').value,subject:$('#swalEmailSubject').value,body:$('#swalEmailBody').value})});if(!x.isConfirmed||!x.value)return;show('กำลังส่งอีเมล...');try{await rpc('adminSendDirectEmail',TOKEN,CID,x.value.to,x.value.subject,x.value.body,[]);hide();await Swal.fire({icon:'success',title:'ส่งอีเมลสำเร็จแล้ว',confirmButtonColor:'#006D70'})}catch(e){err(e)}}
 

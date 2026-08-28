@@ -4281,13 +4281,6 @@ function adminResendReviewerCreds(token,conferenceId,reviewerId){
     return {success:true, email:email};
   });
 }
-function adminSendDirectEmail(token,conferenceId,to,subj,msg){
-  return runSafely_('adminSendDirectEmail',function(){
-    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
-    sendEmailLogged_(conferenceId,to,subj,String(msg).replace(/\n/g,'<br>'),'DIRECT_MESSAGE','',null);
-    return {success:true};
-  });
-}
 function adminListUsers(token,conferenceId){
   return runSafely_('adminListUsers',function(){
     requireSession_(token,['SUPERADMIN'],conferenceId);
