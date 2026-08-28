@@ -1221,8 +1221,19 @@ function changePassword(token,currentPassword,newPassword){return runSafely_('ch
 
 function logAudit_(conferenceId,user,role,action,targetType,targetId,details){try{appendRecord_('AuditLogs',{AuditLogID:nextId_('AUD'),ConferenceID:conferenceId,Timestamp:new Date(),UserID:user&&user.UserID||'',UserEmail:user&&user.Email||'',Role:role||'',Action:action,TargetType:targetType,TargetID:targetId,DetailsJson:safeJson_(details||{}),ClientInfo:''});}catch(e){} }
 function logSystem_(name,e){try{appendRecord_('SystemLogs',{SystemLogID:nextId_('SYS'),Timestamp:new Date(),Level:'ERROR',FunctionName:name,Message:e.message||String(e),StackTrace:e.stack||'',ConferenceID:'',UserEmail:'',ClientInfo:''});}catch(ignore){} }
-function sendEmailLogged_(conferenceId,to,subject,html,relatedType,relatedId,user){
-  try{MailApp.sendEmail({to:to,subject:subject,htmlBody:html,name:'TUH Quality Fair'});appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'SENT'});return true;}catch(e){appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'ERROR',ErrorMessage:e.message});return false;}
+function sendEmailLogged_(conferenceId,to,subject,html,relatedType,relatedId,user,attachments){
+  try{
+    const mailOpts = {to:to,subject:subject,htmlBody:html,name:'TUH Quality Fair'};
+    if (attachments && attachments.length) {
+      mailOpts.attachments = attachments;
+    }
+    MailApp.sendEmail(mailOpts);
+    appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'SENT'});
+    return true;
+  }catch(e){
+    appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'ERROR',ErrorMessage:e.message});
+    return false;
+  }
 }
 
 function validateThaiCid_(cid){ cid=normalizeCid_(cid); if(!/^\d{13}$/.test(cid))return false; let sum=0; for(let i=0;i<12;i++)sum+=Number(cid.charAt(i))*(13-i); return (11-(sum%11))%10===Number(cid.charAt(12)); }
@@ -3247,24 +3258,51 @@ function adminSendDirectEmail(token, conferenceId, to, subject, body, attachment
   return runSafely_('adminSendDirectEmail', function() {
     const ctx = requireSession_(token, ['SUPERADMIN','CONFERENCE_ADMIN','FINANCE_STAFF','REGISTRATION_STAFF','ACADEMIC_STAFF'], conferenceId);
     if (!to || !subject) throw new Error('กรุณาระบุผู้รับและหัวข้ออีเมล');
+
+    let bodyFormatted = htmlEscape_(body || '');
+    bodyFormatted = bodyFormatted.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#006D70;text-decoration:underline;font-weight:600;">$1</a>');
+    bodyFormatted = bodyFormatted.replace(/\n/g, '<br>');
+
     let emailHtml = '<div style="font-family:Prompt,sans-serif;line-height:1.6;color:#333;">' +
       '<div style="background:#006D70;color:#fff;padding:12px 18px;border-radius:6px 6px 0 0;font-size:16px;font-weight:bold;">TUH Quality Fair</div>' +
       '<div style="padding:18px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;">' +
-      String(body || '').replace(/\n/g, '<br>') +
+      bodyFormatted +
       '</div></div>';
 
+    const mailAttachments = [];
     if (attachments && attachments.length) {
-      emailHtml += '<br><div style="font-size:13px;color:#666;"><b>เอกสารแนบในระบบ / ลิงก์ดาวน์โหลด:</b><ul>';
-      (attachments || []).forEach(function(att) {
-        if (att.url) {
-          emailHtml += '<li><a href="' + htmlEscape_(att.url) + '" target="_blank">' + htmlEscape_(att.name || att.url) + '</a></li>';
+      attachments.forEach(function(att) {
+        if (att && att.base64) {
+          try {
+            const bytes = Utilities.base64Decode(att.base64);
+            const blob = Utilities.newBlob(bytes, att.mimeType || 'application/octet-stream', att.name || 'attachment');
+            mailAttachments.push(blob);
+          } catch(errBlob) {
+            logSystem_('adminSendDirectEmail_blob', errBlob);
+          }
         }
+      });
+    }
+
+    if (mailAttachments.length) {
+      emailHtml += '<br><div style="font-size:13px;color:#475569;background:#f8fafc;padding:10px 14px;border-radius:6px;border:1px solid #e2e8f0;">' +
+        '<b>📎 แนบไฟล์ในอีเมล (' + mailAttachments.length + ' รายการ):</b> ' +
+        mailAttachments.map(function(b){ return htmlEscape_(b.getName()); }).join(', ') +
+        '</div>';
+    }
+
+    const urlList = (attachments || []).filter(function(att) { return att && att.url; });
+    if (urlList.length) {
+      emailHtml += '<br><div style="font-size:13px;color:#666;"><b>เอกสารแนบในระบบ / ลิงก์ดาวน์โหลด:</b><ul>';
+      urlList.forEach(function(att) {
+        emailHtml += '<li><a href="' + htmlEscape_(att.url) + '" target="_blank">' + htmlEscape_(att.name || att.url) + '</a></li>';
       });
       emailHtml += '</ul></div>';
     }
 
-    sendEmailLogged_(conferenceId, to, subject, emailHtml, 'DIRECT_EMAIL', to, ctx.user);
-    logAudit_(conferenceId, ctx.user, ctx.role, 'SEND_DIRECT_EMAIL', 'Email', to, {subject: subject, attachmentsCount: (attachments||[]).length});
+    const sent = sendEmailLogged_(conferenceId, to, subject, emailHtml, 'DIRECT_EMAIL', to, ctx.user, mailAttachments);
+    if (!sent) throw new Error('ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลในระบบ');
+    logAudit_(conferenceId, ctx.user, ctx.role, 'SEND_DIRECT_EMAIL', 'Email', to, {subject: subject, attachmentsCount: (attachments||[]).length, filesCount: mailAttachments.length});
     return {success: true};
   });
 }
