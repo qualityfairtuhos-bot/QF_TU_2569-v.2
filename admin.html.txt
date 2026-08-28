@@ -106,10 +106,36 @@
     </section>
 
     <section class="page" id="page-import">
+      <!-- ส่วนที่ 1: นำเข้าโดยตรงจาก Google Sheet (ตรวจสอบสดกับ Registrations) -->
+      <div class="card" style="border:1.5px solid #006D70; background:#f0fdf4; margin-bottom:16px;">
+        <h3 style="color:#006D70; margin-top:0;"><i class="fa-solid fa-cloud-arrow-down"></i> นำเข้าข้อมูลโดยตรงจาก Google Sheet (การตอบแบบฟอร์ม)<span class="en">Direct Import from Google Sheet</span></h3>
+        <div class="info-box" style="background:#ffffff; border-left:4px solid #006D70;">
+          <b><i class="fa-solid fa-circle-check" style="color:#006D70;"></i> ระบบตรวจสอบสดกับแผ่นงาน Registrations ณ ปัจจุบัน:</b>
+          <ul style="margin: 6px 0 0 18px; padding: 0;">
+            <li><b>ไม่ต้องแปลงไฟล์</b> สามารถดึงข้อมูลและหัวตารางที่มีชื่อซ้ำกันจาก Google Sheet ได้โดยตรง 100%</li>
+            <li>ระบบจะตรวจสอบชื่อ-นามสกุลเทียบกับข้อมูลจริงในแผ่นงาน <b>Registrations</b> ณ วินาทีที่กดนำเข้า</li>
+            <li><b>รายชื่อที่มีชื่อ-สกุลซ้ำกับในระบบ Registrations จะถูกข้าม (Skip) อัตโนมัติ</b> และไม่นำเข้าซ้ำ</li>
+            <li>นำเข้าข้อมูลที่เหลือทั้งหมดเท่าที่ทำได้ ทั้งบุคลากรภายในและบุคคลภายนอก</li>
+          </ul>
+        </div>
+        <div class="field">
+          <label><b>URL ของ Google Sheet (Form Responses):</b></label>
+          <input type="text" id="directSheetUrl" value="https://docs.google.com/spreadsheets/d/1Kn1-RMo_vfzzmkIMSpxWw0wYPep3TIQp3Jf1WTOPehk/edit?gid=1258481371#gid=1258481371" style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-family:monospace; font-size:0.9rem;">
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn btn-primary" onclick="executeDirectSheetImport()" style="background:#006D70; border-color:#006D70; padding:10px 22px; font-size:0.95rem; font-weight:600;">
+            <i class="fa-solid fa-play"></i> ตรวจสอบและนำเข้าข้อมูลทันที
+          </button>
+          <span class="muted" style="font-size:0.85rem;"><i class="fa-solid fa-shield-halved"></i> ตรวจสอบสดกับ Registrations ปัจจุบัน • ข้ามชื่อซ้ำอัตโนมัติ</span>
+        </div>
+        <div id="directImportResult"></div>
+      </div>
+
+      <!-- ส่วนที่ 2: หรืออัปโหลดผ่านไฟล์ Excel -->
       <div class="card">
-        <h3><i class="fa-solid fa-file-excel"></i> นำเข้าข้อมูล Excel จาก Google Form<span class="en">Import Excel from Google Form</span></h3>
+        <h3><i class="fa-solid fa-file-excel"></i> หรือ นำเข้าผ่านไฟล์ Excel (.xlsx)<span class="en">Or Import via Excel File</span></h3>
         <div class="info-box">
-          <b><i class="fa-solid fa-circle-info"></i> คำแนะนำและนโยบายการนำเข้า:</b>
+          <b><i class="fa-solid fa-circle-info"></i> คำแนะนำและนโยบายการนำเข้าผ่าน Excel:</b>
           <ul style="margin: 6px 0 0 18px; padding: 0;">
             <li>ตรวจจับและ<b>ตัดเว้นวรรคชื่อ-นามสกุลอัตโนมัติ</b>เพื่อป้องกันชื่อซ้ำ เช่น "นาย สมชาย ใจดี" กับ "สมชาย ใจดี" จะถือเป็นคนเดียวกัน</li>
             <li>รายการที่มีชื่อ-นามสกุล หรือเลขบัตรประชาชนซ้ำกับระบบแล้ว จะถูก<b>ข้าม (Skip) ไม่นำเข้าซ้ำ</b></li>
@@ -118,7 +144,7 @@
           </ul>
         </div>
         <div class="field"><input type="file" id="importFile" accept=".xlsx,.xls"></div>
-        <button class="btn btn-primary" onclick="previewImport()"><i class="fa-solid fa-magnifying-glass"></i> อัปโหลดและตรวจสอบ</button>
+        <button class="btn btn-primary" onclick="previewImport()"><i class="fa-solid fa-magnifying-glass"></i> อัปโหลดและตรวจสอบ Pre-import</button>
       </div>
       <div id="importResult"></div>
       <div class="card" style="margin-top:16px;">
@@ -599,6 +625,86 @@ async function commitImport(id){
     $('#importResult').innerHTML = '';
     loadImportBatches();
   } catch(e) { err(e); }
+}
+
+async function executeDirectSheetImport() {
+  const urlEl = $('#directSheetUrl');
+  const url = (urlEl ? urlEl.value.trim() : '');
+  if (!url) {
+    Swal.fire({ icon: 'warning', title: 'กรุณาระบุ URL Google Sheet', text: 'กรุณากรอกลิงก์ Google Sheet ที่ต้องการนำเข้า', confirmButtonColor: '#006D70' });
+    return;
+  }
+
+  const confirm = await Swal.fire({
+    icon: 'question',
+    title: 'ยืนยันการนำเข้าข้อมูลโดยตรง?',
+    html: `
+      <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+        <p>ระบบจะดึงข้อมูลจาก Google Sheet และตรวจสอบกับแผ่นงาน <b>Registrations</b> ณ ปัจจุบัน:</p>
+        <ul style="padding-left:20px; margin:8px 0;">
+          <li>ข้อมูลชื่อ-นามสกุลที่ซ้ำกับในระบบ Registrations จะถูก<b>ข้าม (Skip) โดยอัตโนมัติ</b></li>
+          <li>ข้อมูลที่ยังไม่มี จะถูกนำเข้าเข้าสู่ตาราง <b>Registrations</b> ทันที</li>
+          <li>ไม่มีการส่งอีเมลอัตโนมัติทันที เพื่อความปลอดภัย</li>
+        </ul>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'เริ่มตรวจสอบและนำเข้า',
+    confirmButtonColor: '#006D70',
+    cancelButtonText: 'ยกเลิก'
+  });
+  if (!confirm.isConfirmed) return;
+
+  show('กำลังเชื่อมต่อ Google Sheet และตรวจสอบข้อมูลกับ Registrations...');
+  try {
+    const r = await rpc('adminImportFromGoogleSheet', TOKEN, CID, url);
+    hide();
+
+    let skippedHtml = '';
+    if (r.skippedNames && r.skippedNames.length > 0) {
+      skippedHtml = `
+        <div style="margin-top:12px; max-height:160px; overflow-y:auto; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:10px; font-size:0.85rem;">
+          <b style="color:#c53030;"><i class="fa-solid fa-user-xmark"></i> รายชื่อที่ข้ามเนื่องจากซ้ำกับระบบ (${r.skippedNames.length} คน):</b>
+          <ol style="margin:6px 0 0 20px; padding:0;">
+            ${r.skippedNames.map(s => `<li><b>${esc(s.fullName)}</b> <span class="muted">(${esc(s.reason)})</span></li>`).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    $('#directImportResult').innerHTML = `
+      <div class="card" style="border-left:5px solid #276749; background:#ffffff; margin-top:14px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+        <h4 style="margin:0 0 10px; color:#276749;"><i class="fa-solid fa-circle-check"></i> นำเข้าข้อมูลเรียบร้อยแล้ว</h4>
+        <div class="kpis" style="margin-bottom:12px; grid-template-columns:repeat(3,1fr);">
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span>ทั้งหมดในไฟล์</span><b>${r.totalInFile||0}</b></div></div>
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span style="color:#276749;">นำเข้าใหม่สำเร็จ</span><b style="color:#276749;">${r.imported||0}</b></div></div>
+          <div class="kpi" style="padding:10px;"><div class="kpi-content"><span style="color:#c53030;">ข้ามเนื่องจากซ้ำ</span><b style="color:#c53030;">${r.skippedDuplicates||0}</b></div></div>
+        </div>
+        ${skippedHtml}
+      </div>
+    `;
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'นำเข้าข้อมูลเรียบร้อย',
+      html: `
+        <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+          <p><b>ผลการตรวจสอบและนำเข้าข้อมูล:</b></p>
+          <ul style="padding-left:20px; margin:8px 0;">
+            <li>ทั้งหมดใน Google Sheet: <b>${r.totalInFile}</b> รายการ</li>
+            <li>นำเข้าใหม่สำเร็จ: <b style="color:#276749">${r.imported}</b> รายการ</li>
+            <li>ข้ามเนื่องจากมีชื่อใน Registrations แล้ว: <b style="color:#c53030">${r.skippedDuplicates}</b> รายการ</li>
+            ${r.errors && r.errors.length ? `<li style="color:#e53e3e">ข้อผิดพลาด: ${r.errors.length} รายการ</li>` : ''}
+          </ul>
+        </div>
+      `,
+      confirmButtonColor: '#006D70'
+    });
+
+  } catch(e) {
+    hide();
+    err(e);
+  }
 }
 
 async function loadImportBatches(){

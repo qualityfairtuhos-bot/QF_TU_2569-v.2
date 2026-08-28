@@ -1298,44 +1298,60 @@ function normalizeImportHeader_(value) {
 }
 
 function buildImportRawRow_(headers, values) {
-  const raw = {};
+  const raw = { __headers: headers, __values: values };
+  const counts = {};
+
   (headers || []).forEach(function(header, index) {
     const original = String(header === null || header === undefined ? '' : header);
     const trimmed = clean_(original);
     const normalized = normalizeImportHeader_(original);
     const value = (values || [])[index];
 
-    // เก็บทั้งหัวเดิม หัวที่ trim แล้ว และหัวที่ normalize แล้ว
-    // เพื่อรองรับหัว Google Form ที่มีช่องว่างท้าย เช่น "ชื่อ-นามสกุล  " และ "Email "
-    if (original) raw[original] = value;
-    if (trimmed) raw[trimmed] = value;
-    if (normalized) raw[normalized] = value;
+    const countKey = normalized || trimmed || original;
+    const occurrence = (counts[countKey] || 0) + 1;
+    counts[countKey] = occurrence;
+
+    const suffix = occurrence > 1 ? (' ' + occurrence) : '';
+    const normSuffix = occurrence > 1 ? String(occurrence) : '';
+
+    if (original) {
+      if (occurrence === 1 || raw[original] === undefined || (clean_(raw[original]) === '' && clean_(value) !== '')) {
+        raw[original] = value;
+      }
+      raw[original + suffix] = value;
+    }
+    if (trimmed) {
+      if (occurrence === 1 || raw[trimmed] === undefined || (clean_(raw[trimmed]) === '' && clean_(value) !== '')) {
+        raw[trimmed] = value;
+      }
+      raw[trimmed + suffix] = value;
+    }
+    if (normalized) {
+      if (occurrence === 1 || raw[normalized] === undefined || (clean_(raw[normalized]) === '' && clean_(value) !== '')) {
+        raw[normalized] = value;
+      }
+      raw[normalized + normSuffix] = value;
+    }
   });
   return raw;
 }
 
 function importValue_(row, aliases) {
   row = row || {};
-  const normalized = {};
-
-  Object.keys(row).forEach(function(key) {
-    const normalizedKey = normalizeImportHeader_(key);
-    if (!normalizedKey) return;
-    const value = row[key];
-    if (normalized[normalizedKey] === undefined || clean_(value) !== '') {
-      normalized[normalizedKey] = value;
-    }
-  });
-
-  let firstExisting = '';
   for (let i = 0; i < aliases.length; i++) {
-    const alias = normalizeImportHeader_(aliases[i]);
-    if (normalized[alias] !== undefined) {
-      if (firstExisting === '') firstExisting = normalized[alias];
-      if (clean_(normalized[alias]) !== '') return normalized[alias];
-    }
+    const alias = aliases[i];
+    if (row[alias] !== undefined && clean_(row[alias]) !== '') return row[alias];
+    const norm = normalizeImportHeader_(alias);
+    if (row[norm] !== undefined && clean_(row[norm]) !== '') return row[norm];
   }
-  return firstExisting;
+  // Fallback to first defined value even if empty
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (row[alias] !== undefined) return row[alias];
+    const norm = normalizeImportHeader_(alias);
+    if (row[norm] !== undefined) return row[norm];
+  }
+  return '';
 }
 
 function isBlankImportRow_(values) {
@@ -1910,6 +1926,19 @@ function commitImportBatch(token, conferenceId, batchId) {
           return num_(a.SourceRowNo) - num_(b.SourceRowNo);
         });
 
+      // Pre-fetch live Registrations once for high-performance duplicate checking
+      const existingRegs = findMany_('Registrations', { ConferenceID: conferenceId });
+      const existingNameMap = {};
+      const existingCidMap = {};
+      existingRegs.forEach(function(rec) {
+        if (upper_(rec.RegistrationStatus) !== 'CANCELLED') {
+          const nk = normalizeNameKey_(rec.FullName);
+          if (nk) existingNameMap[nk] = rec.RegID;
+          const cleanCid = clean_(rec.CID).replace(/[^\d]/g, '');
+          if (cleanCid) existingCidMap[cleanCid] = rec.RegID;
+        }
+      });
+
       rows.forEach(function(row) {
         if (row.ImportStatus === 'IMPORTED') {
           skipped++;
@@ -1923,14 +1952,9 @@ function commitImportBatch(token, conferenceId, batchId) {
           mapped.SourceRowNo = row.SourceRowNo;
 
           const nameKey = normalizeNameKey_(mapped.FullName);
-          const isCidDuplicate = mapped.CID && findMany_('Registrations', { ConferenceID: conferenceId, CID: mapped.CID })
-            .some(function(record) { return upper_(record.RegistrationStatus) !== 'CANCELLED'; });
-
-          const isNameDuplicate = nameKey && findMany_('Registrations', { ConferenceID: conferenceId })
-            .some(function(record) {
-              if (upper_(record.RegistrationStatus) === 'CANCELLED') return false;
-              return normalizeNameKey_(record.FullName) === nameKey;
-            });
+          const cleanCid = clean_(mapped.CID).replace(/[^\d]/g, '');
+          const isCidDuplicate = cleanCid && existingCidMap[cleanCid];
+          const isNameDuplicate = nameKey && existingNameMap[nameKey];
 
           if (isCidDuplicate || isNameDuplicate) {
             updateRecord_('ImportRows', row.__row, {
@@ -1949,6 +1973,9 @@ function commitImportBatch(token, conferenceId, batchId) {
             true,
             row.ValidationStatus
           );
+
+          if (nameKey) existingNameMap[nameKey] = registration.RegID;
+          if (cleanCid) existingCidMap[cleanCid] = registration.RegID;
 
           // ถอดการส่ง Email อัตโนมัติออก ให้แอดมินส่งแบบ Manual Trigger ภายหลังตรวจทาน
           try{ maybeAutoIssueMealPass_(conferenceId,registration.RegID,'IMPORT_COMPLETE'); }catch(mealError){ errors.push({sourceRowNo:row.SourceRowNo,message:'Meal pass: '+(mealError.message||String(mealError))}); }
@@ -2012,6 +2039,259 @@ function commitImportBatch(token, conferenceId, batchId) {
       mappingVersion: TUH_IMPORT_MAPPING_VERSION
     };
   });
+}
+
+/**
+ * ฟังก์ชันนำเข้าข้อมูลโดยตรงจาก Google Sheet (สามารถกด Run ใน Google Apps Script Editor ได้ทันที)
+ * URL: https://docs.google.com/spreadsheets/d/1Kn1-RMo_vfzzmkIMSpxWw0wYPep3TIQp3Jf1WTOPehk/edit?gid=1258481371#gid=1258481371
+ * ตรวจสอบรายชื่อซ้ำเทียบกับ Registrations สดๆ ทันที ข้ามคนซ้ำ และนำเข้าคนที่เหลือทั้งหมด
+ */
+function runImportFromFormSheetNow() {
+  const formSheetUrl = 'https://docs.google.com/spreadsheets/d/1Kn1-RMo_vfzzmkIMSpxWw0wYPep3TIQp3Jf1WTOPehk/edit?gid=1258481371#gid=1258481371';
+  const result = executeDirectFormSheetImport_(APP.DEFAULT_CONFERENCE_ID, formSheetUrl, 'GAS_DIRECT_RUN');
+  Logger.log('=== ผลการนำเข้า Google Form Response Sheet ===');
+  Logger.log('ทั้งหมดในไฟล์: ' + result.totalInFile);
+  Logger.log('นำเข้าสำเร็จ: ' + result.imported);
+  Logger.log('ข้ามเนื่องจากซ้ำกับ Registrations: ' + result.skippedDuplicates);
+  if (result.skippedNames && result.skippedNames.length) {
+    Logger.log('รายชื่อที่ข้าม: ' + JSON.stringify(result.skippedNames));
+  }
+  if (result.errors && result.errors.length) {
+    Logger.log('ข้อผิดพลาด: ' + JSON.stringify(result.errors));
+  }
+  return result;
+}
+
+/**
+ * ฟังก์ชันนำเข้าข้อมูลจาก Google Form Sheet เข้าสู่แผ่นงาน Registrations โดยตรง
+ * สามารถเลือกและกด "เรียกใช้" (Run) ในเมนูของ Google Apps Script Editor ได้ทันทีโดยไม่ต้องผ่านหน้าเว็บ
+ * - ตรวจสอบความซ้ำซ้อนกับแผ่นงาน Registrations ณ ปัจจุบันโดยตรง
+ * - ข้อมูลชื่อ-สกุลซ้ำให้ข้ามไป ไม่ต้องนำเข้า
+ * - นำเข้าข้อมูลเท่าที่ทำได้ ทั้งบุคลากรภายในและบุคคลภายนอก
+ * Google Sheet URL: https://docs.google.com/spreadsheets/d/1Kn1-RMo_vfzzmkIMSpxWw0wYPep3TIQp3Jf1WTOPehk/edit?gid=1258481371#gid=1258481371
+ */
+function importGoogleFormSheetToRegistrationsDirectly() {
+  const url = 'https://docs.google.com/spreadsheets/d/1Kn1-RMo_vfzzmkIMSpxWw0wYPep3TIQp3Jf1WTOPehk/edit?gid=1258481371#gid=1258481371';
+  Logger.log('>>> เริ่มต้นนำเข้าข้อมูลจาก Google Sheet สู่แผ่นงาน Registrations โดยตรง...');
+  const result = executeDirectFormSheetImport_(APP.DEFAULT_CONFERENCE_ID, url, 'APPS_SCRIPT_DIRECT_RUN');
+  Logger.log('==================================================');
+  Logger.log(' ผลการนำเข้าข้อมูลสู่แผ่นงาน Registrations ');
+  Logger.log('==================================================');
+  Logger.log('จำนวนแถวข้อมูลทั้งหมดใน Sheet: ' + result.totalInFile + ' ราย');
+  Logger.log('นำเข้าใหม่สำเร็จ: ' + result.imported + ' ราย');
+  Logger.log('ข้าม (ชื่อซ้ำกับ Registrations): ' + result.skippedDuplicates + ' ราย');
+  if (result.skippedNames && result.skippedNames.length > 0) {
+    Logger.log('--- รายชื่อที่ถูกข้าม (' + result.skippedNames.length + ' ราย) ---');
+    result.skippedNames.forEach(function(s) {
+      Logger.log('[แถว ' + s.sourceRowNo + '] ' + s.fullName + ' -> ' + s.reason);
+    });
+  }
+  if (result.importedList && result.importedList.length > 0) {
+    Logger.log('--- ตัวอย่างรายชื่อที่นำเข้าสำเร็จ (' + result.importedList.length + ' ราย) ---');
+    result.importedList.slice(0, 10).forEach(function(r) {
+      Logger.log('[สำเร็จ] ' + r.regId + ': ' + r.fullName + ' (' + r.participantType + ')');
+    });
+  }
+  Logger.log('==================================================');
+  return result;
+}
+
+/**
+ * RPC API สำหรับหน้า Admin เพื่อนำเข้าจาก Google Sheet URL
+ */
+function adminImportFromGoogleSheet(token, conferenceId, sheetUrl) {
+  return runSafely_('adminImportFromGoogleSheet', function() {
+    const ctx = requireSession_(
+      token,
+      ['SUPERADMIN', 'CONFERENCE_ADMIN', 'REGISTRATION_STAFF'],
+      conferenceId
+    );
+    const cid = ctx.conferenceId || conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const url = sheetUrl || 'https://docs.google.com/spreadsheets/d/1Kn1-RMo_vfzzmkIMSpxWw0wYPep3TIQp3Jf1WTOPehk/edit?gid=1258481371#gid=1258481371';
+    return executeDirectFormSheetImport_(cid, url, ctx.user.Email);
+  });
+}
+
+function parseGoogleSheetUrl_(url) {
+  url = String(url || '').trim();
+  const idMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const sheetId = idMatch ? idMatch[1] : url;
+  const gidMatch = url.match(/[#&?]gid=([0-9]+)/);
+  const gid = gidMatch ? gidMatch[1] : '';
+  return { sheetId: sheetId, gid: gid };
+}
+
+function executeDirectFormSheetImport_(conferenceId, sheetUrl, triggerUser) {
+  const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+  const parsed = parseGoogleSheetUrl_(sheetUrl);
+  if (!parsed.sheetId) throw new Error('ไม่พบ Spreadsheet ID ใน URL ที่ระบุ');
+
+  let data = null;
+  // 1. ลองเปิดผ่าน SpreadsheetApp
+  try {
+    const ss = SpreadsheetApp.openById(parsed.sheetId);
+    let sheet = null;
+    if (parsed.gid) {
+      const sheets = ss.getSheets();
+      for (let i = 0; i < sheets.length; i++) {
+        if (String(sheets[i].getSheetId()) === String(parsed.gid)) {
+          sheet = sheets[i];
+          break;
+        }
+      }
+    }
+    if (!sheet) sheet = ss.getSheets()[0];
+    data = sheet.getDataRange().getDisplayValues();
+  } catch (openErr) {
+    // 2. ถ้าเปิดตรงไม่ได้ ให้เปิดผ่าน CSV Export
+    try {
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/' + parsed.sheetId + '/export?format=csv' + (parsed.gid ? '&gid=' + parsed.gid : '');
+      const res = UrlFetchApp.fetch(csvUrl, { muteHttpExceptions: true });
+      if (res.getResponseCode() === 200) {
+        data = Utilities.parseCsv(res.getContentText());
+      } else {
+        throw new Error('ไม่สามารถเข้าถึงไฟล์ Google Sheet ได้ (HTTP ' + res.getResponseCode() + ')');
+      }
+    } catch (csvErr) {
+      throw new Error('ไม่สามารถเปิด Google Sheet ได้: ' + (openErr.message || String(openErr)));
+    }
+  }
+
+  if (!data || data.length < 2) {
+    throw new Error('ไม่พบข้อมูลแถวใน Google Sheet ที่ระบุ');
+  }
+
+  const headers = data[0];
+  const sourceRows = [];
+  for (let r = 1; r < data.length; r++) {
+    if (!isBlankImportRow_(data[r])) {
+      sourceRows.push({ values: data[r], sourceRowNo: r + 1 });
+    }
+  }
+
+  // 1. อ่านข้อมูลสดจากแผ่นงาน Registrations ณ ปัจจุบันโดยตรง
+  const existingRegs = findMany_('Registrations', {});
+  const existingNameKeys = {};
+  const existingCids = {};
+
+  existingRegs.forEach(function(rec) {
+    if (upper_(rec.RegistrationStatus) !== 'CANCELLED') {
+      const nameKey1 = normalizeNameKey_(rec.FullName);
+      if (nameKey1) existingNameKeys[nameKey1] = rec.RegID || 'EXISTS';
+      const nameKey2 = normalizeNameKey_([rec.FirstName, rec.LastName].filter(Boolean).join(' '));
+      if (nameKey2) existingNameKeys[nameKey2] = rec.RegID || 'EXISTS';
+      const cleanCid = clean_(rec.CID).replace(/[^\d]/g, '');
+      if (cleanCid) existingCids[cleanCid] = rec.RegID || 'EXISTS';
+    }
+  });
+
+  let imported = 0;
+  let skippedDuplicates = 0;
+  const skippedNames = [];
+  const importedList = [];
+  const errors = [];
+
+  withLock_(function() {
+    sourceRows.forEach(function(item) {
+      try {
+        const raw = buildImportRawRow_(headers, item.values);
+        const mapped = mapTuhGoogleFormRow_(raw, cid);
+        mapped.ConferenceID = cid;
+        mapped.SourceBatchID = 'SHEET_DIRECT';
+        mapped.SourceRowNo = item.sourceRowNo;
+
+        // ตรวจสอบชื่อ
+        const nameKey = normalizeNameKey_(mapped.FullName);
+        const nameKeyFromSplit = normalizeNameKey_([mapped.FirstName, mapped.LastName].filter(Boolean).join(' '));
+        if (!nameKey || !mapped.FirstName) {
+          errors.push({ sourceRowNo: item.sourceRowNo, message: 'ชื่อหรือนามสกุลไม่ครบถ้วน' });
+          return;
+        }
+
+        // ข้ามหากชื่อ-นามสกุลซ้ำกับ Registrations ปัจจุบัน หรือซ้ำในชุดเดียวกัน
+        const matchedNameRegId = (nameKey && existingNameKeys[nameKey]) || (nameKeyFromSplit && existingNameKeys[nameKeyFromSplit]);
+        if (matchedNameRegId) {
+          skippedDuplicates++;
+          skippedNames.push({
+            sourceRowNo: item.sourceRowNo,
+            fullName: mapped.FullName,
+            reason: 'ชื่อ-นามสกุลซ้ำกับข้อมูลในตาราง Registrations (' + matchedNameRegId + ')'
+          });
+          return;
+        }
+
+        // ตรวจสอบ CID ซ้ำ (ถ้ามีเลขบัตรประชาชน)
+        const cleanCid = clean_(mapped.CID).replace(/[^\d]/g, '');
+        if (cleanCid && existingCids[cleanCid]) {
+          skippedDuplicates++;
+          skippedNames.push({
+            sourceRowNo: item.sourceRowNo,
+            fullName: mapped.FullName,
+            reason: 'เลขบัตรประชาชนซ้ำกับข้อมูลในตาราง Registrations (' + existingCids[cleanCid] + ')'
+          });
+          return;
+        }
+
+        // บันทึกเข้า Registrations โดยตรง
+        const validationStatus = cleanCid && validateThaiCid_(cleanCid) ? 'READY' : 'INCOMPLETE';
+        const created = createRegistrationRecord_(
+          mapped,
+          triggerUser || 'GOOGLE_FORM_IMPORT',
+          true,
+          validationStatus
+        );
+
+        // มาร์กไว้ใน map เพื่อป้องกันซ้ำในรอบเดียวกัน
+        if (nameKey) existingNameKeys[nameKey] = created.RegID;
+        if (nameKeyFromSplit) existingNameKeys[nameKeyFromSplit] = created.RegID;
+        if (cleanCid) existingCids[cleanCid] = created.RegID;
+
+        try {
+          maybeAutoIssueMealPass_(cid, created.RegID, 'IMPORT_COMPLETE');
+        } catch (ignore) {}
+
+        imported++;
+        importedList.push({
+          regId: created.RegID,
+          fullName: mapped.FullName,
+          participantType: mapped.ParticipantType,
+          sourceRowNo: item.sourceRowNo
+        });
+      } catch (err) {
+        errors.push({ sourceRowNo: item.sourceRowNo, message: err.message || String(err) });
+      }
+    });
+  });
+
+  // เคลียร์แคชและบันทึกประวัติ audit
+  invalidateCache_(cid);
+  try {
+    logAudit_(cid, { Email: triggerUser || 'SYSTEM' }, 'ADMIN', 'IMPORT_GOOGLE_SHEET_DIRECT', 'Registrations', parsed.sheetId, {
+      totalInFile: sourceRows.length,
+      imported: imported,
+      skippedDuplicates: skippedDuplicates,
+      errorsCount: errors.length
+    });
+  } catch (ignore) {}
+
+  Logger.log('=== ผลการนำเข้า Google Sheet โดยตรง ===');
+  Logger.log('ทั้งหมด: ' + sourceRows.length + ' ราย');
+  Logger.log('นำเข้าสำเร็จ: ' + imported + ' ราย');
+  Logger.log('ข้าม (ซ้ำกับ Registrations): ' + skippedDuplicates + ' ราย');
+  if (errors.length > 0) {
+    Logger.log('ข้อผิดพลาด: ' + errors.length + ' ราย');
+  }
+
+  return {
+    success: true,
+    sheetId: parsed.sheetId,
+    totalInFile: sourceRows.length,
+    imported: imported,
+    skippedDuplicates: skippedDuplicates,
+    skippedNames: skippedNames,
+    importedList: importedList,
+    errors: errors
+  };
 }
 
 function listImportBatches(token, conferenceId) {
@@ -5005,6 +5285,11 @@ const API_ACTIONS = Object.freeze({
   adminListFinanceDocuments: adminListFinanceDocuments,
   adminDeleteFinanceDocument: adminDeleteFinanceDocument,
   getPublicFinanceDocuments: getPublicFinanceDocuments,
+  adminImportFromGoogleSheet: adminImportFromGoogleSheet,
+  adminGetImportBatchDetail: adminGetImportBatchDetail,
+  listImportBatches: listImportBatches,
+  adminSendBatchImportEmails: adminSendBatchImportEmails,
+  adminDeleteWorkFile: adminDeleteWorkFile,
   commitImportBatch: commitImportBatch,
   confirmEventScanner: confirmEventScanner,
   emailMyMealPass: emailMyMealPass,
@@ -5042,6 +5327,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1,
   adminUploadFinanceDocument:1, adminDeleteFinanceDocument:1,
+  adminImportFromGoogleSheet:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
   emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,
   replaceWorkFile:1, requestPasswordReset:1, reviewerSaveReview:1,
@@ -5113,7 +5399,7 @@ function apiAuthorize_(action,args) {
   if (action.indexOf('admin') === 0 || [
     'getAdminSettings','saveAdminSettings','uploadExcelForImport',
     'commitImportBatch','exportWorksToExcel','exportRegistrationsToExcel',
-    'exportPaymentsToExcel'
+    'exportPaymentsToExcel','listImportBatches'
   ].indexOf(action) >= 0) return requireSession_(args[0], API_ADMIN_ROLES, args[1]);
   throw apiError_('FORBIDDEN','ไม่มีสิทธิ์ใช้คำสั่งนี้');
 }
