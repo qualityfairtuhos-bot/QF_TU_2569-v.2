@@ -461,7 +461,48 @@ async function init(){
   }
 }
 
-$('#regForm').addEventListener('submit',async e=>{e.preventDefault();const consent=$('#consentAccepted');if(!PDPA_READ||!consent||!consent.checked)return Swal.fire({icon:'warning',title:'กรุณาอ่านและให้ความยินยอม',text:'โปรดกดเปิดอ่านข้อความขอความยินยอม อ่านรายละเอียด แล้วเลือกช่องให้ความยินยอมก่อนบันทึก',confirmButtonColor:'#006D70'});const selected=[...e.target.querySelectorAll('#attendanceDates input[type=checkbox]')].some(x=>x.checked);if(!selected)return Swal.fire({icon:'warning',title:'กรุณาเลือกวันเข้าร่วมงาน',confirmButtonColor:'#006D70'});load('กำลังบันทึกการลงทะเบียน');try{const r=await rpc('submitRegistration',CID,formObj(e.target));done();await Swal.fire({icon:'success',title:'ลงทะเบียนสำเร็จ',html:`เลขลงทะเบียน <b>${esc(r.RegID)}</b><br>รหัสแก้ไข <b>${esc(r.EditCode)}</b>${r.warnings?.length?'<br><small>'+r.warnings.map(esc).join('<br>')+'</small>':''}`,confirmButtonColor:'#006D70'});e.target.reset();renderAttendanceDates();resetConsentState();go('status');$('#statusRegId').value=r.RegID}catch(x){alertErr(x)}});
+$('#regForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const consent=$('#consentAccepted');
+  if(!PDPA_READ||!consent||!consent.checked)return Swal.fire({icon:'warning',title:'กรุณาอ่านและให้ความยินยอม',text:'โปรดกดเปิดอ่านข้อความขอความยินยอม อ่านรายละเอียด แล้วเลือกช่องให้ความยินยอมก่อนบันทึก',confirmButtonColor:'#006D70'});
+  const selected=[...e.target.querySelectorAll('#attendanceDates input[type=checkbox]')].some(x=>x.checked);
+  if(!selected)return Swal.fire({icon:'warning',title:'กรุณาเลือกวันเข้าร่วมงาน',confirmButtonColor:'#006D70'});
+  load('กำลังบันทึกการลงทะเบียน');
+  try{
+    const r=await rpc('submitRegistration',CID,formObj(e.target));
+    done();
+    await Swal.fire({icon:'success',title:'ลงทะเบียนสำเร็จ',html:`เลขลงทะเบียน <b>${esc(r.RegID)}</b><br>รหัสแก้ไข <b>${esc(r.EditCode)}</b>${r.warnings?.length?'<br><small>'+r.warnings.map(esc).join('<br>')+'</small>':''}`,confirmButtonColor:'#006D70'});
+    e.target.reset();
+    renderAttendanceDates();
+    resetConsentState();
+    go('status');
+    $('#statusRegId').value=r.RegID;
+  }catch(x){
+    done();
+    const msg=x.message||String(x);
+    if(/ชื่อ-นามสกุล|เลขบัตรประชาชน|ลงทะเบียนแล้ว|หมายเลขลงทะเบียนเดิม/.test(msg)){
+      const matchReg=msg.match(/REG-\d{4}-\d+/i);
+      const preRegId=matchReg?matchReg[0]:'';
+      await Swal.fire({
+        icon:'warning',
+        title:'ตรวจพบข้อมูลการลงทะเบียนแล้ว',
+        html:`${esc(msg)}<br><br><span style="font-size:0.9rem;color:#475569">ระบบไม่อนุญาตให้ลงทะเบียนซ้ำ กรุณาใช้หมายเลขลงทะเบียนเดิมเพื่อเข้าสู่ระบบตรวจสอบและแก้ไขข้อมูลให้ครบถ้วน</span>`,
+        showCancelButton:true,
+        confirmButtonText:'ไปหน้าตรวจสอบ/แก้ไขข้อมูล',
+        cancelButtonText:'ปิด',
+        confirmButtonColor:'#006D70',
+        cancelButtonColor:'#64748b'
+      }).then(res=>{
+        if(res.isConfirmed){
+          go('status');
+          if(preRegId&&$('#statusRegId')){$('#statusRegId').value=preRegId;}
+        }
+      });
+    }else{
+      alertErr(x);
+    }
+  }
+});
 async function lookupStatus(){load('กำลังค้นหาข้อมูล');try{const r=await rpc('lookupRegistrationForEdit',CID,$('#statusRegId').value,$('#statusKey').value,$('#statusCode').value);let docs=[];try{docs=await rpc('getPublicFinanceDocuments',CID,$('#statusRegId').value,$('#statusKey').value)}catch(ignore){}done();renderStatus(r,docs)}catch(e){alertErr(e)}}
 function renderStatus(r,docs){
   const prefixes=settingOptions('PREFIX_OPTIONS_JSON',['นาย','นาง','นางสาว','นพ.','พญ.','ทพ.','ทพญ.','ภก.','ภญ.']),positions=settingOptions('POSITION_OPTIONS_JSON',[]),professions=settingOptions('PROFESSION_OPTIONS_JSON',['แพทย์','ทันตแพทย์','เภสัชกร','พยาบาล','นักวิชาการ']);
@@ -567,7 +608,19 @@ async function promptReplaceWorkFile(workId,category,title){const {value:file}=a
 function updateWorkRules(){const sel=$('#workCategory'),code=sel?.selectedOptions?.[0]?.dataset?.code||'',researchOrInnovation=['RESEARCH','INNOVATION'].includes(code),ethics=$('#ethicsRequired'),hint=$('#ethicsFileHint');if(hint)hint.textContent=researchOrInnovation?'หากผลงานเกี่ยวข้องกับมนุษย์ ต้องแนบไฟล์หลักฐานจริยธรรม':'แนบเมื่อผลงานเกี่ยวข้องกับมนุษย์';if(ethics&&researchOrInnovation)ethics.closest('.work-rule')?.classList.add('gold');else ethics?.closest('.work-rule')?.classList.remove('gold')}
 function updateRegion4Intent(){const yes=document.querySelector('input[name="Region4Affiliation"][value="YES"]')?.checked,box=$('#region4IntentBox');if(box)box.classList.toggle('show',!!yes);document.querySelectorAll('input[name="Region4AwardIntentChoice"]').forEach(x=>{x.required=!!yes;if(!yes)x.checked=false})}
 async function emailMyPass(){load('กำลังส่งคูปองเข้า Email');try{await rpc('emailMyMealPass',CID,$('#passRegId').value,$('#passKey').value);done();Swal.fire({icon:'success',title:'ส่ง Email สำเร็จ',text:'กรุณาตรวจสอบในกล่องจดหมาย หรือ Junk/Spam',confirmButtonColor:'#006D70'})}catch(e){alertErr(e)}}
-async function loadPass(){load('กำลังโหลดคูปอง');try{const r=await rpc('getMealPass',CID,$('#passRegId').value,$('#passKey').value);done();const reg=r.registration||{},active=(r.entitlements||[]).filter(e=>String(e.Status||'').toUpperCase()!=='CANCELLED');const rows=active.map(e=>`<div class="ent-row"><span>${esc(formatThaiDate(e.EventDate))} · ${esc(e.MealNameTH||e.MealCode)}</span><b>${esc(e.Status)}</b></div>`).join('');$('#passResult').innerHTML=`<div class="card"><div class="meal-pass-public"><div class="meal-pass-top"><span class="meal-pass-event">มหกรรมคุณภาพ 2569</span><span>TUH STAFF EVENT PASS</span></div><div>ยินดีต้อนรับเข้าสู่งาน</div><div class="meal-pass-name">${esc(reg.FullName||'')}</div><div class="meal-pass-id">ID: ${esc(reg.RegID||'')}</div><img src="https://quickchart.io/qr?size=360&margin=2&text=${encodeURIComponent(r.PassToken)}" alt="QR Code คูปองอาหาร"><div class="meal-pass-meta"><div>ประเภทบุคคล<b>${esc(reg.ParticipantType||'')}</b></div><div>สถานะการชำระเงิน<b>${esc(reg.PaymentStatus||'')}</b></div></div><div class="meal-entitlements">${rows||'<div class="ent-row">ยังไม่มีรายการสิทธิ์อาหาร</div>'}</div><div class="meal-pass-note">กรุณาเปิดคูปองนี้ให้เจ้าหน้าที่สแกน ณ จุดบริการอาหาร</div></div></div>`}catch(e){alertErr(e)}}
+async function loadPass(){
+  load('กำลังโหลดคูปอง');
+  try{
+    const r=await rpc('getMealPass',CID,$('#passRegId').value,$('#passKey').value);
+    done();
+    const reg=r.registration||{},active=(r.entitlements||[]).filter(e=>String(e.Status||'').toUpperCase()!=='CANCELLED');
+    const confName=BOOT.conference?.ShortName||'มหกรรมคุณภาพ 2569';
+    const isInternal=(reg.ParticipantType==='INTERNAL');
+    const passLabel=isInternal?'TUH STAFF EVENT PASS':'TUH EVENT PASS';
+    const rows=active.map(e=>`<div class="ent-row"><span>${esc(formatThaiDate(e.EventDate))} · ${esc(e.MealNameTH||e.MealCode)}</span><b>${esc(e.Status)}</b></div>`).join('');
+    $('#passResult').innerHTML=`<div class="card"><div class="meal-pass-public"><div class="meal-pass-top"><span class="meal-pass-event">${esc(confName)}</span><span>${esc(passLabel)}</span></div><div style="color:#e6c252;font-weight:600;font-size:0.95rem;margin-top:6px">ยินดีต้อนรับเข้าสู่งาน</div><div class="meal-pass-name">${esc(reg.FullName||'')}</div><div class="meal-pass-id">ID: ${esc(reg.RegID||'')}</div><div style="background:#fff;border-radius:14px;padding:10px;width:210px;margin:18px auto;box-sizing:border-box"><img src="https://quickchart.io/qr?size=360&margin=2&text=${encodeURIComponent(r.PassToken)}" alt="QR Code คูปองอาหาร" style="width:190px;height:190px;display:block;margin:0 auto"></div><div class="meal-pass-meta"><div>ประเภทบุคคล<b>${esc(reg.ParticipantTypeName||reg.ParticipantType||'')}</b></div><div>สถานะการชำระเงิน<b>${esc(reg.PaymentStatus||'')}</b></div></div><div class="meal-entitlements">${rows||'<div class="ent-row">ยังไม่มีรายการสิทธิ์อาหาร</div>'}</div><div class="meal-pass-note" style="margin-top:14px;color:#d7a7ba;font-size:0.75rem">กรุณาแสดง QR Code นี้ให้จุดสแกนอาหาร และไม่ส่งต่อให้ผู้อื่น</div></div></div>`;
+  }catch(e){alertErr(e)}
+}
 const heroCarousel=$('#heroCarousel');if(heroCarousel){heroCarousel.addEventListener('mouseenter',()=>clearInterval(HERO_TIMER));heroCarousel.addEventListener('mouseleave',startHeroCarousel);heroCarousel.addEventListener('focusin',()=>clearInterval(HERO_TIMER));heroCarousel.addEventListener('focusout',startHeroCarousel)}
 window.addEventListener('load',init);
 </script>

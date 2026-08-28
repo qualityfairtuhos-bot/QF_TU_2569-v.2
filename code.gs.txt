@@ -2961,7 +2961,29 @@ function submitRegistration(conferenceId,payload){
     return {RegID:reg.RegID,EditCode:reg.EditCode,warnings:duplicateWarnings_(mapped,cid,reg.RegID),mealPass:mealPass};
   });
 }
-function validateNewRegistration_(m,cid,excludeRegId){ if(!m.ConsentAccepted)throw new Error('กรุณายินยอมการเก็บและใช้ข้อมูลส่วนบุคคล'); if(!m.ParticipantType)throw new Error('กรุณาเลือกประเภทผู้สมัคร'); if(!m.FirstName||!m.LastName)throw new Error('กรุณากรอกชื่อและนามสกุล'); if(!validateThaiCid_(m.CID))throw new Error('เลขบัตรประชาชนไม่ถูกต้อง'); const dup=findMany_('Registrations',{ConferenceID:cid,CID:m.CID}).find(function(x){return x.RegID!==excludeRegId&&upper_(x.RegistrationStatus)!=='CANCELLED';}); if(dup)throw new Error('เลขบัตรประชาชนนี้ลงทะเบียนแล้ว'); if(!m.Email)throw new Error('กรุณากรอก Email'); if(!m.Phone)throw new Error('กรุณากรอกโทรศัพท์'); }
+function validateNewRegistration_(m,cid,excludeRegId){
+  if(!m.ConsentAccepted)throw new Error('กรุณายินยอมการเก็บและใช้ข้อมูลส่วนบุคคล');
+  if(!m.ParticipantType)throw new Error('กรุณาเลือกประเภทผู้สมัคร');
+  if(!m.FirstName||!m.LastName)throw new Error('กรุณากรอกชื่อและนามสกุล');
+  if(!validateThaiCid_(m.CID))throw new Error('เลขบัตรประชาชนไม่ถูกต้อง');
+  const dup=findMany_('Registrations',{ConferenceID:cid,CID:m.CID}).find(function(x){return x.RegID!==excludeRegId&&upper_(x.RegistrationStatus)!=='CANCELLED';});
+  if(dup)throw new Error('เลขบัตรประชาชนนี้ลงทะเบียนแล้ว ('+dup.RegID+') กรุณาใช้หมายเลขลงทะเบียนเดิมเข้ามาแก้ไขข้อมูลให้ครบถ้วน');
+  const fn2=clean_(m.FirstName).replace(/\s+/g,'').toLowerCase();
+  const ln2=clean_(m.LastName).replace(/\s+/g,'').toLowerCase();
+  if(fn2&&ln2){
+    const dupName=findMany_('Registrations',{ConferenceID:cid}).find(function(x){
+      if(x.RegID===excludeRegId||upper_(x.RegistrationStatus)==='CANCELLED')return false;
+      const fn1=clean_(x.FirstName).replace(/\s+/g,'').toLowerCase();
+      const ln1=clean_(x.LastName).replace(/\s+/g,'').toLowerCase();
+      return fn1===fn2&&ln1===ln2;
+    });
+    if(dupName){
+      throw new Error('ตรวจพบชื่อ-นามสกุลนี้ลงทะเบียนในระบบแล้ว ('+dupName.RegID+') กรุณาใช้หมายเลขลงทะเบียนเดิมเข้ามาแก้ไขข้อมูลให้ครบถ้วน');
+    }
+  }
+  if(!m.Email)throw new Error('กรุณากรอก Email');
+  if(!m.Phone)throw new Error('กรุณากรอกโทรศัพท์');
+}
 function duplicateWarnings_(m,cid,exclude){ const w=[]; const emails=findMany_('Registrations',{ConferenceID:cid,Email:m.Email}).filter(function(x){return x.RegID!==exclude;}); if(emails.length)w.push('Email นี้ถูกใช้กับผู้ลงทะเบียนอื่น '+emails.length+' ราย'); const phones=findMany_('Registrations',{ConferenceID:cid,Phone:m.Phone}).filter(function(x){return x.RegID!==exclude;}); if(phones.length)w.push('เบอร์โทรนี้ถูกใช้กับผู้ลงทะเบียนอื่น '+phones.length+' ราย'); return w; }
 function createRegistrationRecord_(m,userEmail,isImport,validationStatus){
   const cid=m.ConferenceID||APP.DEFAULT_CONFERENCE_ID, regId=nextId_('REG'), editCode=String(Math.floor(100000+Math.random()*900000)), type=findOne_('RegistrationTypes',{ConferenceID:cid,TypeCode:m.ParticipantType})||{};
@@ -3708,14 +3730,23 @@ function mealPassDispatchInfo_(conferenceId,regId){
 function buildMealPassEmailHtml_(conferenceId,r,type,passToken){
   const conf=findOne_('Conferences',{ConferenceID:conferenceId})||{},fee=bool_(type.PaymentRequired)?Number(type.FeeAmount||0).toLocaleString('th-TH')+' บาท':'ไม่เสียค่าลงทะเบียน';
   const entitlements=findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:r.RegID});
-  const days=uniqueCleanList_(entitlements.map(function(e){return formatThaiDateServer_(e.EventDate);}));
+  let days=uniqueCleanList_(entitlements.filter(function(e){return upper_(e.Status)!=='CANCELLED';}).map(function(e){return formatThaiDateServer_(e.EventDate);}));
+  if(!days.length){
+    const dates=jsonParse_(getSetting_(conferenceId,'EVENT_DATES_JSON','[]'),[]).slice(0,3);
+    const sel=[bool_(r.AttendanceDay1),bool_(r.AttendanceDay2),bool_(r.AttendanceDay3)];
+    dates.forEach(function(d,i){if(sel[i])days.push(formatThaiDateServer_(d));});
+    days=uniqueCleanList_(days);
+  }
+  const isInternal = bool_(type.IsInternal) || r.ParticipantType === 'INTERNAL';
+  const passLabel = isInternal ? 'TUH STAFF EVENT PASS' : 'TUH EVENT PASS';
+  const confName = conf.ShortName || 'TUH Quality 2569';
   return '<div style="font-family:Arial,\'Noto Sans Thai\',sans-serif;background:#f4f7f8;padding:24px">'+
     '<div style="max-width:430px;margin:auto;background:linear-gradient(145deg,#0b1730,#12172b 72%,#281232);color:#fff;border-radius:18px;padding:24px;box-shadow:0 18px 48px rgba(11,23,48,.25)">'+
-    '<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:14px"><b style="color:#d7ad2d">'+htmlEscape_(conf.ShortName||'TUH Quality Fair 2026')+'</b><span style="font-size:12px;color:#9ba8bd">TUH STAFF EVENT PASS</span></div>'+ 
-    '<div style="text-align:center;padding:20px 0 12px"><div style="color:#d7ad2d;font-weight:700">ยินดีต้อนรับเข้าสู่งาน</div><h2 style="margin:14px 0 4px">'+htmlEscape_(r.FullName)+'</h2><div style="color:#9ba8bd">ID: '+htmlEscape_(r.RegID)+'</div>'+ 
-    '<div style="background:#fff;border-radius:14px;padding:10px;width:210px;margin:20px auto"><img src="cid:mealQr" width="190" height="190" alt="Meal QR Code" style="display:block"></div></div>'+ 
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;background:rgba(255,255,255,.06);border-radius:12px;padding:13px"><div><small style="color:#9ba8bd">ประเภทบุคคล</small><br><b style="color:#f0c53b">'+htmlEscape_(type.TypeNameTH||r.ParticipantType)+'</b></div><div><small style="color:#9ba8bd">ค่าลงทะเบียน</small><br><b>'+htmlEscape_(fee)+'</b></div></div>'+ 
-    '<div style="margin-top:14px;color:#c9d0dd;font-size:13px">วันใช้สิทธิ์: '+htmlEscape_(days.join(', '))+'</div>'+ 
+    '<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:14px"><b style="color:#d7ad2d;font-size:16px">'+htmlEscape_(confName)+'</b><span style="font-size:12px;color:#9ba8bd">'+passLabel+'</span></div>'+ 
+    '<div style="text-align:center;padding:20px 0 12px"><div style="color:#d7ad2d;font-weight:700;font-size:15px">ยินดีต้อนรับเข้าสู่งาน</div><h2 style="margin:14px 0 4px;font-size:22px;color:#fff">'+htmlEscape_(r.FullName)+'</h2><div style="color:#9ba8bd;font-size:14px">ID: '+htmlEscape_(r.RegID)+'</div>'+ 
+    '<div style="background:#fff;border-radius:14px;padding:10px;width:210px;margin:20px auto;box-sizing:border-box"><img src="cid:mealQr" width="190" height="190" alt="Meal QR Code" style="display:block;margin:0 auto"></div></div>'+ 
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;background:rgba(255,255,255,.06);border-radius:12px;padding:13px;text-align:left"><div><small style="color:#9ba8bd;font-size:12px">ประเภทบุคคล</small><br><b style="color:#f0c53b;font-size:13px;display:block;margin-top:2px">'+htmlEscape_(type.TypeNameTH||r.ParticipantType)+'</b></div><div><small style="color:#9ba8bd;font-size:12px">ค่าลงทะเบียน</small><br><b style="color:#fff;font-size:13px;display:block;margin-top:2px">'+htmlEscape_(fee)+'</b></div></div>'+ 
+    (days.length ? '<div style="margin-top:14px;color:#c9d0dd;font-size:13px;text-align:left">วันใช้สิทธิ์: '+htmlEscape_(days.join(', '))+'</div>' : '')+ 
     '<div style="margin-top:16px;color:#d7a7ba;font-size:12px;text-align:center">กรุณาแสดง QR Code นี้ให้จุดสแกนอาหาร และไม่ส่งต่อให้ผู้อื่น</div></div></div>';
 }
 function formatThaiDateServer_(value){
@@ -3776,6 +3807,16 @@ function adminSaveRegistration(token,conferenceId,regId,payload){
     const cid=normalizeCid_(payload.CID||r.CID);if(!validateThaiCid_(cid))throw new Error('เลขบัตรประชาชนไม่ถูกต้อง');
     const dup=findMany_('Registrations',{ConferenceID:conferenceId,CID:cid}).find(function(x){return x.RegID!==regId&&upper_(x.RegistrationStatus)!=='CANCELLED';});if(dup)throw new Error('เลขบัตรประชาชนนี้ซ้ำกับ '+dup.RegID);
     const first=clean_(payload.FirstName||r.FirstName),last=clean_(payload.LastName||r.LastName),email=normalizeEmail_(payload.Email||r.Email),phone=normalizePhone_(payload.Phone||r.Phone);if(!first||!last||!email||!phone)throw new Error('ชื่อ นามสกุล Email และโทรศัพท์ต้องครบ');
+    const fn2=first.replace(/\s+/g,'').toLowerCase(),ln2=last.replace(/\s+/g,'').toLowerCase();
+    if(fn2&&ln2){
+      const dupName=findMany_('Registrations',{ConferenceID:conferenceId}).find(function(x){
+        if(x.RegID===regId||upper_(x.RegistrationStatus)==='CANCELLED')return false;
+        const fn1=clean_(x.FirstName).replace(/\s+/g,'').toLowerCase();
+        const ln1=clean_(x.LastName).replace(/\s+/g,'').toLowerCase();
+        return fn1===fn2&&ln1===ln2;
+      });
+      if(dupName)throw new Error('ชื่อ-นามสกุลนี้ซ้ำกับ '+dupName.RegID+' กรุณาใช้หมายเลขลงทะเบียนเดิม');
+    }
     const participantType=clean_(payload.ParticipantType||r.ParticipantType),type=registrationTypeMap_(conferenceId)[participantType]||{};
     let paymentStatus=r.PaymentStatus;if(!bool_(type.PaymentRequired))paymentStatus='NOT_REQUIRED';else if(paymentStatus==='NOT_REQUIRED')paymentStatus='UNPAID';
     const org=clean_(payload.OrganizationUnit||payload.Institution||r.OrganizationUnit||r.Institution),prefix=clean_(payload.Prefix||r.Prefix);
@@ -3833,7 +3874,37 @@ function adminListMealPasses(token,conferenceId,filters){
     rows.sort(function(a,b){return String(a.FullName).localeCompare(String(b.FullName),'th');});return serialize_(rows);
   });
 }
-function adminPreviewMealPass(token,conferenceId,regId){return runSafely_('adminPreviewMealPass',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF','FOOD_STAFF'],conferenceId);const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');const type=registrationTypeMap_(conferenceId)[r.ParticipantType]||{},elig=mealPassEligibility_(r,type);if(!elig.ok)throw new Error(elig.reason);ensureMealEntitlements_(conferenceId,regId);const tokenValue=signMealPassToken_(conferenceId,regId);return {registration:publicRegistration_(r),type:serialize_(type),token:tokenValue,qrUrl:'https://quickchart.io/qr?size=360&margin=2&text='+encodeURIComponent(tokenValue),dispatch:serialize_(mealPassDispatchInfo_(conferenceId,regId)),entitlements:serialize_(findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:regId}))};});}
+function adminPreviewMealPass(token,conferenceId,regId){
+  return runSafely_('adminPreviewMealPass',function(){
+    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF','FOOD_STAFF'],conferenceId);
+    const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});
+    if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
+    const type=registrationTypeMap_(conferenceId)[r.ParticipantType]||{},elig=mealPassEligibility_(r,type);
+    if(!elig.ok)throw new Error(elig.reason);
+    ensureMealEntitlements_(conferenceId,regId);
+    const tokenValue=signMealPassToken_(conferenceId,regId);
+    const qrUrl='https://quickchart.io/qr?size=360&margin=2&text='+encodeURIComponent(tokenValue);
+    const entitlements=findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:regId});
+    let days=uniqueCleanList_(entitlements.filter(function(e){return upper_(e.Status)!=='CANCELLED';}).map(function(e){return formatThaiDateServer_(e.EventDate);}));
+    if(!days.length){
+      const dates=jsonParse_(getSetting_(conferenceId,'EVENT_DATES_JSON','[]'),[]).slice(0,3);
+      const sel=[bool_(r.AttendanceDay1),bool_(r.AttendanceDay2),bool_(r.AttendanceDay3)];
+      dates.forEach(function(d,i){if(sel[i])days.push(formatThaiDateServer_(d));});
+      days=uniqueCleanList_(days);
+    }
+    const cardHtml=buildMealPassEmailHtml_(conferenceId,r,type,tokenValue).replace('cid:mealQr',qrUrl);
+    return {
+      registration:publicRegistration_(r),
+      type:serialize_(type),
+      token:tokenValue,
+      qrUrl:qrUrl,
+      days:days,
+      cardHtml:cardHtml,
+      dispatch:serialize_(mealPassDispatchInfo_(conferenceId,regId)),
+      entitlements:serialize_(entitlements)
+    };
+  });
+}
 function adminSendMealPasses(token,conferenceId,regIds){
   return runSafely_('adminSendMealPasses',function(){const ctx=requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF'],conferenceId),ids=uniqueCleanList_(regIds||[]);if(!ids.length)throw new Error('กรุณาเลือกผู้ลงทะเบียนอย่างน้อย 1 คน');if(ids.length>100)throw new Error('ส่งได้ครั้งละไม่เกิน 100 คน');const result={requested:ids.length,sent:0,failed:0,items:[]};ids.forEach(function(id){try{const x=sendMealPassEmail_(conferenceId,id,ctx.user,'ADMIN_BULK');result.sent++;result.items.push({RegID:id,success:true,dispatchCount:x.dispatchCount});}catch(e){result.failed++;result.items.push({RegID:id,success:false,message:e.message||String(e)});}});invalidateCache_(conferenceId);return result;});
 }
