@@ -517,6 +517,14 @@ function renderStatus(r,docs){
 
   const docsHtml=(docs&&docs.length)?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin-bottom:14px;"><div style="font-weight:600;color:#166534;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-file-invoice-dollar"></i> เอกสารทางการเงินจากเจ้าหน้าที่ (Finance Documents)</div><div style="display:flex;flex-direction:column;gap:6px">${docs.map(d=>{const catLabel=d.DocCategory==='INVOICE'?'ใบแจ้งหนี้ (Invoice)':(d.DocCategory==='RECEIPT'?'ใบเสร็จรับเงิน (Receipt)':'เอกสารอื่นๆ');const badgeStyle=d.DocCategory==='INVOICE'?'color:#92400e;background:#fef3c7;border:1px solid #fde68a;':(d.DocCategory==='RECEIPT'?'color:#15803d;background:#dcfce7;border:1px solid #86efac;':'color:#1e40af;background:#dbeafe;border:1px solid #bfdbfe;');return `<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #e2e8f0;font-size:0.88rem;flex-wrap:wrap;gap:8px;"><div><span style="font-size:0.75rem;padding:2px 8px;border-radius:4px;font-weight:600;margin-right:6px;${badgeStyle}">${catLabel}</span><b>${esc(d.FileName)}</b>${d.Note?`<span class="muted" style="margin-left:6px">(${esc(d.Note)})</span>`:''}</div><a href="${esc(d.FileUrl)}" target="_blank" class="btn btn-sm btn-primary" style="padding:4px 12px;font-size:0.8rem;text-decoration:none;"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดดู / ดาวน์โหลด</a></div>`}).join('')}</div></div>`:'';
 
+  const isChecked = v => v === true || String(v||'').trim().toUpperCase() === 'TRUE' || v === 1 || String(v||'').trim() === '1';
+  const eventDates = getEventDates().slice(0, 3);
+  const attendanceOptionsHtml = eventDates.length ? eventDates.map((d, i) => {
+    const dayNum = i + 1;
+    const checked = isChecked(r['AttendanceDay' + dayNum]);
+    return `<label class="attendance-option"><input type="checkbox" name="AttendanceDay${dayNum}" ${checked ? 'checked' : ''}><span><b>วันที่ ${dayNum}: ${esc(formatThaiDate(d))}</b><span class="en">Day ${dayNum}: ${esc(formatEnglishDate(d))}</span></span></label>`;
+  }).join('') : '<div class="notice">ผู้ดูแลระบบยังไม่ได้กำหนดวันจัดงาน กรุณาติดต่อเจ้าหน้าที่</div>';
+
   $('#statusResult').innerHTML=`<div class="card">
     <div class="notice ${r.DataCompletenessStatus==='COMPLETE'?'success':''}" style="margin-bottom:14px">
       สถานะข้อมูล: <b>${esc(r.DataCompletenessStatus)}</b> | สถานะลงทะเบียน: <b>${esc(r.RegistrationStatus)}</b> | การเงิน: <b>${esc(r.PaymentStatus)}</b>
@@ -573,12 +581,22 @@ function renderStatus(r,docs){
           </div>
         </div>
 
-        <!-- 4. ข้อมูลอาหาร -->
+        <!-- 4. อาหารและการเข้าร่วมงาน -->
         <div class="form-section">
-          <div class="form-section-header"><span class="sec-badge">4</span><span>อาหารและการเข้าร่วมงาน</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Meal & Preference</span></div>
+          <div class="form-section-header"><span class="sec-badge">4</span><span>อาหารและการเข้าร่วมงาน</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Meal & Attendance</span></div>
           <div class="grid">
             <div class="field"><label>ประเภทอาหาร<span class="en">Meal preference</span></label>${select('FoodType',foods,r.FoodType)}</div>
             <div class="field"><label>รายละเอียดการแพ้อาหาร<span class="en">Food allergy details</span></label>${input('FoodAllergyDetail',r.FoodAllergyDetail)}</div>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-weight:600;font-size:0.92rem;display:block;margin-bottom:6px">วันเข้าร่วมงาน <span class="required-star">*</span><span class="en">Attendance days</span></label>
+            <div class="attendance-list">${attendanceOptionsHtml}</div>
+          </div>
+          <div style="margin-top:14px;padding:10px 14px;background:#fff;border:1px solid #dce5ea;border-radius:12px">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:600">
+              <input type="checkbox" name="WantsSubmitWork" ${isChecked(r.WantsSubmitWork) ? 'checked' : ''}>
+              <span>ประสงค์ส่งผลงาน (ผู้นำเสนอหลักเป็นผู้กรอกข้อมูลและส่งไฟล์ผลงาน) <span class="en">I intend to submit a work (Main presenter submits information and files)</span></span>
+            </label>
           </div>
         </div>
 
@@ -589,7 +607,20 @@ function renderStatus(r,docs){
       </fieldset>
     </form>
   </div>`;
-  $('#editForm').onsubmit=async e=>{e.preventDefault();load('กำลังบันทึกข้อมูล');try{const x=await rpc('saveRegistrationEdit',CID,r.RegID,$('#statusKey').value,$('#statusCode').value,formObj(e.target));done();Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',html:(x.warnings||[]).map(esc).join('<br>'),confirmButtonColor:'#006D70'});lookupStatus()}catch(z){alertErr(z)}}
+  $('#editForm').onsubmit=async e=>{
+    e.preventDefault();
+    const selected=[...e.target.querySelectorAll('input[name^="AttendanceDay"]')].some(x=>x.checked);
+    if(!selected)return Swal.fire({icon:'warning',title:'กรุณาเลือกวันเข้าร่วมงาน',text:'โปรดเลือกวันเข้าร่วมงานอย่างน้อย 1 วัน',confirmButtonColor:'#006D70'});
+    load('กำลังบันทึกข้อมูล');
+    try{
+      const x=await rpc('saveRegistrationEdit',CID,r.RegID,$('#statusKey').value,$('#statusCode').value,formObj(e.target));
+      done();
+      Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',html:(x.warnings||[]).map(esc).join('<br>'),confirmButtonColor:'#006D70'});
+      lookupStatus();
+    }catch(z){
+      alertErr(z);
+    }
+  };
 }
 function renderPaymentSlip(url,name,status){const p=$('#paymentSlipPreview'),btn=document.querySelector('#page-payment button[onclick="sendPayment()"]'),fi=$('#payFile');if(status==='APPROVED'){if(p)p.innerHTML=`<div class="notice success" style="margin-bottom:12px"><b>สถานะการเงิน: อนุมัติเรียบร้อยแล้ว</b><br>ไม่สามารถแก้ไขหลักฐานการชำระเงินได้อีก</div>`+(url&&url!=='undefined'?`<div style="padding:10px;border:1px solid #c7d3da;border-radius:8px;background:#fbfcfd;display:flex;align-items:center;gap:10px;font-size:0.85rem"><a href="${url}" target="_blank" style="color:#006D70;text-decoration:underline"><b>ดูไฟล์เดิม:</b> ${name||'เปิดดูหลักฐาน'}</a></div>`:'');if(btn)btn.style.display='none';if(fi)fi.style.display='none'}else{if(p){if(url&&url!=='undefined'){p.innerHTML=`<div class="notice" style="margin-bottom:12px"><b>สถานะการเงิน: ${esc(status||'ยังไม่ได้ชำระ')}</b></div><div style="padding:10px;border:1px solid #c7d3da;border-radius:8px;background:#fbfcfd;display:flex;align-items:center;gap:10px;font-size:0.85rem"><a href="${url}" target="_blank" style="color:#006D70;text-decoration:underline"><b>ดูไฟล์เดิม:</b> ${name||'เปิดดูหลักฐาน'}</a></div>`}else{p.innerHTML=`<div class="notice" style="margin-bottom:12px"><b>สถานะการเงิน: ${esc(status||'ยังไม่ได้ชำระ')}</b></div>`}}if(btn)btn.style.display='';if(fi)fi.style.display=''}}
 async function sendPayment(){load('กำลังอัปโหลดหลักฐาน');try{const f=await fileObj($('#payFile'));if(!f)throw new Error('กรุณาเลือกไฟล์');const r=await rpc('uploadPaymentSlip',CID,$('#payRegId').value,$('#payKey').value,f);done();renderPaymentSlip(r.SlipFileUrl,r.SlipFileName,r.PaymentStatus);$('#payFile').value='';Swal.fire({icon:'success',title:'อัปโหลดเรียบร้อย',text:'กรุณารอฝ่ายการเงินตรวจสอบ',confirmButtonColor:'#006D70'})}catch(e){alertErr(e)}}
