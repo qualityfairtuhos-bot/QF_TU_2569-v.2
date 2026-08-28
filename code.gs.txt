@@ -2097,6 +2097,238 @@ function importGoogleFormSheetToRegistrationsDirectly() {
 }
 
 /**
+ * ฟังก์ชัน All-in-One: นำเข้าจาก Google Form Sheet และส่งอีเมลแจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วนทันทีในคลิกเดียว
+ * สามารถเลือกและกด "เรียกใช้" (Run) ใน Google Apps Script Editor ได้ทันที
+ */
+function importGoogleFormSheetAndSendEmails() {
+  Logger.log('=== ขั้นตอนที่ 1: นำเข้าข้อมูลจาก Google Form Sheet สู่ Registrations ===');
+  const importResult = importGoogleFormSheetToRegistrationsDirectly();
+  Logger.log('=== ขั้นตอนที่ 2: ส่งอีเมลแจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วนให้มากรอกเลขบัตรประชาชน ===');
+  const emailResult = sendEmailToIncompleteRegistrationsNow(false);
+  return { importResult: importResult, emailResult: emailResult };
+}
+
+/**
+ * ฟังก์ชันหลักในการส่งอีเมลแจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน (INCOMPLETE)
+ * - ส่งอีเมลแจ้งรหัสลงทะเบียน (RegID) พร้อมปุ่มลิงก์ตรงสำหรับเปิดหน้าเว็บกรอกเลขบัตรประชาชน 13 หลัก
+ * - มีระบบป้องกันการส่งซ้ำ (เช็คจาก EmailLogs)
+ * - มีระบบป้องกันโควตาอีเมลรายวันของ Google
+ * @param {boolean} testMode หากเป็น true จะเป็นเพียงการจำลอง (Dry Run) ไม่ส่งจริง
+ * @param {number} maxCount จำนวนสูงสุดที่จะส่งในรอบนี้ (หากไม่ระบุ จะส่งทั้งหมดตามโควตาที่เหลือ)
+ * @param {string} overrideEmail หากระบุ จะส่งทุกฉบับไปที่อีเมลนี้เพื่อการทดสอบ
+ */
+function sendEmailToIncompleteRegistrationsNow(testMode, maxCount, overrideEmail) {
+  const cid = APP.DEFAULT_CONFERENCE_ID;
+  Logger.log('>>> เริ่มกระบวนการตรวจสอบและส่งอีเมลแจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน...');
+
+  const remainingQuota = MailApp.getRemainingDailyQuota();
+  Logger.log('โควตาส่งอีเมลที่เหลือของบัญชีวันนี้: ' + remainingQuota + ' ฉบับ');
+  if (remainingQuota <= 5) {
+    Logger.log('⚠️ คำเตือน: โควตาส่งอีเมลเหลือไม่เพียงพอ (' + remainingQuota + ' ฉบับ) กรุณารอรอบโควตาถัดไป');
+    return { success: false, message: 'โควตาส่งอีเมลไม่เพียงพอ (' + remainingQuota + ')' };
+  }
+
+  // ดึงประวัติอีเมลที่เคยส่งสำเร็จแล้ว เพื่อไม่ให้ส่งซ้ำ
+  const sentLogs = findMany_('EmailLogs', { ConferenceID: cid, RelatedType: 'INCOMPLETE_NOTICE', Status: 'SENT' });
+  const alreadySentRegIds = {};
+  sentLogs.forEach(function(l) {
+    if (l.RelatedID) alreadySentRegIds[l.RelatedID] = true;
+  });
+
+  // ค้นหาผู้ลงทะเบียนที่สถานะ INCOMPLETE หรือ IMPORTED_INCOMPLETE
+  const allRegs = findMany_('Registrations', { ConferenceID: cid });
+  const targets = allRegs.filter(function(r) {
+    if (upper_(r.RegistrationStatus) === 'CANCELLED') return false;
+    if (r.DataCompletenessStatus !== 'INCOMPLETE' && r.RegistrationStatus !== 'IMPORTED_INCOMPLETE') return false;
+    if (!r.Email || String(r.Email).indexOf('@') === -1) return false;
+    if (alreadySentRegIds[r.RegID]) return false;
+    return true;
+  });
+
+  Logger.log('พบผู้ลงทะเบียนที่ข้อมูลยังไม่ครบถ้วนและยังไม่เคยได้รับอีเมล: ' + targets.length + ' ราย');
+  if (testMode) {
+    Logger.log('=== [โหมดจำลอง (DRY RUN) - ไม่มีการส่งอีเมลจริง] ===');
+    targets.slice(0, 20).forEach(function(r, idx) {
+      Logger.log((idx + 1) + '. ' + r.RegID + ' | ' + r.FullName + ' | ' + r.Email + ' | สถานะ: ' + r.RegistrationStatus);
+    });
+    if (targets.length > 20) {
+      Logger.log('... และอีก ' + (targets.length - 20) + ' ราย');
+    }
+    return { success: true, dryRun: true, count: targets.length };
+  }
+
+  const limit = maxCount || Math.min(targets.length, remainingQuota - 5);
+  let sent = 0;
+  let failed = 0;
+
+  for (let i = 0; i < limit; i++) {
+    const reg = targets[i];
+    const targetEmail = overrideEmail || reg.Email;
+    Logger.log('กำลังส่ง [' + (i + 1) + '/' + limit + '] ให้: ' + reg.FullName + ' (' + reg.RegID + ') -> ' + targetEmail);
+    const ok = sendIncompleteProfileNotificationEmail_(cid, Object.assign({}, reg, { Email: targetEmail }), null, { Email: 'APPS_SCRIPT_RUNNER' });
+    if (ok) {
+      sent++;
+      Logger.log('  -> ส่งสำเร็จ');
+    } else {
+      failed++;
+      Logger.log('  -> ส่งไม่สำเร็จ (ดูข้อผิดพลาดใน EmailLogs)');
+    }
+    Utilities.sleep(250); // หน่วงเวลาเล็กน้อยเพื่อความเสถียร
+  }
+
+  Logger.log('==================================================');
+  Logger.log(' สรุปผลการส่งอีเมลแจ้งเตือน ');
+  Logger.log('==================================================');
+  Logger.log('ส่งสำเร็จ: ' + sent + ' ฉบับ');
+  Logger.log('ส่งไม่สำเร็จ: ' + failed + ' ฉบับ');
+  Logger.log('คงเหลือที่ยังไม่ได้ส่ง: ' + (targets.length - sent) + ' ราย');
+  Logger.log('==================================================');
+  return { success: true, sent: sent, failed: failed, remaining: targets.length - sent };
+}
+
+/**
+ * ฟังก์ชันดูตัวอย่างรายชื่อที่จะได้รับอีเมล (Dry Run) ไม่มีการส่งจริง
+ * กด Run ในเมนู Apps Script ได้ทันที
+ */
+function previewEmailToIncompleteRegistrations() {
+  return sendEmailToIncompleteRegistrationsNow(true);
+}
+
+/**
+ * ฟังก์ชันส่งอีเมลทดสอบ 1 ฉบับมายังอีเมลของตนเอง
+ * เพื่อตรวจดูการแสดงผลและทดสอบคลิกลิงก์ตรง
+ */
+function sendTestEmailToAdmin(targetEmail) {
+  const cid = APP.DEFAULT_CONFERENCE_ID;
+  const myEmail = targetEmail || Session.getActiveUser().getEmail() || 'qualityfair.tuhos@gmail.com';
+  Logger.log('>>> กำลังส่งอีเมลทดสอบไปยัง: ' + myEmail);
+
+  const sample = findOne_('Registrations', { ConferenceID: cid, DataCompletenessStatus: 'INCOMPLETE' }) || {
+    RegID: 'REG-TEST-001',
+    FullName: 'ภญ.อาภัสรี บัวประดิษฐ์ (ตัวอย่างทดสอบ)',
+    ParticipantType: 'บุคลากรภายใน รพ.ธรรมศาสตร์ฯ',
+    OrganizationUnit: 'ฝ่ายเภสัชกรรม',
+    DataCompletenessStatus: 'INCOMPLETE',
+    RegistrationStatus: 'IMPORTED_INCOMPLETE'
+  };
+
+  const testReg = Object.assign({}, sample, { Email: myEmail });
+  const ok = sendIncompleteProfileNotificationEmail_(cid, testReg, null, { Email: 'TEST_ADMIN' });
+  Logger.log('ผลการส่งอีเมลทดสอบ: ' + (ok ? 'สำเร็จ! กรุณาตรวจใน Inbox หรือ Junk/Spam' : 'ล้มเหลว'));
+  return { success: ok, targetEmail: myEmail, sampleRegId: testReg.RegID };
+}
+
+/**
+ * สร้าง HTML Template สำหรับ Email แจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน
+ */
+function buildIncompleteProfileEmailHtml_(conferenceId, reg, directUrl) {
+  const conf = findOne_('Conferences', { ConferenceID: conferenceId });
+  const confName = conf ? conf.ConferenceNameTH : 'TUH Quality Fair 2569';
+  const url = directUrl || ('https://qf-2569.vercel.app/?page=status&regId=' + encodeURIComponent(reg.RegID) + '&key=' + encodeURIComponent(reg.Email));
+
+  return '<div style="font-family: \'Sarabun\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #2d3748; line-height: 1.6;">' +
+    '<div style="text-align: center; border-bottom: 2px solid #006D70; padding-bottom: 16px; margin-bottom: 20px;">' +
+      '<div style="font-size: 13px; font-weight: 600; color: #006D70; letter-spacing: 0.5px; text-transform: uppercase;">โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ</div>' +
+      '<h2 style="color: #006D70; margin: 6px 0 0; font-size: 1.35rem; font-weight: bold;">' + esc(confName) + '</h2>' +
+      '<p style="color: #4a5568; margin: 4px 0 0; font-size: 0.95rem;">แจ้งรหัสการลงทะเบียนและขอความกรุณากรอกข้อมูลเพิ่มเติมให้ครบถ้วน</p>' +
+    '</div>' +
+
+    '<p style="font-size: 1rem; margin: 0 0 12px;">เรียน คุณ <strong>' + esc(reg.FullName) + '</strong>,</p>' +
+
+    '<p style="font-size: 0.95rem; color: #4a5568; margin: 0 0 16px;">' +
+      'คณะกรรมการจัดงานฯ ได้ดำเนินการนำเข้าข้อมูลการลงทะเบียนเข้าร่วมงานของท่านจาก Google Form เข้าสู่ระบบฐานข้อมูลหลักเรียบร้อยแล้ว โดยมีรายละเอียดการลงทะเบียนเบื้องต้นดังนี้:' +
+    '</p>' +
+
+    '<div style="background-color: #f7fafc; border: 1px solid #e2e8f0; border-left: 5px solid #006D70; border-radius: 8px; padding: 16px; margin: 18px 0;">' +
+      '<div style="margin: 4px 0; font-size: 0.95rem;">' +
+        '<span style="color: #718096;">เลขลงทะเบียน (RegID):</span> ' +
+        '<span style="font-size: 1.25rem; color: #006D70; font-weight: bold; margin-left: 8px;">' + esc(reg.RegID) + '</span>' +
+      '</div>' +
+      '<div style="margin: 6px 0; font-size: 0.9rem;">' +
+        '<span style="color: #718096;">ชื่อ-นามสกุล:</span> <strong>' + esc(reg.FullName) + '</strong>' +
+      '</div>' +
+      '<div style="margin: 6px 0; font-size: 0.9rem;">' +
+        '<span style="color: #718096;">ประเภทผู้สมัคร:</span> <span>' + esc(reg.ParticipantType || '-') + '</span>' +
+      '</div>' +
+      (reg.OrganizationUnit ? ('<div style="margin: 6px 0; font-size: 0.9rem;"><span style="color: #718096;">หน่วยงาน/สถาบัน:</span> <span>' + esc(reg.OrganizationUnit) + '</span></div>') : '') +
+      '<div style="margin: 6px 0; font-size: 0.9rem;">' +
+        '<span style="color: #718096;">สถานะข้อมูล:</span> ' +
+        '<span style="color: #c53030; font-weight: bold; background: #fff5f5; padding: 2px 8px; border-radius: 4px; border: 1px solid #feb2b2;">' +
+          '⚠️ ข้อมูลยังไม่สมบูรณ์ (ต้องระบุเลขประจำตัวประชาชน 13 หลัก)' +
+        '</span>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="background-color: #fffaf0; border: 1px solid #feebc8; border-radius: 8px; padding: 14px; margin: 18px 0; font-size: 0.9rem; color: #744210;">' +
+      '<strong>📌 เหตุผลที่ต้องกรอกข้อมูลเพิ่มเติม:</strong><br>' +
+      'เนื่องจากแบบฟอร์ม Google Form เดิมไม่ได้จัดเก็บ <strong>เลขบัตรประจำตัวประชาชน 13 หลัก</strong> ทางคณะกรรมการจึงจำเป็นต้องขอความกรุณาท่านเข้ามากรอกข้อมูลให้ครบถ้วน เพื่อใช้ประโยชน์ในการ:' +
+      '<ul style="margin: 6px 0 0; padding-left: 20px;">' +
+        '<li>ออกใบประกาศนียบัตรอิเล็กทรอนิกส์ (E-Certificate) ที่ถูกต้องตามมาตรฐาน</li>' +
+        '<li>สร้าง QR Code บัตรผู้เข้าร่วมงาน (Meal Pass & สิทธิ์อาหาร)</li>' +
+        '<li>ตรวจสอบความถูกต้องของสิทธิ์การเข้าร่วมงานแต่ละวัน</li>' +
+      '</ul>' +
+    '</div>' +
+
+    '<div style="text-align: center; margin: 26px 0;">' +
+      '<a href="' + url + '" target="_blank" style="background-color: #006D70; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1rem; display: inline-block; box-shadow: 0 3px 6px rgba(0,109,112,0.25);">' +
+        '👉 คลิกที่นี่เพื่อกรอกเลขบัตรประชาชนและตรวจสอบข้อมูล' +
+      '</a>' +
+    '</div>' +
+
+    '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; font-size: 0.85rem; color: #4a5568; margin-top: 20px;">' +
+      '<strong>💡 ขั้นตอนการเข้าสู่ระบบด้วยตนเอง (หากลิงก์ไม่เปิด):</strong>' +
+      '<ol style="margin: 6px 0 0; padding-left: 20px; line-height: 1.6;">' +
+        '<li>เข้าสู่เว็บไซต์หลัก: <a href="https://qf-2569.vercel.app/" target="_blank" style="color: #006D70; font-weight: bold;">https://qf-2569.vercel.app/</a></li>' +
+        '<li>เลือกเมนู <strong>"แก้ไขข้อมูล / ตรวจสอบสถานะ"</strong></li>' +
+        '<li>กรอกเลขลงทะเบียน: <strong>' + esc(reg.RegID) + '</strong></li>' +
+        '<li>กรอกอีเมล: <strong>' + esc(reg.Email) + '</strong></li>' +
+        '<li>กดปุ่ม "ค้นหา" แล้วกรอกเลขประจำตัวประชาชน 13 หลัก จากนั้นกดบันทึก</li>' +
+      '</ol>' +
+    '</div>' +
+
+    '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px;" />' +
+    '<div style="font-size: 0.8rem; color: #a0aec0; text-align: center; line-height: 1.5;">' +
+      'งานพัฒนาคุณภาพ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ<br>' +
+      'สอบถามข้อมูลเพิ่มเติม ติดต่อคณะกรรมการจัดงาน TUH Quality Fair 2569' +
+    '</div>' +
+  '</div>';
+}
+
+/**
+ * ส่งอีเมลแจ้งเตือนข้อมูลไม่สมบูรณ์ 1 รายการ พร้อมบันทึก EmailLogs
+ */
+function sendIncompleteProfileNotificationEmail_(conferenceId, reg, directUrl, user) {
+  if (!reg || !reg.Email) return false;
+  const conf = findOne_('Conferences', { ConferenceID: conferenceId });
+  const confName = conf ? conf.ConferenceNameTH : 'TUH Quality Fair 2569';
+  const subject = '[' + confName + '] แจ้งรหัสลงทะเบียน (' + reg.RegID + ') และขอความกรุณากรอกข้อมูลเพิ่มเติมให้ครบถ้วน';
+  const html = buildIncompleteProfileEmailHtml_(conferenceId, reg, directUrl);
+  return sendEmailLogged_(conferenceId, reg.Email, subject, html, 'INCOMPLETE_NOTICE', reg.RegID, user);
+}
+
+/**
+ * RPC API สำหรับหน้า Admin เพื่อส่ง Email แจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน
+ */
+function adminSendIncompleteProfileEmails(token, conferenceId, options) {
+  return runSafely_('adminSendIncompleteProfileEmails', function() {
+    const ctx = requireSession_(
+      token,
+      ['SUPERADMIN', 'CONFERENCE_ADMIN', 'REGISTRATION_STAFF'],
+      conferenceId
+    );
+    options = options || {};
+    const cid = ctx.conferenceId || conferenceId || APP.DEFAULT_CONFERENCE_ID;
+
+    if (options.isTest) {
+      const testEmail = options.testEmail || ctx.user.Email;
+      return sendTestEmailToAdmin(testEmail);
+    }
+
+    return sendEmailToIncompleteRegistrationsNow(false, options.maxCount, options.overrideEmail);
+  });
+}
+
+/**
  * RPC API สำหรับหน้า Admin เพื่อนำเข้าจาก Google Sheet URL
  */
 function adminImportFromGoogleSheet(token, conferenceId, sheetUrl) {
@@ -2254,7 +2486,10 @@ function executeDirectFormSheetImport_(conferenceId, sheetUrl, triggerUser) {
         importedList.push({
           regId: created.RegID,
           fullName: mapped.FullName,
+          email: mapped.Email,
+          phone: mapped.Phone,
           participantType: mapped.ParticipantType,
+          completeness: created.record.DataCompletenessStatus,
           sourceRowNo: item.sourceRowNo
         });
       } catch (err) {
@@ -5286,6 +5521,7 @@ const API_ACTIONS = Object.freeze({
   adminDeleteFinanceDocument: adminDeleteFinanceDocument,
   getPublicFinanceDocuments: getPublicFinanceDocuments,
   adminImportFromGoogleSheet: adminImportFromGoogleSheet,
+  adminSendIncompleteProfileEmails: adminSendIncompleteProfileEmails,
   adminGetImportBatchDetail: adminGetImportBatchDetail,
   listImportBatches: listImportBatches,
   adminSendBatchImportEmails: adminSendBatchImportEmails,
@@ -5327,7 +5563,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1,
   adminUploadFinanceDocument:1, adminDeleteFinanceDocument:1,
-  adminImportFromGoogleSheet:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
+  adminImportFromGoogleSheet:1, adminSendIncompleteProfileEmails:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
   emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,
   replaceWorkFile:1, requestPasswordReset:1, reviewerSaveReview:1,

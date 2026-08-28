@@ -131,6 +131,29 @@
         <div id="directImportResult"></div>
       </div>
 
+      <!-- ส่วนที่ 1.1: ส่ง Email แจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน (INCOMPLETE) ให้มากรอกเลขบัตรประชาชน -->
+      <div class="card" style="border:1.5px solid #d97706; background:#fffbeb; margin-bottom:16px;">
+        <h3 style="color:#b45309; margin-top:0;"><i class="fa-solid fa-envelope-open-text"></i> ส่ง Email แจ้งผู้ที่นำเข้าข้อมูลแล้ว ให้มากรอกข้อมูลให้ครบถ้วน<span class="en">Notify Incomplete Registrations via Email</span></h3>
+        <div class="info-box" style="background:#ffffff; border-left:4px solid #d97706;">
+          <b><i class="fa-solid fa-circle-exclamation" style="color:#d97706;"></i> ขั้นตอนและระบบส่ง Email แจ้งรหัสและขอข้อมูลเพิ่ม:</b>
+          <ul style="margin: 6px 0 0 18px; padding: 0;">
+            <li>ระบบจะค้นหาผู้ลงทะเบียนที่มีสถานะข้อมูล <b>INCOMPLETE</b> (เช่น ขาดเลขบัตรประชาชน 13 หลักจากการนำเข้า Google Form)</li>
+            <li>ในเนื้อหา Email จะมี <b>รหัสลงทะเบียน (RegID)</b> และ <b>ปุ่มลิงก์ตรง (Direct Link)</b> ที่คลิกแล้วเข้าสู่หน้าตรวจสอบสถานะและค้นหาข้อมูลให้อัตโนมัติ เพื่อให้ผู้ลงทะเบียนพิมพ์เลขบัตรประชาชน 13 หลักและกดบันทึกได้ทันที</li>
+            <li><b>ป้องกันการส่งซ้ำ:</b> ระบบจะบันทึกประวัติไว้ใน EmailLogs หากรหัส RegID ใดเคยได้รับอีเมลประเภทนี้แล้ว จะไม่ส่งซ้ำอีก</li>
+            <li>สามารถกด <b>ทดสอบส่ง Email ตัวอย่าง</b> มายังอีเมลของท่าน เพื่อตรวจดูรูปแบบข้อความและทดสอบคลิกลิงก์ได้ทันที</li>
+          </ul>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:14px;">
+          <button type="button" class="btn" onclick="sendIncompleteNoticeEmails(true)" style="background:#4b5563; color:#fff; padding:10px 18px; font-size:0.92rem; font-weight:600;">
+            <i class="fa-solid fa-paper-plane"></i> 1. ทดสอบส่ง Email ตัวอย่างมาที่ฉัน (1 ฉบับ)
+          </button>
+          <button type="button" class="btn btn-gold" onclick="sendIncompleteNoticeEmails(false)" style="background:#d97706; border-color:#d97706; color:#fff; padding:10px 22px; font-size:0.95rem; font-weight:700; box-shadow:0 2px 4px rgba(217,119,6,0.25);">
+            <i class="fa-solid fa-paper-plane"></i> 2. เริ่มส่ง Email แจ้งเตือนทุกคนที่ยังไม่ครบถ้วน
+          </button>
+        </div>
+        <div id="incompleteEmailResult" style="margin-top:12px;"></div>
+      </div>
+
       <!-- ส่วนที่ 2: หรืออัปโหลดผ่านไฟล์ Excel -->
       <div class="card">
         <h3><i class="fa-solid fa-file-excel"></i> หรือ นำเข้าผ่านไฟล์ Excel (.xlsx)<span class="en">Or Import via Excel File</span></h3>
@@ -698,6 +721,99 @@ async function executeDirectSheetImport() {
       confirmButtonColor: '#006D70'
     });
 
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
+
+async function sendIncompleteNoticeEmails(isTest) {
+  if (isTest) {
+    const { value: testEmail } = await Swal.fire({
+      title: 'ทดสอบส่ง Email ตัวอย่าง',
+      text: 'ระบุอีเมลผู้รับสำหรับทดสอบตรวจดูเนื้อหาและปุ่มลิงก์ตรง:',
+      input: 'email',
+      inputValue: (PROFILE && PROFILE.Email) || 'qualityfair.tuhos@gmail.com',
+      showCancelButton: true,
+      confirmButtonText: 'ส่งอีเมลทดสอบทันที',
+      confirmButtonColor: '#006D70',
+      cancelButtonText: 'ยกเลิก'
+    });
+    if (!testEmail) return;
+
+    show('กำลังส่งอีเมลตัวอย่าง...');
+    try {
+      const res = await rpc('adminSendIncompleteProfileEmails', TOKEN, CID, { isTest: true, testEmail: testEmail });
+      hide();
+      Swal.fire({
+        icon: 'success',
+        title: 'ส่งอีเมลทดสอบสำเร็จ',
+        html: `
+          <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+            <p>ระบบได้ส่งอีเมลตัวอย่างไปยัง <b>${esc(testEmail)}</b> เรียบร้อยแล้ว</p>
+            <p class="muted">กรุณาเปิดกล่องจดหมาย (Inbox) หรือโฟลเดอร์ Junk/Spam เพื่อตรวจดูหัวข้อ ข้อความ และทดลองคลิกปุ่มกรอกข้อมูล</p>
+          </div>
+        `,
+        confirmButtonColor: '#006D70'
+      });
+    } catch(e) {
+      hide();
+      err(e);
+    }
+    return;
+  }
+
+  const confirm = await Swal.fire({
+    icon: 'warning',
+    title: 'ยืนยันการส่ง Email แจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน?',
+    html: `
+      <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+        <p>ระบบจะค้นหาผู้ลงทะเบียนในตาราง <b>Registrations</b> ที่มีสถานะ <b>INCOMPLETE</b> และยังไม่เคยได้รับอีเมลแจ้งเตือน:</p>
+        <ul style="padding-left:20px; margin:8px 0;">
+          <li>อีเมลจะระบุ <b>รหัสลงทะเบียน (RegID)</b> พร้อม <b>ปุ่มลิงก์ตรง</b> สำหรับคลิกเข้ามากรอกเลขบัตรประชาชน 13 หลักทันที</li>
+          <li><b>ระบบป้องกันการส่งซ้ำ:</b> หากเคยส่งให้ผู้สมัครรายใดแล้ว จะข้ามและไม่ส่งซ้ำ</li>
+        </ul>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'เริ่มส่ง Email แจ้งเตือน',
+    confirmButtonColor: '#d97706',
+    cancelButtonText: 'ยกเลิก'
+  });
+  if (!confirm.isConfirmed) return;
+
+  show('กำลังส่ง Email แจ้งเตือนผู้ลงทะเบียน (ระบบอาจใช้เวลาสักครู่)...');
+  try {
+    const res = await rpc('adminSendIncompleteProfileEmails', TOKEN, CID, { isTest: false });
+    hide();
+
+    $('#incompleteEmailResult').innerHTML = `
+      <div class="card" style="border-left:5px solid #d97706; background:#ffffff; margin-top:10px; padding:12px 16px;">
+        <h4 style="margin:0 0 8px; color:#d97706;"><i class="fa-solid fa-envelope-circle-check"></i> ผลการส่ง Email แจ้งเตือน:</h4>
+        <div style="display:flex; gap:16px; font-size:0.9rem;">
+          <div>ส่งสำเร็จ: <b style="color:#276749">${res.sent || 0}</b> ฉบับ</div>
+          <div>ส่งไม่สำเร็จ: <b style="color:#c53030">${res.failed || 0}</b> ฉบับ</div>
+          <div>คงเหลือที่ยังไม่ได้ส่ง: <b>${res.remaining || 0}</b> ราย</div>
+        </div>
+      </div>
+    `;
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'ส่ง Email เรียบร้อย',
+      html: `
+        <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+          <p><b>สรุปผลการส่ง Email แจ้งเตือน:</b></p>
+          <ul style="padding-left:20px; margin:8px 0;">
+            <li>ส่งสำเร็จ: <b style="color:#276749">${res.sent || 0}</b> ฉบับ</li>
+            <li>ส่งไม่สำเร็จ: <b style="color:#c53030">${res.failed || 0}</b> ฉบับ</li>
+            <li>คงเหลือที่ยังไม่ได้ส่ง: <b>${res.remaining || 0}</b> ราย</li>
+          </ul>
+          <p class="muted" style="font-size:0.82rem; margin-top:8px;">* ประวัติการส่งถูกบันทึกไว้ในตาราง EmailLogs เรียบร้อยแล้ว</p>
+        </div>
+      `,
+      confirmButtonColor: '#006D70'
+    });
   } catch(e) {
     hide();
     err(e);
