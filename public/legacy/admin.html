@@ -926,7 +926,7 @@ async function loadRegistrations(){
       $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
     }
     window.REGISTRATION_ROWS = rows;
-    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
     initRegScrollSync();
     setTimeout(updateRegTopScrollbar, 50);
   }finally{hide()}
@@ -2006,125 +2006,7 @@ function applyRegEmailTemplate(type, regId, name){
   }
 }
 
-async function openSendEmailModal(regId,toEmail,recipientName){
-  const html=`<div style="text-align:left;font-size:0.9rem;font-family:'Prompt',sans-serif;">
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;">ผู้รับ (Email):</label>
-      <input id="swalEmailTo" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(toEmail||'')}">
-    </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;">เลือกเทมเพลตข้อความ:</label>
-      <select id="swalEmailTpl" class="swal2-select" style="width:100%;margin:0;" onchange="applyEmailTemplate(this.value,'${esc(regId)}','${esc(recipientName)}')">
-        <option value="CUSTOM">-- เขียนข้อความเอง --</option>
-        <option value="PAYMENT_APPROVED">แจ้งอนุมัติการชำระเงินและส่งคูปองอาหาร</option>
-        <option value="RECEIPT_ISSUED">แจ้งออกใบเสร็จรับเงินเรียบร้อยแล้ว</option>
-        <option value="INVOICE_ISSUED">แจ้งออกใบแจ้งหนี้เรียบร้อยแล้ว</option>
-      </select>
-    </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;">หัวข้ออีเมล (Subject):</label>
-      <input id="swalEmailSubject" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="[TUH Quality Fair] แจ้งข้อมูลการชำระเงิน / ใบเสร็จ (${esc(regId)})">
-    </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;">รายละเอียดข้อความ (Body):</label>
-      <textarea id="swalEmailBody" class="swal2-textarea" style="width:100%;margin:0;height:120px;box-sizing:border-box;">เรียน คุณ ${esc(recipientName)}\n\nฝ่ายการเงิน งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแจ้งข้อมูลการชำระเงินของคุณ (${esc(regId)})\n\nขอบคุณครับ</textarea>
-    </div>
-    <div style="margin-top:10px;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px dashed #94a3b8;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <label style="font-weight:600;font-size:0.84rem;color:#334155;margin:0;">
-          <i class="fa-solid fa-paperclip" style="color:#0284c7;"></i> แนบไฟล์ (ถ้าต้องการ, สูงสุด 3MB):
-        </label>
-        <button type="button" id="btnCancelPayAttachment" style="display:none;background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.78rem;font-weight:600;padding:0;">
-          <i class="fa-solid fa-xmark"></i> ยกเลิกไฟล์แนบ
-        </button>
-      </div>
-      <input type="file" id="swalPayEmailAttachment" style="width:100%;font-size:0.84rem;padding:5px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
-      <div id="swalPayAttachmentInfo" style="font-size:0.8rem;color:#006D70;margin-top:4px;display:none;font-weight:500;"></div>
-    </div>
-  </div>`;
-
-  const x=await Swal.fire({
-    title:`ส่งอีเมลถึงผู้ลงทะเบียน (${esc(regId)})`,
-    html,
-    width:'640px',
-    showCancelButton:true,
-    confirmButtonText:'ส่งอีเมล',
-    confirmButtonColor:'#006D70',
-    cancelButtonText:'ยกเลิก',
-    didOpen: () => {
-      const fileInput = document.getElementById('swalPayEmailAttachment');
-      const fileInfo = document.getElementById('swalPayAttachmentInfo');
-      const clearBtn = document.getElementById('btnCancelPayAttachment');
-      if (fileInput) {
-        fileInput.addEventListener('change', function() {
-          if (this.files && this.files[0]) {
-            const f = this.files[0];
-            if (f.size > 3.5 * 1024 * 1024) {
-              Swal.showValidationMessage('ไฟล์มีขนาดใหญ่เกินไป (จำกัดไม่เกิน 3MB)');
-              this.value = '';
-              fileInfo.style.display = 'none';
-              clearBtn.style.display = 'none';
-              return;
-            }
-            Swal.resetValidationMessage();
-            const kb = Math.round(f.size / 1024);
-            const sizeStr = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB';
-            fileInfo.innerHTML = `<i class="fa-solid fa-circle-check"></i> พร้อมแนบ: <b>${esc(f.name)}</b> (${sizeStr})`;
-            fileInfo.style.display = 'block';
-            clearBtn.style.display = 'inline-block';
-          } else {
-            fileInfo.style.display = 'none';
-            clearBtn.style.display = 'none';
-          }
-        });
-      }
-      if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-          if (fileInput) fileInput.value = '';
-          fileInfo.style.display = 'none';
-          clearBtn.style.display = 'none';
-          Swal.resetValidationMessage();
-        });
-      }
-    },
-    preConfirm:()=>{
-      const to=($('#swalEmailTo')?.value||'').trim();
-      const subject=($('#swalEmailSubject')?.value||'').trim();
-      const body=($('#swalEmailBody')?.value||'').trim();
-      const fileInput=document.getElementById('swalPayEmailAttachment');
-      const file=fileInput&&fileInput.files&&fileInput.files[0]?fileInput.files[0]:null;
-      if(!to){Swal.showValidationMessage('กรุณาระบุอีเมลผู้รับ');return false;}
-      if(!subject){Swal.showValidationMessage('กรุณาระบุหัวข้ออีเมล');return false;}
-      if(!body){Swal.showValidationMessage('กรุณาระบุข้อความอีเมล');return false;}
-      return {to,subject,body,file};
-    }
-  });
-  if(!x.isConfirmed||!x.value)return;
-  show('กำลังส่งอีเมล...');
-  let attachments=[];
-  if(x.value.file){
-    try{
-      const base64=await new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onload=()=>resolve(reader.result.split(',')[1]);
-        reader.onerror=reject;
-        reader.readAsDataURL(x.value.file);
-      });
-      attachments.push({name:x.value.file.name,mimeType:x.value.file.type||'application/octet-stream',base64});
-    }catch(errFile){
-      hide();
-      return Swal.fire({icon:'error',title:'ไม่สามารถอ่านไฟล์แนบได้',text:String(errFile)});
-    }
-  }
-  try{
-    await rpc('adminSendDirectEmail',TOKEN,CID,x.value.to,x.value.subject,x.value.body,attachments);
-    hide();
-    await Swal.fire({icon:'success',title:'ส่งอีเมลสำเร็จแล้ว',confirmButtonColor:'#006D70'});
-  }catch(e){
-    hide();
-    err(e);
-  }
-}
+async function openSendEmailModal(regId,toEmail,recipientName){const html=`<div style="text-align:left;font-size:0.9rem;"><div style="margin-bottom:10px;"><label style="font-weight:600;display:block;margin-bottom:4px;">ผู้รับ (Email):</label><input id="swalEmailTo" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(toEmail||'')}"></div><div style="margin-bottom:10px;"><label style="font-weight:600;display:block;margin-bottom:4px;">เลือกเทมเพลตข้อความ:</label><select id="swalEmailTpl" class="swal2-select" style="width:100%;margin:0;" onchange="applyEmailTemplate(this.value,'${esc(regId)}','${esc(recipientName)}')"><option value="CUSTOM">-- เขียนข้อความเอง --</option><option value="PAYMENT_APPROVED">แจ้งอนุมัติการชำระเงินและส่งคูปองอาหาร</option><option value="RECEIPT_ISSUED">แจ้งออกใบเสร็จรับเงินเรียบร้อยแล้ว</option><option value="INVOICE_ISSUED">แจ้งออกใบแจ้งหนี้เรียบร้อยแล้ว</option></select></div><div style="margin-bottom:10px;"><label style="font-weight:600;display:block;margin-bottom:4px;">หัวข้ออีเมล (Subject):</label><input id="swalEmailSubject" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="[TUH Quality Fair] แจ้งข้อมูลการชำระเงิน / ใบเสร็จ (${esc(regId)})"></div><div><label style="font-weight:600;display:block;margin-bottom:4px;">รายละเอียดข้อความ (Body):</label><textarea id="swalEmailBody" class="swal2-textarea" style="width:100%;margin:0;height:120px;box-sizing:border-box;">เรียน คุณ ${esc(recipientName)}\n\nฝ่ายการเงิน งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแจ้งข้อมูลการชำระเงินของคุณ (${esc(regId)})\n\nขอบคุณครับ</textarea></div></div>`;const x=await Swal.fire({title:`ส่งอีเมลถึงผู้ลงทะเบียน (${esc(regId)})`,html,showCancelButton:true,confirmButtonText:'ส่งอีเมล',confirmButtonColor:'#006D70',cancelButtonText:'ยกเลิก',preConfirm:()=>({to:$('#swalEmailTo').value,subject:$('#swalEmailSubject').value,body:$('#swalEmailBody').value})});if(!x.isConfirmed||!x.value)return;show('กำลังส่งอีเมล...');try{await rpc('adminSendDirectEmail',TOKEN,CID,x.value.to,x.value.subject,x.value.body,[]);hide();await Swal.fire({icon:'success',title:'ส่งอีเมลสำเร็จแล้ว',confirmButtonColor:'#006D70'})}catch(e){err(e)}}
 
 function applyEmailTemplate(type,regId,name){const subj=$('#swalEmailSubject'),body=$('#swalEmailBody');if(!subj||!body)return;if(type==='PAYMENT_APPROVED'){subj.value=`[TUH Quality Fair] ยืนยันการชำระเงินลงทะเบียนเรียบร้อยแล้ว (${regId})`;body.value=`เรียน คุณ ${name}\n\nฝ่ายการเงินได้รับและตรวจสอบหลักฐานการชำระเงินของท่าน (${regId}) เรียบร้อยแล้ว\nสถานะการลงทะเบียนของท่านได้รับการอนุมัติเรียบร้อย\n\nท่านสามารถเข้าสู่ระบบเพื่อรับคูปองอาหารและดูรายละเอียดงานได้ที่เว็บไซต์งานมหกรรมคุณภาพ\n\nขอบคุณครับ`}else if(type==='RECEIPT_ISSUED'){subj.value=`[TUH Quality Fair] แจ้งออกใบเสร็จรับเงินเรียบร้อยแล้ว (${regId})`;body.value=`เรียน คุณ ${name}\n\nฝ่ายการเงินได้ดำเนินการออกใบเสร็จรับเงินสำหรับการลงทะเบียน (${regId}) เรียบร้อยแล้ว\nท่านสามารถดาวน์โหลดเอกสารใบเสร็จได้ผ่านระบบหรือติดต่อขอรับเอกสารได้ที่ฝ่ายการเงิน\n\nขอบคุณครับ`}else if(type==='INVOICE_ISSUED'){subj.value=`[TUH Quality Fair] แจ้งออกใบแจ้งหนี้สำหรับการลงทะเบียน (${regId})`;body.value=`เรียน คุณ ${name}\n\nฝ่ายการเงินได้ดำเนินการออกใบแจ้งหนี้สำหรับการลงทะเบียน (${regId}) เรียบร้อยแล้ว\n\nขอบคุณครับ`}}
 
