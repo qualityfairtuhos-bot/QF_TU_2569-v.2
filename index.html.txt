@@ -50,13 +50,16 @@
 
     /* ===== v2.0: High-Resolution Graphic Hero Carousel ===== */
     .hero{padding:0;min-height:0;background:#021422}
-    .hero-carousel{position:relative;display:grid;min-height:340px;width:100%;max-width:100%;overflow:hidden;background:#021422;box-shadow:0 12px 36px rgba(0,18,36,.32)}
-    .hero-slide{grid-area:1/1;display:flex;align-items:center;justify-content:center;min-height:340px;padding:24px 36px 36px;opacity:0;visibility:hidden;pointer-events:none;transform:scale(0.985);transition:opacity .65s ease-in-out,transform .65s cubic-bezier(0.16,1,0.3,1),visibility .65s;background-size:cover;background-position:center;position:relative}
-    .hero-slide:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(3,23,38,0.94) 0%,rgba(4,38,62,0.85) 30%,rgba(6,56,88,0.78) 50%,rgba(4,38,62,0.85) 70%,rgba(3,23,38,0.94) 100%);pointer-events:none}
+    .hero-carousel{position:relative;display:grid;min-height:220px;width:100%;max-width:100%;overflow:hidden;background:#021422;box-shadow:0 8px 30px rgba(0,18,36,.25)}
+    .hero-slide{grid-area:1/1;display:flex;align-items:center;justify-content:center;min-height:220px;padding:0;opacity:0;visibility:hidden;pointer-events:none;transform:scale(0.99);transition:opacity .55s ease-in-out,transform .55s cubic-bezier(0.16,1,0.3,1),visibility .55s;background-size:cover;background-position:center;position:relative}
     .hero-slide.active{opacity:1;visibility:visible;pointer-events:auto;transform:scale(1)}
     
+    .banner-img-container{position:relative;width:100%;display:flex;justify-content:center;align-items:center;background:#021422;overflow:hidden}
+    .banner-responsive-img{width:100%;max-height:540px;object-fit:cover;display:block}
+    @media(max-width:768px){.banner-responsive-img{min-height:160px;object-fit:cover}}
+    
     /* Main Banner Stage (Matching sample layout) */
-    .banner-stage{position:relative;z-index:2;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;width:min(1240px,100%);margin:0 auto}
+    .banner-stage{position:relative;z-index:2;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;width:min(1240px,100%);margin:0 auto;padding:24px 36px 36px}
     .banner-side{display:flex;align-items:center;justify-content:center}
     
     /* Left: TUH 19th 3D Star Badge */
@@ -87,41 +90,15 @@
     .hacc-caption-text b{font-size:0.78rem;color:#f8fafc;font-weight:700}
     .hacc-caption-text span{font-size:0.74rem;color:#e6c252;font-weight:600}
     
-    /* Theme Slide Styles */
-    .theme-slide-wrap{position:relative;z-index:2;width:min(1100px,100%);margin:0 auto;text-align:center;display:flex;flex-direction:column;align-items:center}
-    .theme-badge-top{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(90deg,rgba(230,194,82,0.25),rgba(13,148,136,0.35));border:1px solid #e6c252;border-radius:999px;padding:4px 14px;color:#fef08a;font-size:0.78rem;font-weight:700;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase}
-    .theme-slide-title{font-size:clamp(1.3rem,2.4vw,1.95rem);font-weight:800;color:#fff;line-height:1.25;margin:0 0 6px;text-shadow:0 2px 10px rgba(0,0,0,0.6)}
-    .theme-slide-sub{font-size:clamp(0.85rem,1.1vw,0.98rem);color:#e2e8f0;margin:0 0 14px;max-width:850px}
-    .theme-pillars-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;margin-bottom:14px}
-    .pillar-card{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.22);border-radius:12px;padding:8px 12px;text-align:left}
-    .pillar-icon-box{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;flex-shrink:0;color:#fff}
-    .pillar-icon-box.v{background:linear-gradient(135deg,#0284c7,#0d9488)}
-    .pillar-icon-box.a{background:linear-gradient(135deg,#eab308,#d97706)}
-    .pillar-icon-box.r{background:linear-gradient(135deg,#10b981,#059669)}
-    .pillar-text b{display:block;font-size:0.88rem;color:#fff;font-weight:700}
-    .pillar-text span{font-size:0.75rem;color:#cbd5e1;line-height:1.25;display:block}
-    .banner-cta-group{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-    .btn-banner-cta{background:linear-gradient(135deg,#006D70,#0d9488);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:8px 20px;font-weight:700;font-size:0.86rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.3);display:inline-flex;align-items:center;gap:8px;transition:transform 0.2s,box-shadow 0.2s}
-    .btn-banner-cta:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(13,148,136,0.5)}
-    .btn-banner-subtle{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:8px 16px;font-weight:600;font-size:0.86rem;cursor:pointer;backdrop-filter:blur(6px);display:inline-flex;align-items:center;gap:8px}
-    .btn-banner-subtle:hover{background:rgba(255,255,255,0.25)}
-    
-    /* Call for Works Slide */
-    .cqi-slide-wrap{position:relative;z-index:2;width:min(1100px,100%);margin:0 auto;text-align:center;display:flex;flex-direction:column;align-items:center}
-    .cqi-badge-top{display:inline-flex;align-items:center;gap:6px;background:rgba(234,179,8,0.22);border:1px solid #eab308;border-radius:999px;padding:4px 14px;color:#fde047;font-size:0.78rem;font-weight:700;letter-spacing:1px;margin-bottom:8px}
-    .cqi-highlights-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
-    .cqi-pill-item{display:inline-flex;align-items:center;gap:8px;background:rgba(12,56,91,0.6);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:8px 16px;color:#fff;font-size:0.84rem}
-    .cqi-pill-item.gold{border-color:#fde047;background:rgba(202,138,4,0.25);color:#fef08a}
-    
     /* Custom Admin Banner Slide */
-    .custom-banner-overlay{position:relative;z-index:2;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center}
-    .custom-banner-card{background:rgba(3,23,38,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);border-radius:16px;padding:12px 24px;margin-bottom:12px;max-width:850px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+    .custom-banner-overlay{position:absolute;z-index:2;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:center;padding:12px;background:linear-gradient(0deg,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0) 100%)}
+    .custom-banner-card{background:rgba(3,23,38,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:8px 18px;max-width:850px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.3)}
     
     /* Carousel Controls */
-    .hero-controls{position:absolute;z-index:10;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.3);padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15)}
+    .hero-controls{position:absolute;z-index:10;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.35);padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18)}
     .hero-dot{width:9px;height:9px;padding:0;border:1px solid rgba(255,255,255,0.7);border-radius:50%;background:rgba(255,255,255,0.3);cursor:pointer;transition:all 0.3s ease}
-    .hero-dot.active{width:26px;border-radius:999px;background:#38bdf8;border-color:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,0.6)}
-    .hero-arrow{position:absolute;z-index:10;top:50%;transform:translateY(-50%);width:38px;height:38px;border:1px solid rgba(255,255,255,0.35);border-radius:50%;background:rgba(3,23,38,0.55);color:#fff;font-size:20px;line-height:1;cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:background 0.2s,transform 0.2s}
+    .hero-dot.active{width:24px;border-radius:999px;background:#38bdf8;border-color:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,0.6)}
+    .hero-arrow{position:absolute;z-index:10;top:50%;transform:translateY(-50%);width:38px;height:38px;border:1px solid rgba(255,255,255,0.35);border-radius:50%;background:rgba(3,23,38,0.65);color:#fff;font-size:20px;line-height:1;cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:background 0.2s,transform 0.2s}
     .hero-arrow:hover{background:rgba(0,109,112,0.85);transform:translateY(-50%) scale(1.08)}
     .hero-arrow.prev{left:16px}.hero-arrow.next{right:16px}
     
@@ -186,8 +163,8 @@
 </header>
 <section class="hero" id="homeHero" aria-label="ข้อมูลงานประชุม">
   <div class="hero-carousel" id="heroCarousel">
-    <!-- Slide 0: Main Panoramic Conference Banner (Matching Sample) -->
-    <article class="hero-slide active" data-hero-slide="0" aria-hidden="false" style="background-image: url('/images/tuh-banner-main.jpg');">
+    <!-- Default Conference Banner Slide (Shown if no custom admin banner is uploaded) -->
+    <article class="hero-slide active" data-hero-slide="0" aria-hidden="false">
       <div class="banner-stage">
         <!-- Left: TUH 19th Star Emblem -->
         <div class="banner-side left">
@@ -246,67 +223,6 @@
         </div>
       </div>
     </article>
-
-    <!-- Slide 1: Conference Theme Banner (VAR for Sustainability Healthcare) -->
-    <article class="hero-slide" data-hero-slide="1" aria-hidden="true" style="background-image: url('/images/tuh-banner-var.jpg');">
-      <div class="theme-slide-wrap">
-        <div class="theme-badge-top"><i class="fa-solid fa-sparkles"></i> THEME : VAR FOR SUSTAINABILITY HEALTHCARE</div>
-        <h2 class="theme-slide-title">งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1</h2>
-        <p class="theme-slide-sub">จุดประกายแนวคิดและทิศทางการพัฒนาคุณภาพด้านสุขภาพและสิ่งแวดล้อมให้บุคลากรในระบบบริการสุขภาพ</p>
-        <div class="theme-pillars-grid">
-          <div class="pillar-card">
-            <div class="pillar-icon-box v">V</div>
-            <div class="pillar-text">
-              <b>Value</b>
-              <span>มุ่งเน้นคุณค่าสูงสุดแก่ผู้ป่วย ชุมชน และระบบสุขภาพ</span>
-            </div>
-          </div>
-          <div class="pillar-card">
-            <div class="pillar-icon-box a">A</div>
-            <div class="pillar-text">
-              <b>Accountability</b>
-              <span>ยึดมั่นความรับผิดชอบ ความโปร่งใส และธรรมาภิบาล</span>
-            </div>
-          </div>
-          <div class="pillar-card">
-            <div class="pillar-icon-box r">R</div>
-            <div class="pillar-text">
-              <b>Real Impact</b>
-              <span>ขับเคลื่อนผลลัพธ์ที่จับต้องได้จริง มีประสิทธิภาพและยั่งยืน</span>
-            </div>
-          </div>
-        </div>
-        <div class="banner-cta-group">
-          <button type="button" class="btn-banner-cta" onclick="go('register')"><i class="fa-solid fa-user-plus"></i> ลงทะเบียนเข้าร่วมงาน (Register)</button>
-          <button type="button" class="btn-banner-subtle" onclick="showScheduleNotice()"><i class="fa-regular fa-calendar-check"></i> ดูร่างกำหนดการจัดงาน</button>
-        </div>
-      </div>
-    </article>
-
-    <!-- Slide 2: Call for Research, Innovation & CQI Works Banner -->
-    <article class="hero-slide" data-hero-slide="2" aria-hidden="true" style="background-image: url('/images/tuh-banner-cqi.jpg');">
-      <div class="cqi-slide-wrap">
-        <div class="cqi-badge-top"><i class="fa-solid fa-trophy"></i> CALL FOR RESEARCH & CQI WORKS</div>
-        <h2 class="theme-slide-title">เปิดรับสมัครผลงานวิจัย นวัตกรรม และมหกรรมคุณภาพ</h2>
-        <p class="theme-slide-sub">ประเภท Oral Presentation / Poster Presentation / นวัตกรรมบริการทางการแพทย์และสาธารณสุข</p>
-        <div class="cqi-highlights-row">
-          <div class="cqi-pill-item"><i class="fa-solid fa-clock"></i> <span>ส่งผลงานได้ถึง <strong id="announceSubmissionCloseHero">20 ตุลาคม 2569</strong></span></div>
-          <div class="cqi-pill-item gold"><i class="fa-solid fa-award"></i> <span>มอบเกียรติบัตร & ชิงเงินรางวัลรวมกว่า <strong>50,000 บาท</strong></span></div>
-        </div>
-        <div class="banner-cta-group">
-          <button type="button" class="btn-banner-cta" onclick="go('work')"><i class="fa-solid fa-file-arrow-up"></i> ส่งผลงานวิชาการ (Submit Work)</button>
-          <button type="button" class="btn-banner-subtle" onclick="go('author-status')"><i class="fa-solid fa-magnifying-glass"></i> ตรวจสอบสถานะผลงาน</button>
-        </div>
-      </div>
-    </article>
-
-    <button class="hero-arrow prev" type="button" aria-label="ภาพก่อนหน้า" onclick="nextHeroSlide(-1)">‹</button>
-    <button class="hero-arrow next" type="button" aria-label="ภาพถัดไป" onclick="nextHeroSlide(1)">›</button>
-    <div class="hero-controls" aria-label="เลือกแบนเนอร์">
-      <button class="hero-dot active" type="button" aria-label="งานมหกรรมคุณภาพ ครั้งที่ 19" onclick="setHeroSlide(0,true)"></button>
-      <button class="hero-dot" type="button" aria-label="VAR Theme" onclick="setHeroSlide(1,true)"></button>
-      <button class="hero-dot" type="button" aria-label="ส่งผลงานวิชาการ CQI" onclick="setHeroSlide(2,true)"></button>
-    </div>
   </div>
 </section>
 <main>
@@ -330,7 +246,7 @@
             <div class="en" style="font-size:0.8rem; color:#0d9488;">Important Information & Registration Details</div>
           </div>
         </div>
-        <button type="button" class="announcement-link" onclick="showScheduleNotice()"><i class="fa-regular fa-calendar-days"></i> ร่างกำหนดการจัดงาน › คลิกอ่าน</button>
+        <button type="button" class="announcement-link" onclick="go('schedule')"><i class="fa-regular fa-calendar-days"></i> กำหนดการจัดงาน › คลิกอ่าน</button>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
@@ -482,6 +398,72 @@
   <section class="page" id="page-work"><div class="card"><div class="section-title"><b>ส่งผลงานเพื่อนำเสนอ</b><span class="en">Work submission</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="workRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="workKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="verifyWork()">ตรวจสอบสิทธิ์<span class="en">Verify eligibility</span></button></div></div></div><div id="workFormHost"></div></section>
 
   <section class="page" id="page-author-status"><div class="card"><div class="section-title"><b>สถานะผลงาน</b><span class="en">Work Status</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="authorWorkRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="authorWorkKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="lookupAuthorWorks()">ค้นหา<span class="en">Search</span></button></div></div></div><div id="authorWorkResult"></div></section>
+
+  <section class="page" id="page-schedule">
+    <div class="card" style="border:1px solid #99f6e4; background:linear-gradient(135deg, #f0fdfa, #f8fafc); margin-bottom:16px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:42px; height:42px; border-radius:12px; background:#006D70; color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.25rem;">
+            <i class="fa-regular fa-calendar-days"></i>
+          </div>
+          <div>
+            <div style="font-weight:800; font-size:1.2rem; color:#0f766e;">กำหนดการจัดงานประชุมวิชาการ</div>
+            <div class="en" style="font-size:0.85rem; color:#0d9488;">Conference Schedule & Program Agenda</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="go('register')"><i class="fa-solid fa-user-plus" style="margin-right:6px;"></i> ลงทะเบียนเข้าร่วมงาน</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><b>ตารางกำหนดการจัดงานรายวัน</b><span class="en">Daily Agenda Schedule</span></div>
+      <div id="scheduleTimelineHost" style="display:grid; gap:16px;">
+        <div style="background:#fff; border:1px solid #cbdce3; border-radius:12px; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:1.05rem; color:#006D70;"><i class="fa-solid fa-calendar-day" style="margin-right:6px;"></i> วันที่ 1 : วันพุธที่ 18 พฤศจิกายน 2569</span>
+            <span class="en" style="color:#64748b; font-size:0.88rem;">Wednesday, 18 November 2026</span>
+          </div>
+          <div style="line-height:1.8; color:#334155; font-size:0.92rem;">
+            <div>• <b>08:00 - 08:45 น.</b> ลงทะเบียนผู้เข้าร่วมงาน / รับเอกสารประกอบการประชุม</div>
+            <div>• <b>08:45 - 09:30 น.</b> พิธีเปิดการประชุมวิชาการ โดย ผู้บริหารโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ และ คณะผู้บริหารองค์กรสาธารณสุข</div>
+            <div>• <b>09:30 - 12:00 น.</b> การบรรยายพิเศษ (Keynote Lecture): ทิศทางและนโยบายการพัฒนาคุณภาพระบบบริการสุขภาพไทยในทศวรรษหน้า</div>
+            <div>• <b>12:00 - 13:00 น.</b> พักรับประทานอาหารกลางวัน (Meal Pass QR Code)</div>
+            <div>• <b>13:00 - 16:30 น.</b> การนำเสนอผลงานวิชาการและนวัตกรรม (Oral Presentation & Poster Exhibition Session)</div>
+          </div>
+        </div>
+
+        <div style="background:#fff; border:1px solid #cbdce3; border-radius:12px; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:1.05rem; color:#006D70;"><i class="fa-solid fa-calendar-day" style="margin-right:6px;"></i> วันที่ 2 : วันพฤหัสบดีที่ 19 พฤศจิกายน 2569</span>
+            <span class="en" style="color:#64748b; font-size:0.88rem;">Thursday, 19 November 2026</span>
+          </div>
+          <div style="line-height:1.8; color:#334155; font-size:0.92rem;">
+            <div>• <b>08:30 - 09:00 น.</b> ลงทะเบียนและเยี่ยมชมนิทรรศการผลงานคุณภาพ / นวัตกรรมโรงพยาบาล</div>
+            <div>• <b>09:00 - 12:00 น.</b> การเสวนาวิชาการ HA Regional Forum เขตสุขภาพที่ 4: Value & Accountability in Healthcare</div>
+            <div>• <b>12:00 - 13:00 น.</b> พักรับประทานอาหารกลางวัน</div>
+            <div>• <b>13:00 - 16:30 น.</b> การประชุมกลุ่มย่อย (Parallel Sessions): CQI / Lean / Patient Safety / Green Hospital</div>
+          </div>
+        </div>
+
+        <div style="background:#fff; border:1px solid #cbdce3; border-radius:12px; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:1.05rem; color:#006D70;"><i class="fa-solid fa-calendar-day" style="margin-right:6px;"></i> วันที่ 3 : วันศุกร์ที่ 20 พฤศจิกายน 2569</span>
+            <span class="en" style="color:#64748b; font-size:0.88rem;">Friday, 20 November 2026</span>
+          </div>
+          <div style="line-height:1.8; color:#334155; font-size:0.92rem;">
+            <div>• <b>08:30 - 09:00 น.</b> ลงทะเบียนและสรุปบทเรียนผลงานเด่น</div>
+            <div>• <b>09:00 - 11:30 น.</b> บรรยายพิเศษ: การขับเคลื่อนสู่ Smart & Sustainable Hospital</div>
+            <div>• <b>11:30 - 12:30 น.</b> พิธีมอบรางวัลผลงานวิจัย นวัตกรรม และผลงานคุณภาพยอดเยี่ยม พร้อมพิธีปิดการประชุม</div>
+            <div>• <b>12:30 - 13:30 น.</b> รับประทานอาหารกลางวันและเดินทางกลับโดยสวัสดิภาพ</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; padding:14px 18px; background:#f0fdfa; border:1px solid #99f6e4; border-radius:10px; font-size:0.9rem; color:#0f766e;">
+        <i class="fa-solid fa-location-dot" style="margin-right:6px;"></i> <b>สถานที่จัดงาน:</b> อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต ตำบลคลองหนึ่ง อำเภอคลองหลวง จังหวัดปทุมธานี
+      </div>
+    </div>
+  </section>
 
   <section class="page" id="page-pass"><div class="card"><div class="section-title"><b>คูปองอาหาร QR Code</b><span class="en">Meal QR pass</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="passRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="passKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="loadPass()">แสดงคูปอง<span class="en">Show pass</span></button><button class="btn btn-soft" style="margin-top:29px;margin-left:8px;" onclick="emailMyPass()">ส่งเข้า Email<span class="en">Send to Email</span></button></div></div></div><div id="passResult"></div></section>
 </main>
@@ -659,7 +641,7 @@ function applyBootData(data){
   const meta=$('#confMeta');if(meta)meta.innerHTML='<div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>'+esc(BOOT.conference.Venue||'อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')+'</span></div>'+eventRangeHtml(dates);
   document.documentElement.style.setProperty('--blue',BOOT.conference.PrimaryColor||'#0C385B');
   document.documentElement.style.setProperty('--teal',BOOT.conference.SecondaryColor||'#006D70');
-  const pages=[['home','หน้าหลัก','Home'],['register','ลงทะเบียน','Registration'],['status','แก้ไข/สถานะ','Edit/Status'],['payment','ชำระเงิน','Payment'],['work','ส่งผลงาน','Submit work'],['author-status','สถานะผลงาน','Work Status'],['pass','คูปองอาหาร','Meal pass']];
+  const pages=[['home','หน้าหลัก','Home'],['register','ลงทะเบียน','Registration'],['status','แก้ไข/สถานะ','Edit/Status'],['payment','ชำระเงิน','Payment'],['work','ส่งผลงาน','Submit work'],['author-status','สถานะผลงาน','Work Status'],['schedule','กำหนดการ','Schedule'],['pass','คูปองอาหาร','Meal pass']];
   const nav=$('#nav');if(nav)nav.innerHTML=pages.map((p,i)=>`<button data-page="${p[0]}" class="${i===0?'active':''}" onclick="go('${p[0]}')">${p[1]}<span class="en">${p[2]}</span></button>`).join('');
   const pType=$('#participantType');
   if(pType&&Array.isArray(BOOT.registrationTypes)&&BOOT.registrationTypes.length){
@@ -685,54 +667,106 @@ function renderHeroBanners(){
   }
   
   const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false);
-
-  document.querySelectorAll('.hero-slide-custom').forEach(el => el.remove());
-  document.querySelectorAll('.hero-dot-custom').forEach(el => el.remove());
-
   const carousel = $('#heroCarousel');
-  const controls = document.querySelector('.hero-controls');
-  if(!carousel || !controls) return;
+  if(!carousel) return;
 
-  const arrows = carousel.querySelectorAll('.hero-arrow');
-  const insertBeforeEl = arrows.length ? arrows[0] : controls;
-
-  // Base slides count is 3 (Main, Theme, Call for Works)
-  activeBanners.forEach((b, idx) => {
-    const slideIdx = 3 + idx;
-    const normalizedUrl = normalizeBannerImageUrl(b.imageUrl);
-    const slide = document.createElement('article');
-    slide.className = 'hero-slide hero-slide-custom';
-    slide.setAttribute('data-hero-slide', String(slideIdx));
-    slide.setAttribute('aria-hidden', 'true');
-    slide.style.backgroundImage = `url('${normalizedUrl}')`;
-    slide.style.backgroundSize = 'cover';
-    slide.style.backgroundPosition = 'center';
-    
-    if (b.linkUrl) {
-      slide.style.cursor = 'pointer';
-      slide.onclick = () => window.open(b.linkUrl, '_blank');
-    }
-
-    if (b.title || b.subtitle) {
-      slide.innerHTML = `
-        <div class="custom-banner-overlay">
-          <div class="custom-banner-card">
-            ${b.title ? `<div style="font-size:1.35rem; font-weight:800; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,0.6);">${esc(b.title)}</div>` : ''}
-            ${b.subtitle ? `<div style="font-size:0.95rem; color:#bae6fd; margin-top:6px; text-shadow:0 1px 4px rgba(0,0,0,0.6);">${esc(b.subtitle)}</div>` : ''}
+  // Render ONLY banners uploaded by Admin
+  if(activeBanners.length > 0) {
+    let html = '';
+    activeBanners.forEach((b, idx) => {
+      const normalizedUrl = normalizeBannerImageUrl(b.imageUrl);
+      const cursorStyle = b.linkUrl ? 'cursor:pointer;' : '';
+      const clickAttr = b.linkUrl ? `onclick="window.open('${esc(b.linkUrl)}','_blank')"` : '';
+      html += `
+        <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
+          <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
+            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" onerror="this.onerror=null; this.src='https://placehold.co/1920x600?text=Banner+Image';">
+            ${(b.title || b.subtitle) ? `
+              <div class="custom-banner-overlay">
+                <div class="custom-banner-card">
+                  ${b.title ? `<div style="font-size:1.15rem; font-weight:800; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,0.6);">${esc(b.title)}</div>` : ''}
+                  ${b.subtitle ? `<div style="font-size:0.88rem; color:#bae6fd; margin-top:4px; text-shadow:0 1px 4px rgba(0,0,0,0.6);">${esc(b.subtitle)}</div>` : ''}
+                </div>
+              </div>
+            ` : ''}
           </div>
+        </article>
+      `;
+    });
+
+    if(activeBanners.length > 1) {
+      html += `
+        <button class="hero-arrow prev" type="button" aria-label="ภาพก่อนหน้า" onclick="nextHeroSlide(-1)">‹</button>
+        <button class="hero-arrow next" type="button" aria-label="ภาพถัดไป" onclick="nextHeroSlide(1)">›</button>
+        <div class="hero-controls" aria-label="เลือกแบนเนอร์">
+          ${activeBanners.map((b, idx) => `<button class="hero-dot ${idx === 0 ? 'active' : ''}" type="button" aria-label="${esc(b.title || 'แบนเนอร์ ' + (idx+1))}" onclick="setHeroSlide(${idx}, true)"></button>`).join('')}
         </div>
       `;
     }
 
-    carousel.insertBefore(slide, insertBeforeEl);
-
-    const dot = document.createElement('button');
-    dot.className = 'hero-dot hero-dot-custom';
-    dot.type = 'button';
-    dot.setAttribute('aria-label', b.title || `แบนเนอร์ ${idx+1}`);
-    dot.onclick = () => setHeroSlide(slideIdx, true);
-    controls.appendChild(dot);
-  });
+    carousel.innerHTML = html;
+    HERO_INDEX = 0;
+    if(activeBanners.length > 1) {
+      startHeroCarousel();
+    } else {
+      clearInterval(HERO_TIMER);
+    }
+  } else {
+    // Fallback single conference header when no admin banners are uploaded
+    carousel.innerHTML = `
+      <article class="hero-slide active" data-hero-slide="0" aria-hidden="false">
+        <div class="banner-stage">
+          <div class="banner-side left">
+            <div class="banner-star-badge">
+              <div class="star-emblem-wrap">
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#fff4cc"/>
+                      <stop offset="35%" stop-color="#f59e0b"/>
+                      <stop offset="70%" stop-color="#b45309"/>
+                      <stop offset="100%" stop-color="#fef08a"/>
+                    </linearGradient>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="3" result="blur"/>
+                      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                    </filter>
+                  </defs>
+                  <polygon points="50,5 64,36 98,36 70,57 81,90 50,70 19,90 30,57 2,36 36,36" fill="url(#goldGrad)" stroke="#fff" stroke-width="1.5" filter="url(#glow)"/>
+                </svg>
+              </div>
+              <div class="star-content-wrap">
+                <div class="tuh-brand">TUH <span>19<sup>th</sup></span></div>
+                <div class="qf-brand">QUALITY FAIR</div>
+              </div>
+              <img class="tuh-logo-mini" id="heroLeftLogo" src="${BOOT?.conference?.LogoUrl || DEFAULT_LOGO}" alt="TUH Logo" referrerpolicy="no-referrer">
+            </div>
+          </div>
+          <div class="banner-center">
+            <h1 class="banner-title" id="confName">${esc(BOOT?.conference?.ConferenceNameTH || 'งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569')}</h1>
+            <p class="banner-sub" id="confDesc">${esc(BOOT?.conference?.DescriptionTH || 'ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ')}</p>
+            <div class="banner-pills" id="confMeta">
+              <div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>${esc(BOOT?.conference?.Venue || 'อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')}</span></div>
+              ${eventRangeHtml(getEventDates())}
+            </div>
+          </div>
+          <div class="banner-side right">
+            <div class="banner-hacc-badge">
+              <div class="hacc-circle-wrap">
+                <img id="heroRightLogo" src="${HACC_LOGO}" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
+              </div>
+              <div class="hacc-caption-text">
+                <b>HACC นครจตุรศรีปทุมทอง</b>
+                <span>HA Regional Forum เขต 4</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+    HERO_INDEX = 0;
+    clearInterval(HERO_TIMER);
+  }
 }
 
 async function init(){

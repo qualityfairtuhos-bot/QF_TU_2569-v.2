@@ -636,6 +636,18 @@ async function loadSettings(){
   }
 }
 
+function normalizeBannerImageUrl(url){
+  if(!url) return '';
+  let str = String(url).trim();
+  if(str.startsWith('data:image/')) return str;
+  if(str.startsWith('/')) return str;
+  const driveMatch = str.match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=view&)?id=|thumbnail\?id=)|lh3\.googleusercontent\.com\/d\/)([a-zA-Z0-9_-]+)/);
+  if(driveMatch && driveMatch[1]) {
+    return 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
+  }
+  return str;
+}
+
 function renderBannerList(){
   const container = $('#bannerListContainer');
   if(!container) return;
@@ -648,16 +660,18 @@ function renderBannerList(){
       <div style="text-align:center; padding:24px 16px; border:2px dashed #cbd5e1; border-radius:12px; background:#fff; color:#64748b;">
         <i class="fa-regular fa-image" style="font-size:2rem; color:#94a3b8; margin-bottom:8px; display:block;"></i>
         <div style="font-weight:600; margin-bottom:4px;">ยังไม่มีภาพ Banner เพิ่มเติม</div>
-        <div style="font-size:0.8rem; margin-bottom:12px;">(ระบบจะใช้สไลด์แนะนำงานประชุมและข้อความประกาศเริ่มต้นตามปกติ)</div>
-        <button type="button" class="btn btn-soft btn-sm" onclick="openAddBannerModal()"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner แรก</button>
+        <div style="font-size:0.8rem; margin-bottom:12px;">(ระบบจะใช้สไลด์แนะนำงานประชุมเริ่มต้นตามปกติ)</div>
+        <button type="button" class="btn btn-soft btn-sm" onclick="openAddBannerModal()"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner</button>
       </div>
     `;
     return;
   }
-  container.innerHTML = list.map((b, idx) => `
+  container.innerHTML = list.map((b, idx) => {
+    const normUrl = normalizeBannerImageUrl(b.imageUrl);
+    return `
     <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#fff; border:1px solid ${b.active!==false?'#e2e8f0':'#fecaca'}; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.04); opacity:${b.active!==false?'1':'0.75'};">
       <div style="width:140px; height:50px; flex-shrink:0; border-radius:6px; overflow:hidden; background:#0c385b; display:flex; align-items:center; justify-content:center; border:1px solid #cbd5e1;">
-        <img src="${esc(b.imageUrl)}" alt="${esc(b.title||'Banner')}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://placehold.co/1920x600?text=Invalid+Image';">
+        <img src="${esc(normUrl)}" alt="${esc(b.title||'Banner')}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://placehold.co/1920x600?text=Banner';">
       </div>
       <div style="flex:1; min-width:0;">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -674,7 +688,8 @@ function renderBannerList(){
         <button type="button" class="btn btn-bad btn-sm" onclick="deleteBannerSlide(${idx})" title="ลบ"><i class="fa-solid fa-trash"></i></button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function toggleBannerActive(idx){
@@ -792,6 +807,8 @@ async function openAddBannerModal(editIdx = null){
         Swal.showValidationMessage('กรุณาเลือกไฟล์ภาพ หรือ ระบุ URL ภาพ');
         return false;
       }
+
+      imageUrl = normalizeBannerImageUrl(imageUrl);
 
       return {
         id: isEdit && item.id ? item.id : 'b_' + Date.now(),

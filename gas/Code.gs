@@ -3671,7 +3671,14 @@ function adminUploadBanner(token,conferenceId,file){
     requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN'],conferenceId);
     if(!file||!file.base64)throw new Error('กรุณาเลือกไฟล์ภาพ Banner');
     const up=uploadBase64File_(file,'00_Assets','BANNER');
-    return {fileId:up.fileId,fileUrl:up.fileUrl,fileName:up.fileName};
+    if(up&&up.fileId){
+      try {
+        const driveFile=DriveApp.getFileById(up.fileId);
+        driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch(e){}
+      up.fileUrl = 'https://lh3.googleusercontent.com/d/' + up.fileId;
+    }
+    return {fileId:up.fileId,fileUrl:up.fileUrl,rawDriveUrl:up.rawDriveUrl||up.fileUrl,fileName:up.fileName};
   });
 }
 
