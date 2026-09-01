@@ -2897,7 +2897,12 @@ function assertConferenceWindow_(conferenceId,openField,closeField,label){
 function requireRegistrationAccess_(conferenceId,regId,emailOrPhone,editCode){
   const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:clean_(regId)}); if(!r)throw new Error('ไม่พบเลขลงทะเบียน');
   const key=normalizeEmail_(emailOrPhone), codeOk=editCode&&hashText_(String(editCode)+getAuthSecret_())===r.EditAccessCodeHash;
-  if(normalizeEmail_(r.Email)!==key&&normalizePhone_(r.Phone)!==normalizePhone_(emailOrPhone)&&!codeOk)throw new Error('ข้อมูลยืนยันไม่ถูกต้อง');
+  const phoneKey=normalizePhone_(emailOrPhone);
+  const cidKey=normalizeCid_(emailOrPhone);
+  const emailOk = key && normalizeEmail_(r.Email) === key;
+  const phoneOk = phoneKey && normalizePhone_(r.Phone) === phoneKey;
+  const cidOk = cidKey && normalizeCid_(r.CID) === cidKey;
+  if(!emailOk && !phoneOk && !cidOk && !codeOk) throw new Error('ข้อมูลยืนยันไม่ถูกต้อง (กรุณาระบุ Email, เบอร์โทรศัพท์ หรือเลขบัตรประชาชนที่ใช้ลงทะเบียน)');
   return r;
 }
 
