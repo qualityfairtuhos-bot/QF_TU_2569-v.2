@@ -101,7 +101,51 @@
         <div class="grid3">
           <div class="field"><label>คำนำหน้า<textarea name="PREFIX_OPTIONS_JSON"></textarea></label></div><div class="field"><label>ตำแหน่ง<textarea name="POSITION_OPTIONS_JSON"></textarea></label></div><div class="field"><label>วิชาชีพ<textarea name="PROFESSION_OPTIONS_JSON"></textarea></label></div>
           <div class="field"><label>ฝ่าย/กลุ่มงาน<textarea name="ORGANIZATION_GROUP_OPTIONS_JSON"></textarea></label></div><div class="field"><label>หน่วยงาน/สถาบัน<textarea name="ORGANIZATION_OPTIONS_JSON"></textarea></label></div><div class="field"><label>ประเภทอาหาร<textarea name="FOOD_TYPE_OPTIONS_JSON"></textarea></label></div>
-        </div><button class="btn btn-primary">บันทึกการตั้งค่า</button></form>
+        </div>
+
+        <!-- ส่วนจัดการรูปภาพ Banner ส่วนหัวเว็บไซต์ (Header Banners) -->
+        <div class="card" style="margin:20px 0 10px; border-left:4px solid #c8b278; background:#fffdf9; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <h4 style="margin:0; color:#0c385b;"><i class="fa-solid fa-images" style="color:#c8b278;"></i> จัดการรูปภาพ Banner ส่วนหัวเว็บไซต์ (Header Banners)<span class="en">Header Banner Carousel</span></h4>
+            <button type="button" class="btn btn-gold btn-sm" onclick="openAddBannerModal()" style="font-weight:600;"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner ใหม่</button>
+          </div>
+          
+          <!-- Banner Specification Guide -->
+          <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+            <div style="font-weight:700; color:#0369a1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+              <i class="fa-solid fa-circle-info"></i> คำแนะนำและสเปกขนาดภาพ Banner สำหรับผู้ดูแลระบบ
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:10px; font-size:0.85rem; color:#1e293b;">
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-expand"></i> ขนาดภาพที่แนะนำ (Pixels):</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">1920 × 600 px</span><br>
+                <span class="muted" style="font-size:0.75rem;">(อัตราส่วน 16:5 กว้างพิเศษ)</span>
+              </div>
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-ruler-combined"></i> ขนาดเซนติเมตร (cm):</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">50.8 × 15.88 cm</span><br>
+                <span class="muted" style="font-size:0.75rem;">(ที่ความละเอียดหน้าจอ 96–150 DPI)</span>
+              </div>
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-crosshairs"></i> Safe Zone กึ่งกลาง:</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">1200 × 500 px</span><br>
+                <span class="muted" style="font-size:0.75rem;">(พื้นที่ปลอดภัย ข้อความไม่ถูกตัดบนมือถือ)</span>
+              </div>
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-file-image"></i> นามสกุลไฟล์:</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">JPG / WebP / PNG</span><br>
+                <span class="muted" style="font-size:0.75rem;">(แนะนำไฟล์ขนาดไม่เกิน 2–5 MB)</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="bannerListContainer" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+            <!-- รายการภาพ Banner จะถูก render อัตโนมัติ -->
+          </div>
+          <input type="hidden" name="BANNER_SLIDES_JSON" id="BANNER_SLIDES_JSON_INPUT" value="[]">
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:10px;">บันทึกการตั้งค่า</button></form>
       </div>
     </section>
 
@@ -558,8 +602,244 @@ async function loadDashboard(){
     if(!hasRenderedCache) hide();
   }
 }
-async function loadSettings(){show('กำลังโหลดการตั้งค่า');try{const d=await rpc('getAdminSettings',TOKEN,CID),f=$('#settingsForm');['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>f.elements[k].value=d.conference[k]||'');DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));const sm={};d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>f.elements[k].value=sm[k]||'');f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);const o=d.optionConfig||{};f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');f.elements.POSITION_OPTIONS_JSON.value=(o.positions||[]).join('\n');f.elements.PROFESSION_OPTIONS_JSON.value=(o.professions||[]).join('\n');f.elements.ORGANIZATION_GROUP_OPTIONS_JSON.value=(o.organizationGroups||[]).join('\n');f.elements.ORGANIZATION_OPTIONS_JSON.value=(o.organizations||[]).join('\n');f.elements.FOOD_TYPE_OPTIONS_JSON.value=(o.foodTypes||[]).join('\n');$$('.date-input').forEach(el=>el.onblur=()=>warnGregorianInput(el))}finally{hide()}}
-$('#settingsForm').onsubmit=async e=>{e.preventDefault();try{const o=formObj(e.target),conf={};['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));const settings={};['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));show('กำลังบันทึกการตั้งค่า');await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});hide();await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',text:'ตัวเลือกใหม่จะแสดงในหน้าลงทะเบียนเมื่อรีเฟรชหน้าเว็บ',confirmButtonColor:'#006D70'});await loadSettings()}catch(x){err(x)}};
+async function loadSettings(){
+  show('กำลังโหลดการตั้งค่า');
+  try{
+    const d=await rpc('getAdminSettings',TOKEN,CID),f=$('#settingsForm');
+    ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>f.elements[k].value=d.conference[k]||'');
+    DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));
+    const sm={};
+    d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>f.elements[k].value=sm[k]||'');
+    f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);
+    const o=d.optionConfig||{};
+    f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');
+    f.elements.POSITION_OPTIONS_JSON.value=(o.positions||[]).join('\n');
+    f.elements.PROFESSION_OPTIONS_JSON.value=(o.professions||[]).join('\n');
+    f.elements.ORGANIZATION_GROUP_OPTIONS_JSON.value=(o.organizationGroups||[]).join('\n');
+    f.elements.ORGANIZATION_OPTIONS_JSON.value=(o.organizations||[]).join('\n');
+    f.elements.FOOD_TYPE_OPTIONS_JSON.value=(o.foodTypes||[]).join('\n');
+    
+    // โหลดภาพ Banner
+    try {
+      const rawB = sm.BANNER_SLIDES_JSON || '[]';
+      window.BANNER_LIST = typeof rawB === 'string' ? JSON.parse(rawB) : rawB;
+      if (!Array.isArray(window.BANNER_LIST)) window.BANNER_LIST = [];
+    } catch(e) {
+      window.BANNER_LIST = [];
+    }
+    renderBannerList();
+
+    $$('.date-input').forEach(el=>el.onblur=()=>warnGregorianInput(el));
+  }finally{
+    hide();
+  }
+}
+
+function renderBannerList(){
+  const container = $('#bannerListContainer');
+  if(!container) return;
+  const list = window.BANNER_LIST || [];
+  if($('#BANNER_SLIDES_JSON_INPUT')) {
+    $('#BANNER_SLIDES_JSON_INPUT').value = JSON.stringify(list);
+  }
+  if(!list.length){
+    container.innerHTML = `
+      <div style="text-align:center; padding:24px 16px; border:2px dashed #cbd5e1; border-radius:12px; background:#fff; color:#64748b;">
+        <i class="fa-regular fa-image" style="font-size:2rem; color:#94a3b8; margin-bottom:8px; display:block;"></i>
+        <div style="font-weight:600; margin-bottom:4px;">ยังไม่มีภาพ Banner เพิ่มเติม</div>
+        <div style="font-size:0.8rem; margin-bottom:12px;">(ระบบจะใช้สไลด์แนะนำงานประชุมและข้อความประกาศเริ่มต้นตามปกติ)</div>
+        <button type="button" class="btn btn-soft btn-sm" onclick="openAddBannerModal()"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner แรก</button>
+      </div>
+    `;
+    return;
+  }
+  container.innerHTML = list.map((b, idx) => `
+    <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#fff; border:1px solid ${b.active!==false?'#e2e8f0':'#fecaca'}; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.04); opacity:${b.active!==false?'1':'0.75'};">
+      <div style="width:140px; height:50px; flex-shrink:0; border-radius:6px; overflow:hidden; background:#0c385b; display:flex; align-items:center; justify-content:center; border:1px solid #cbd5e1;">
+        <img src="${esc(b.imageUrl)}" alt="${esc(b.title||'Banner')}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://placehold.co/1920x600?text=Invalid+Image';">
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <b style="font-size:0.92rem; color:#0f172a;">${esc(b.title || ('ภาพ Banner #' + (idx+1)))}</b>
+          <span class="badge ${b.active!==false?'ok':'bad'}" style="cursor:pointer; font-size:0.72rem; padding:2px 8px;" onclick="toggleBannerActive(${idx})" title="คลิกเพื่อเปิด/ปิด">${b.active!==false?'กำลังแสดงผล':'ปิดใช้งาน'}</span>
+        </div>
+        ${b.subtitle ? `<div class="muted" style="font-size:0.8rem; margin-top:2px;">${esc(b.subtitle)}</div>` : ''}
+        ${b.linkUrl ? `<div style="font-size:0.75rem; color:#0284c7; margin-top:2px; word-break:break-all;"><i class="fa-solid fa-link"></i> ${esc(b.linkUrl)}</div>` : ''}
+      </div>
+      <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+        <button type="button" class="btn btn-soft btn-sm" onclick="moveBannerSlide(${idx}, -1)" ${idx===0?'disabled':''} title="เลื่อนขึ้น"><i class="fa-solid fa-arrow-up"></i></button>
+        <button type="button" class="btn btn-soft btn-sm" onclick="moveBannerSlide(${idx}, 1)" ${idx===list.length-1?'disabled':''} title="เลื่อนลง"><i class="fa-solid fa-arrow-down"></i></button>
+        <button type="button" class="btn btn-gold btn-sm" onclick="openAddBannerModal(${idx})" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="btn btn-bad btn-sm" onclick="deleteBannerSlide(${idx})" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleBannerActive(idx){
+  if(!window.BANNER_LIST || !window.BANNER_LIST[idx]) return;
+  window.BANNER_LIST[idx].active = window.BANNER_LIST[idx].active === false ? true : false;
+  renderBannerList();
+}
+
+function moveBannerSlide(idx, dir){
+  if(!window.BANNER_LIST) return;
+  const target = idx + dir;
+  if(target < 0 || target >= window.BANNER_LIST.length) return;
+  const temp = window.BANNER_LIST[idx];
+  window.BANNER_LIST[idx] = window.BANNER_LIST[target];
+  window.BANNER_LIST[target] = temp;
+  renderBannerList();
+}
+
+async function deleteBannerSlide(idx){
+  if(!window.BANNER_LIST || !window.BANNER_LIST[idx]) return;
+  const res = await Swal.fire({
+    title: 'ยืนยันการลบภาพ Banner?',
+    text: window.BANNER_LIST[idx].title ? `"${window.BANNER_LIST[idx].title}"` : 'ภาพ Banner นี้',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'ลบภาพ',
+    cancelButtonText: 'ยกเลิก'
+  });
+  if(res.isConfirmed){
+    window.BANNER_LIST.splice(idx, 1);
+    renderBannerList();
+  }
+}
+
+async function openAddBannerModal(editIdx = null){
+  const isEdit = editIdx !== null && window.BANNER_LIST && window.BANNER_LIST[editIdx];
+  const item = isEdit ? window.BANNER_LIST[editIdx] : { imageUrl: '', title: '', subtitle: '', linkUrl: '', active: true };
+
+  const html = `
+    <div style="text-align:left; font-size:0.9rem;">
+      <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:0.82rem; color:#0369a1;">
+        <i class="fa-solid fa-lightbulb"></i> <b>ข้อแนะนำขนาดภาพ:</b> 1920 × 600 px (16:5) หรือ 50.8 × 15.88 ซม. โดยให้ข้อความสำคัญอยู่กึ่งกลางภาพ (Safe zone 1200 × 500 px)
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">1. เลือกอัปโหลดไฟล์ภาพ หรือ ระบุ URL ภาพ *</label>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <input type="file" id="bm_file" accept="image/*" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; width:100%; box-sizing:border-box;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.8rem; color:#64748b;">หรือใส่ URL:</span>
+            <input type="url" id="bm_url" value="${esc(item.imageUrl||'')}" placeholder="https://..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">2. หัวข้อแบนเนอร์ (Title - ไม่บังคับ)</label>
+        <input type="text" id="bm_title" value="${esc(item.title||'')}" placeholder="เช่น ขอเชิญส่งผลงานวิจัยและนวัตกรรม" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">3. ข้อความย่อย (Subtitle - ไม่บังคับ)</label>
+        <input type="text" id="bm_subtitle" value="${esc(item.subtitle||'')}" placeholder="เช่น รับคะแนน CNEU และชิงเงินรางวัลรวมกว่า 50,000 บาท" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">4. ลิงก์เมื่อกดแบนเนอร์ (Link URL - ไม่บังคับ)</label>
+        <input type="url" id="bm_link" value="${esc(item.linkUrl||'')}" placeholder="https://..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="bm_active" ${item.active!==false?'checked':''} style="width:18px; height:18px; cursor:pointer;">
+        <label for="bm_active" style="cursor:pointer; font-weight:600; color:#1e293b;">เปิดใช้งานแบนเนอร์นี้ทันที</label>
+      </div>
+    </div>
+  `;
+
+  const res = await Swal.fire({
+    title: isEdit ? 'แก้ไขภาพ Banner' : 'เพิ่มภาพ Banner ใหม่',
+    html: html,
+    width: '600px',
+    showCancelButton: true,
+    confirmButtonText: isEdit ? 'บันทึกการแก้ไข' : 'เพิ่มภาพ Banner',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70',
+    preConfirm: async () => {
+      const fileInput = document.getElementById('bm_file');
+      const urlInput = document.getElementById('bm_url');
+      const titleInput = document.getElementById('bm_title');
+      const subtitleInput = document.getElementById('bm_subtitle');
+      const linkInput = document.getElementById('bm_link');
+      const activeInput = document.getElementById('bm_active');
+
+      let imageUrl = (urlInput.value || '').trim();
+
+      if(fileInput && fileInput.files && fileInput.files[0]){
+        try {
+          const fObj = await fileObj(fileInput);
+          if(!fObj) throw new Error('ไม่สามารถอ่านไฟล์ภาพได้');
+          Swal.showLoading();
+          const uploadRes = await rpc('adminUploadBanner', TOKEN, CID, fObj);
+          if(uploadRes && uploadRes.fileUrl) {
+            imageUrl = uploadRes.fileUrl;
+          } else if (fObj.base64) {
+            imageUrl = 'data:' + fObj.type + ';base64,' + fObj.base64;
+          }
+        } catch(err) {
+          Swal.showValidationMessage('เกิดข้อผิดพลาดในการอัปโหลดภาพ: ' + (err.message || err));
+          return false;
+        }
+      }
+
+      if(!imageUrl){
+        Swal.showValidationMessage('กรุณาเลือกไฟล์ภาพ หรือ ระบุ URL ภาพ');
+        return false;
+      }
+
+      return {
+        id: isEdit && item.id ? item.id : 'b_' + Date.now(),
+        imageUrl: imageUrl,
+        title: (titleInput.value || '').trim(),
+        subtitle: (subtitleInput.value || '').trim(),
+        linkUrl: (linkInput.value || '').trim(),
+        active: !!activeInput.checked
+      };
+    }
+  });
+
+  if(res.isConfirmed && res.value){
+    if(!window.BANNER_LIST) window.BANNER_LIST = [];
+    if(isEdit){
+      window.BANNER_LIST[editIdx] = res.value;
+    } else {
+      window.BANNER_LIST.push(res.value);
+    }
+    renderBannerList();
+    Swal.fire({
+      icon: 'success',
+      title: isEdit ? 'แก้ไขสำเร็จ' : 'เพิ่มภาพสำเร็จ',
+      text: 'กรุณากด "บันทึกการตั้งค่า" ด้านล่างเพื่อบันทึกข้อมูลถาวร',
+      timer: 2500,
+      showConfirmButton: false
+    });
+  }
+}
+
+$('#settingsForm').onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    const o=formObj(e.target),conf={};
+    ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);
+    DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
+    const settings={};
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);
+    settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
+    OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));
+    settings.BANNER_SLIDES_JSON=JSON.stringify(window.BANNER_LIST || []);
+    show('กำลังบันทึกการตั้งค่า');
+    await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});
+    hide();
+    await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',text:'การตั้งค่าและภาพ Banner ได้รับการอัปเดตเรียบร้อยแล้ว',confirmButtonColor:'#006D70'});
+    await loadSettings();
+  }catch(x){err(x)}
+};
 
 async function previewImport(){
   show('กำลังอ่านและวิเคราะห์ไฟล์ Excel...');
@@ -2042,6 +2322,16 @@ async function loadWorks(){
     });
     window.WORK_ROWS = rows;
     
+    // ตรวจหาผลงานที่มีชื่อซ้ำกัน (ตัดช่องว่างทุกจุดและเทียบแบบ case-insensitive)
+    function normTitle(t){
+      return String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '').trim().toLowerCase();
+    }
+    const titleCountMap = {};
+    (rows || []).forEach(w => {
+      const nt = normTitle(w.TitleTH || w.ThaiTitle);
+      if (nt) titleCountMap[nt] = (titleCountMap[nt] || 0) + 1;
+    });
+
     let filteredRows = rows || [];
     if (ptVal) {
       const ptf = ptVal.toLowerCase();
@@ -2079,9 +2369,26 @@ async function loadWorks(){
         ptDisplay = '-';
       }
 
+      const nt = normTitle(w.TitleTH || w.ThaiTitle);
+      const isDuplicate = nt && (titleCountMap[nt] > 1);
+      const dupCount = isDuplicate ? titleCountMap[nt] : 0;
+      const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
+
       return `<tr>
       <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
-      <td>${esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-')}${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}</td>
+      <td>
+        ${isDuplicate 
+          ? `<div style="color:#dc2626; font-weight:700; display:flex; align-items:flex-start; gap:6px;">
+              <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px; flex-shrink:0; color:#dc2626;" title="อาจมีชื่อผลงานซ้ำ (${dupCount} รายการ)"></i>
+              <div>
+                <span style="color:#dc2626;">${titleDisplay}</span>
+                <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.7rem; padding:1px 6px; margin-left:4px; font-weight:600;"><i class="fa-solid fa-clone"></i> ชื่อซ้ำ (${dupCount} เรื่อง)</span>
+              </div>
+             </div>`
+          : `<div>${titleDisplay}</div>`
+        }
+        ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
+      </td>
       <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||w.WorkType||w.Field||w.Theme||'-')}</td>
       <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
       <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>

@@ -3358,10 +3358,12 @@ function requireWorkAccess_(conferenceId,regId,emailOrPhone){
   const r=requireRegistrationAccess_(conferenceId,regId,emailOrPhone,''); const c=canSubmitWork_(r); if(!c.ok)throw new Error(c.message); assertConferenceWindow_(conferenceId,'SubmissionOpenAt','SubmissionCloseAt','การส่งผลงาน'); return r;
 }
 
+function normalizeWorkTitle_(title){
+  return String(title||'').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/\s+/g,'').trim().toLowerCase();
+}
+
 function canSubmitWork_(reg){
-  if(!reg||reg.DataCompletenessStatus!=='COMPLETE'||['CANCELLED','REGISTRATION_RETURNED'].indexOf(upper_(reg.RegistrationStatus))>=0)return {ok:false,message:'ข้อมูลลงทะเบียนยังไม่สมบูรณ์'};
-  const type=findOne_('RegistrationTypes',{ConferenceID:reg.ConferenceID,TypeCode:reg.ParticipantType})||{};
-  if(bool_(type.WorkRequiresPayment)&&upper_(reg.PaymentStatus)!=='APPROVED')return {ok:false,message:'กรุณาชำระค่าลงทะเบียนและรอฝ่ายการเงินอนุมัติก่อนส่งผลงาน'};
+  if(!reg||['CANCELLED','REGISTRATION_RETURNED'].indexOf(upper_(reg.RegistrationStatus))>=0)return {ok:false,message:'สถานะการลงทะเบียนไม่สามารถส่งผลงานได้'};
   return {ok:true};
 }
 function verifyWorkAccess(conferenceId,regId,emailOrPhone){return runSafely_('verifyWorkAccess',function(){const r=requireWorkAccess_(conferenceId||APP.DEFAULT_CONFERENCE_ID,regId,emailOrPhone);const works=findMany_('Works',{ConferenceID:r.ConferenceID,RegID:r.RegID});const files=findMany_('WorkFiles',{ConferenceID:r.ConferenceID,RegID:r.RegID}).filter(function(f){return bool_(f.Active);});const outWorks=works.map(function(w){const cw=Object.assign({},w);cw.files=files.filter(function(f){return f.WorkID===w.WorkID;});return cw;});return {registration:publicRegistration_(r),works:serialize_(outWorks)};});}
@@ -3371,6 +3373,27 @@ function submitWork(conferenceId,regId,emailOrPhone,payload,files){
     if(!payload.CategoryID||!payload.PresentationTypeRequested||!clean_(payload.TitleTH))throw new Error('กรุณากรอกประเภทผลงาน รูปแบบนำเสนอ และชื่อผลงาน');
     const category=findOne_('WorkCategories',{ConferenceID:cid,CategoryID:payload.CategoryID});if(!category||!bool_(category.Active))throw new Error('ประเภทผลงานไม่ถูกต้อง');
     const presentation=findOne_('PresentationTypes',{ConferenceID:cid,PresentationTypeID:payload.PresentationTypeRequested});if(!presentation||!bool_(presentation.Active))throw new Error('รูปแบบการนำเสนอไม่ถูกต้อง');
+    
+    // ตรวจสอบชื่อผลงานซ้ำในระบบ (ตัดช่องว่างทุกจุดและเทียบแบบ case-insensitive)
+    const targetTitleNorm=normalizeWorkTitle_(payload.TitleTH);
+    const allWorks=findMany_('Works',{ConferenceID:cid}).filter(function(x){return upper_(x.Status)!=='CANCELLED';});
+    const duplicate=allWorks.find(function(w){
+      const wNorm=normalizeWorkTitle_(w.TitleTH||w.ThaiTitle);
+      return wNorm&&wNorm===targetTitleNorm;
+    });
+    if(duplicate){
+      const isSelf=String(duplicate.RegID).trim()===String(regId).trim();
+      const existingCode=duplicate.WorkCode||duplicate.WorkID||'';
+      if(isSelf){
+        throw new Error('ผลงานเรื่องนี้ ("'+(duplicate.TitleTH||payload.TitleTH)+'") ได้เคยถูกส่งเข้าระบบแล้ว (รหัสผลงาน: '+existingCode+') โดยตัวท่านเอง หากท่านต้องการแก้ไขข้อมูลหรือไฟล์ผลงาน กรุณาเข้าไปที่เมนู "ติดตามผลงาน" เพื่อแก้ไขข้อมูลเดิม');
+      }else{
+        const ownerReg=findOne_('Registrations',{ConferenceID:cid,RegID:duplicate.RegID})||{};
+        const ownerAuthor=findOne_('WorkAuthors',{ConferenceID:cid,WorkID:duplicate.WorkID,IsPresenter:true})||findOne_('WorkAuthors',{ConferenceID:cid,WorkID:duplicate.WorkID})||{};
+        const ownerName=ownerReg.FullName||[ownerReg.Prefix,ownerReg.FirstName,ownerReg.LastName].filter(Boolean).join(' ')||ownerAuthor.FullName||('ผู้ลงทะเบียน '+duplicate.RegID);
+        throw new Error('ผลงานเรื่องนี้ ("'+(duplicate.TitleTH||payload.TitleTH)+'") ได้เคยถูกส่งเข้าระบบแล้ว (รหัสผลงาน: '+existingCode+') โดยคุณ '+ownerName+' หากชื่อเจ้าของผลงานไม่ตรงตามที่ท่านแจ้ง กรุณาติดต่อผู้ดูแลระบบ (Admin)');
+      }
+    }
+
     if(!files.original)throw new Error('กรุณาแนบไฟล์แบบฟอร์มการนำเสนอผลงาน');
     if(!files.presenterBio)throw new Error('กรุณาแนบไฟล์ประวัติของผู้นำเสนอผลงานเพื่อรับคะแนน CNEU');
     const ethicsRequired=bool_(payload.EthicsRequired);if(ethicsRequired&&!files.ethics)throw new Error('ผลงานที่เกี่ยวข้องกับมนุษย์ต้องแนบหลักฐานการรับรองจริยธรรมการวิจัยในคน');
@@ -3635,6 +3658,15 @@ function saveAdminSettings(token,conferenceId,payload){
     });
     invalidateCache_(conferenceId);logAudit_(conferenceId,ctx.user,ctx.role,'SAVE_SETTINGS','Conference',conferenceId,payload);
     return {saved:true,logoUrl:patch.LogoUrl,eventDates:jsonParse_(getSetting_(conferenceId,'EVENT_DATES_JSON','[]'),[]),optionConfig:getRegistrationOptionMap_(conferenceId)};
+  });
+}
+
+function adminUploadBanner(token,conferenceId,file){
+  return runSafely_('adminUploadBanner',function(){
+    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN'],conferenceId);
+    if(!file||!file.base64)throw new Error('กรุณาเลือกไฟล์ภาพ Banner');
+    const up=uploadBase64File_(file,'00_Assets','BANNER');
+    return {fileId:up.fileId,fileUrl:up.fileUrl,fileName:up.fileName};
   });
 }
 
@@ -5619,6 +5651,7 @@ const API_ACTIONS = Object.freeze({
   adminToggleReceiptStatus: adminToggleReceiptStatus,
   adminUpdateReceiptInfo: adminUpdateReceiptInfo,
   adminUploadFinanceDocument: adminUploadFinanceDocument,
+  adminUploadBanner: adminUploadBanner,
   adminListFinanceDocuments: adminListFinanceDocuments,
   adminDeleteFinanceDocument: adminDeleteFinanceDocument,
   getPublicFinanceDocuments: getPublicFinanceDocuments,
@@ -5664,7 +5697,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1,
-  adminUploadFinanceDocument:1, adminDeleteFinanceDocument:1,
+  adminUploadFinanceDocument:1, adminUploadBanner:1, adminDeleteFinanceDocument:1,
   adminImportFromGoogleSheet:1, adminSendIncompleteProfileEmails:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
   emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,

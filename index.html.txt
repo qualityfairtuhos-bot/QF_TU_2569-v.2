@@ -417,9 +417,73 @@ function applyBootData(data){
   }
   renderConfiguredRegistrationOptions();
   renderAttendanceDates();
+  renderHeroBanners();
 
   const fs=$('#regFieldSet');if(fs)fs.disabled=false;
   const statusEl=$('#regBootStatus');if(statusEl)statusEl.style.display='none';
+}
+
+function renderHeroBanners(){
+  if(!BOOT) return;
+  const raw = BOOT.settings?.BANNER_SLIDES_JSON || '[]';
+  let bannerList = [];
+  try {
+    bannerList = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if(!Array.isArray(bannerList)) bannerList = [];
+  } catch(e) {
+    bannerList = [];
+  }
+  
+  const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false);
+
+  document.querySelectorAll('.hero-slide-custom').forEach(el => el.remove());
+  document.querySelectorAll('.hero-dot-custom').forEach(el => el.remove());
+
+  const carousel = $('#heroCarousel');
+  const controls = document.querySelector('.hero-controls');
+  if(!carousel || !controls) return;
+
+  const arrows = carousel.querySelectorAll('.hero-arrow');
+  const insertBeforeEl = arrows.length ? arrows[0] : controls;
+
+  activeBanners.forEach((b, idx) => {
+    const slideIdx = 2 + idx;
+    const slide = document.createElement('article');
+    slide.className = 'hero-slide hero-slide-custom';
+    slide.setAttribute('data-hero-slide', String(slideIdx));
+    slide.setAttribute('aria-hidden', 'true');
+    slide.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.3)), url('${b.imageUrl}')`;
+    slide.style.backgroundSize = 'cover';
+    slide.style.backgroundPosition = 'center';
+    slide.style.borderRadius = '24px';
+    slide.style.position = 'relative';
+    slide.style.display = 'flex';
+    slide.style.alignItems = 'flex-end';
+    slide.style.justifyContent = 'center';
+    slide.style.minHeight = '320px';
+    if (b.linkUrl) {
+      slide.style.cursor = 'pointer';
+      slide.onclick = () => window.open(b.linkUrl, '_blank');
+    }
+
+    if (b.title || b.subtitle) {
+      slide.innerHTML = `
+        <div style="background:rgba(12, 56, 91, 0.82); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.25); border-radius:16px; padding:12px 20px; margin:0 20px 24px; max-width:850px; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+          ${b.title ? `<div style="font-size:1.3rem; font-weight:700; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,0.5);">${esc(b.title)}</div>` : ''}
+          ${b.subtitle ? `<div style="font-size:0.95rem; color:#e0f2fe; margin-top:4px; text-shadow:0 1px 3px rgba(0,0,0,0.5);">${esc(b.subtitle)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    carousel.insertBefore(slide, insertBeforeEl);
+
+    const dot = document.createElement('button');
+    dot.className = 'hero-dot hero-dot-custom';
+    dot.type = 'button';
+    dot.setAttribute('aria-label', b.title || `แบนเนอร์ ${idx+1}`);
+    dot.onclick = () => setHeroSlide(slideIdx, true);
+    controls.appendChild(dot);
+  });
 }
 
 async function init(){
