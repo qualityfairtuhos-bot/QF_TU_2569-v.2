@@ -1079,8 +1079,16 @@ function clearRequestCache_(){ globalThis.__TUH_RECORDS={}; globalThis.__TUH_HEA
 function findOne_(name,criteria){ return getRecords_(name).find(function(r){ return Object.keys(criteria).every(function(k){return String(r[k])===String(criteria[k]);}); })||null; }
 function findMany_(name,criteria){ return getRecords_(name).filter(function(r){ return Object.keys(criteria).every(function(k){return String(r[k])===String(criteria[k]);}); }); }
 function appendRecord_(name,obj){
-  const sh=getSheet_(name), hm=headerMap_(name), row=hm.headers.map(function(h){return obj[h]!==undefined?obj[h]:'';});
-  const next=sh.getLastRow()+1; sh.getRange(next,1,1,row.length).setValues([row]); applyPlainTextToRow_(sh,hm,next,obj); 
+  const sh=getSheet_(name), hm=headerMap_(name);
+  const row=hm.headers.map(function(h){
+    const val = obj[h];
+    if (val === undefined || val === null) return '';
+    if (val instanceof Date) return val;
+    if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0) return String(val);
+    return val;
+  });
+  const next=sh.getLastRow()+1;
+  sh.getRange(next,1,1,row.length).setValues([row]);
   clearRequestCache_(); 
   clearTableCache_(name);
   return next;
@@ -1090,30 +1098,45 @@ function appendRecords_(name, objects) {
   const sh = getSheet_(name), hm = headerMap_(name);
   const rows = objects.map(function(obj) {
     return hm.headers.map(function(h) {
-      return obj[h] !== undefined ? obj[h] : '';
+      const val = obj[h];
+      if (val === undefined || val === null) return '';
+      if (val instanceof Date) return val;
+      if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0) return String(val);
+      return val;
     });
   });
   const next = sh.getLastRow() + 1;
   sh.getRange(next, 1, rows.length, hm.headers.length).setValues(rows);
-  PLAIN_TEXT_FIELDS.forEach(function(k) {
-    if (hm.map[k] !== undefined) {
-      const colIdx = hm.map[k] + 1;
-      sh.getRange(next, colIdx, rows.length, 1).setNumberFormat('@');
-    }
-  });
   clearRequestCache_();
   clearTableCache_(name);
   return next;
 }
 function updateRecord_(name,rowNumber,patch){
   const sh=getSheet_(name), hm=headerMap_(name); 
-  Object.keys(patch).forEach(function(k){ 
-    if(hm.map[k]!==undefined){ 
-      const cell=sh.getRange(rowNumber,hm.map[k]+1); 
-      if(PLAIN_TEXT_FIELDS.indexOf(k)>=0)cell.setNumberFormat('@'); 
-      cell.setValue(patch[k]); 
-    }
-  }); 
+  const keys = Object.keys(patch);
+  if (keys.length === 0) return true;
+  if (keys.length <= 2) {
+    keys.forEach(function(k){ 
+      if(hm.map[k]!==undefined){ 
+        const cell=sh.getRange(rowNumber,hm.map[k]+1); 
+        if(PLAIN_TEXT_FIELDS.indexOf(k)>=0) {
+          cell.setNumberFormat('@');
+          cell.setValue(String(patch[k]));
+        } else {
+          cell.setValue(patch[k]);
+        }
+      }
+    }); 
+  } else {
+    const rowRange = sh.getRange(rowNumber, 1, 1, hm.headers.length);
+    const rowValues = rowRange.getValues()[0];
+    keys.forEach(function(k){
+      if(hm.map[k] !== undefined){
+        rowValues[hm.map[k]] = (PLAIN_TEXT_FIELDS.indexOf(k) >= 0 && patch[k] !== null && patch[k] !== undefined) ? String(patch[k]) : patch[k];
+      }
+    });
+    rowRange.setValues([rowValues]);
+  }
   clearRequestCache_(); 
   clearTableCache_(name);
   return true;
@@ -1124,12 +1147,13 @@ function nextId_(prefix){
   const p=PropertiesService.getScriptProperties(), key='TUH_SEQ_'+prefix;
   let n;
   if(_seqCache[key]){
-    _seqCache[key]++; n = _seqCache[key]; p.setProperty(key,String(n));
+    _seqCache[key]++;
+    n = _seqCache[key];
+    p.setProperty(key,String(n));
   } else {
-    const lock = LockService.getScriptLock();
-    try { lock.waitLock(10000); } catch(e) {}
-    try { n = Number(p.getProperty(key)||0)+1; _seqCache[key] = n; p.setProperty(key,String(n)); }
-    finally { try{lock.releaseLock();}catch(e){} }
+    n = Number(p.getProperty(key)||0)+1;
+    _seqCache[key] = n;
+    p.setProperty(key,String(n));
   }
   return prefix+'-'+Utilities.formatDate(new Date(),APP.TIMEZONE,'yyyy')+'-'+String(n).padStart(6,'0');
 }
@@ -2986,10 +3010,18 @@ function submitRegistration(conferenceId,payload){
 
     const reg=withLock_(function(){return createRegistrationRecord_(mapped,'PUBLIC',false,'READY');});
     invalidateCache_(cid);
-    sendRegistrationEmail_(reg);
+    
     let mealPass={sent:false,reason:''};
-    try{mealPass=maybeAutoIssueMealPass_(cid,reg.RegID,'PUBLIC_REGISTRATION');}catch(ignore){}
-    return {RegID:reg.RegID,EditCode:reg.EditCode,warnings:duplicateWarnings_(mapped,cid,reg.RegID),mealPass:mealPass};
+    try{
+      mealPass=maybeAutoIssueMealPass_(cid,reg.RegID,'PUBLIC_REGISTRATION');
+    }catch(ignore){}
+    
+    if(!mealPass||!mealPass.sent){
+      try{sendRegistrationEmail_(reg);}catch(ignore){}
+    }
+    
+    const warnings=duplicateWarnings_(mapped,cid,reg.RegID);
+    return {RegID:reg.RegID,EditCode:reg.EditCode,warnings:warnings,mealPass:mealPass};
   });
 }
 function validateNewRegistration_(m,cid,excludeRegId){
@@ -2997,12 +3029,13 @@ function validateNewRegistration_(m,cid,excludeRegId){
   if(!m.ParticipantType)throw new Error('กรุณาเลือกประเภทผู้สมัคร');
   if(!m.FirstName||!m.LastName)throw new Error('กรุณากรอกชื่อและนามสกุล');
   if(!validateThaiCid_(m.CID))throw new Error('เลขบัตรประชาชนไม่ถูกต้อง');
-  const dup=findMany_('Registrations',{ConferenceID:cid,CID:m.CID}).find(function(x){return x.RegID!==excludeRegId&&upper_(x.RegistrationStatus)!=='CANCELLED';});
+  const allRegs=findMany_('Registrations',{ConferenceID:cid});
+  const dup=allRegs.find(function(x){return x.RegID!==excludeRegId&&upper_(x.RegistrationStatus)!=='CANCELLED'&&normalizeCid_(x.CID)===normalizeCid_(m.CID);});
   if(dup)throw new Error('เลขบัตรประชาชนนี้ลงทะเบียนแล้ว ('+dup.RegID+') กรุณาใช้หมายเลขลงทะเบียนเดิมเข้ามาแก้ไขข้อมูลให้ครบถ้วน');
   const fn2=clean_(m.FirstName).replace(/\s+/g,'').toLowerCase();
   const ln2=clean_(m.LastName).replace(/\s+/g,'').toLowerCase();
   if(fn2&&ln2){
-    const dupName=findMany_('Registrations',{ConferenceID:cid}).find(function(x){
+    const dupName=allRegs.find(function(x){
       if(x.RegID===excludeRegId||upper_(x.RegistrationStatus)==='CANCELLED')return false;
       const fn1=clean_(x.FirstName).replace(/\s+/g,'').toLowerCase();
       const ln1=clean_(x.LastName).replace(/\s+/g,'').toLowerCase();
@@ -3015,7 +3048,19 @@ function validateNewRegistration_(m,cid,excludeRegId){
   if(!m.Email)throw new Error('กรุณากรอก Email');
   if(!m.Phone)throw new Error('กรุณากรอกโทรศัพท์');
 }
-function duplicateWarnings_(m,cid,exclude){ const w=[]; const emails=findMany_('Registrations',{ConferenceID:cid,Email:m.Email}).filter(function(x){return x.RegID!==exclude;}); if(emails.length)w.push('Email นี้ถูกใช้กับผู้ลงทะเบียนอื่น '+emails.length+' ราย'); const phones=findMany_('Registrations',{ConferenceID:cid,Phone:m.Phone}).filter(function(x){return x.RegID!==exclude;}); if(phones.length)w.push('เบอร์โทรนี้ถูกใช้กับผู้ลงทะเบียนอื่น '+phones.length+' ราย'); return w; }
+function duplicateWarnings_(m,cid,exclude){
+  const w=[];
+  try{
+    const all=findMany_('Registrations',{ConferenceID:cid});
+    const emailNorm=String(m.Email||'').trim().toLowerCase();
+    const emails=all.filter(function(x){return x.RegID!==exclude&&String(x.Email||'').trim().toLowerCase()===emailNorm&&emailNorm!=='';});
+    if(emails.length)w.push('Email นี้ถูกใช้กับผู้ลงทะเบียนอื่น '+emails.length+' ราย');
+    const phoneNorm=normalizePhone_(m.Phone);
+    const phones=all.filter(function(x){return x.RegID!==exclude&&normalizePhone_(x.Phone)===phoneNorm&&phoneNorm!=='';});
+    if(phones.length)w.push('เบอร์โทรนี้ถูกใช้กับผู้ลงทะเบียนอื่น '+phones.length+' ราย');
+  }catch(e){}
+  return w;
+}
 function createRegistrationRecord_(m,userEmail,isImport,validationStatus){
   const cid=m.ConferenceID||APP.DEFAULT_CONFERENCE_ID, regId=nextId_('REG'), editCode=String(Math.floor(100000+Math.random()*900000)), type=findOne_('RegistrationTypes',{ConferenceID:cid,TypeCode:m.ParticipantType})||{};
   const complete=validateThaiCid_(m.CID)&&m.FirstName&&m.LastName&&m.Email&&m.Phone, status=complete?'WAIT_REGISTRATION_CHECK':'IMPORTED_INCOMPLETE', payment=bool_(type.PaymentRequired)?'UNPAID':'NOT_REQUIRED';
