@@ -1247,13 +1247,27 @@ function uploadBase64File_(file,folderName,prefix){
 
 
 /** ===== 03_ImportRegistration.gs ===== **/
+function isInternalParticipant_(participantType, typeMap) {
+  const p = String(participantType || '').trim();
+  if (!p) return false;
+  if (typeMap && typeMap[p] !== undefined) return bool_(typeMap[p]);
+  const upper = p.toUpperCase();
+  if (upper === 'INTERNAL' || upper.indexOf('INTERNAL') !== -1 || p.indexOf('ภายใน') !== -1 || p.indexOf('ธรรมศาสตร์') !== -1 || p.indexOf('TUH') !== -1) {
+    return true;
+  }
+  return false;
+}
+
 function getDailyQuotaStatus_(cid) {
   const regs = findMany_('Registrations', {ConferenceID: cid}).filter(function(r) {
     return String(r.RegistrationStatus || '').toUpperCase() !== 'CANCELLED';
   });
   const typeMap = {};
   findMany_('RegistrationTypes', {ConferenceID: cid}).forEach(function(t) {
-    typeMap[t.TypeCode] = bool_(t.IsInternal);
+    if(t.TypeCode) typeMap[String(t.TypeCode).trim()] = bool_(t.IsInternal);
+    if(t.TypeNameTH) typeMap[String(t.TypeNameTH).trim()] = bool_(t.IsInternal);
+    if(t.TypeNameEN) typeMap[String(t.TypeNameEN).trim()] = bool_(t.IsInternal);
+    if(t.RegistrationTypeID) typeMap[String(t.RegistrationTypeID).trim()] = bool_(t.IsInternal);
   });
 
   const internalQuotaSetting = getSetting_(cid, 'INTERNAL_DAILY_QUOTA', '') || getSetting_(cid, 'INTERNAL_QUOTA', '400');
@@ -1266,7 +1280,7 @@ function getDailyQuotaStatus_(cid) {
   const external = { max: externalMax, day1: 0, day2: 0, day3: 0 };
 
   regs.forEach(function(r) {
-    const isInternal = typeMap[r.ParticipantType] !== undefined ? typeMap[r.ParticipantType] : (r.ParticipantType === 'INTERNAL');
+    const isInternal = isInternalParticipant_(r.ParticipantType, typeMap);
     const target = isInternal ? internal : external;
     if (bool_(r.AttendanceDay1)) target.day1++;
     if (bool_(r.AttendanceDay2)) target.day2++;
@@ -2947,16 +2961,28 @@ function submitRegistration(conferenceId,payload){
       Note:''
     };
     validateNewRegistration_(mapped,cid);
-    const typeRow=findOne_('RegistrationTypes',{ConferenceID:cid,TypeCode:mapped.ParticipantType});
-    if(typeRow&&num_(typeRow.Quota)>0&&num_(typeRow.UsedQuota)>=num_(typeRow.Quota))throw new Error('ผู้สมัครประเภทนี้เต็มโควตาแล้ว');
+    const typeMap = {};
+    findMany_('RegistrationTypes', {ConferenceID: cid}).forEach(function(t) {
+      if(t.TypeCode) typeMap[String(t.TypeCode).trim()] = bool_(t.IsInternal);
+      if(t.TypeNameTH) typeMap[String(t.TypeNameTH).trim()] = bool_(t.IsInternal);
+      if(t.TypeNameEN) typeMap[String(t.TypeNameEN).trim()] = bool_(t.IsInternal);
+      if(t.RegistrationTypeID) typeMap[String(t.RegistrationTypeID).trim()] = bool_(t.IsInternal);
+    });
 
-    const isInternal = typeRow ? bool_(typeRow.IsInternal) : (mapped.ParticipantType === 'INTERNAL');
+    const isInternal = isInternalParticipant_(mapped.ParticipantType, typeMap);
     const dailyQuota = getDailyQuotaStatus_(cid);
     const targetQuota = isInternal ? dailyQuota.internal : dailyQuota.external;
     const typeLabel = isInternal ? 'บุคลากรภายใน รพ.ธรรมศาสตร์' : 'บุคคลภายนอก';
-    if(mapped.AttendanceDay1 && targetQuota.day1 >= targetQuota.max) throw new Error('วันที่ 1 เต็มโควตาสำหรับ' + typeLabel + 'แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
-    if(mapped.AttendanceDay2 && targetQuota.day2 >= targetQuota.max) throw new Error('วันที่ 2 เต็มโควตาสำหรับ' + typeLabel + 'แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
-    if(mapped.AttendanceDay3 && targetQuota.day3 >= targetQuota.max) throw new Error('วันที่ 3 เต็มโควตาสำหรับ' + typeLabel + 'แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+
+    if(mapped.AttendanceDay1 && targetQuota.day1 >= targetQuota.max) {
+      throw new Error('วันที่ 1 (Day 1) เต็มโควตารายวันสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+    }
+    if(mapped.AttendanceDay2 && targetQuota.day2 >= targetQuota.max) {
+      throw new Error('วันที่ 2 (Day 2) เต็มโควตารายวันสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+    }
+    if(mapped.AttendanceDay3 && targetQuota.day3 >= targetQuota.max) {
+      throw new Error('วันที่ 3 (Day 3) เต็มโควตารายวันสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+    }
 
     const reg=withLock_(function(){return createRegistrationRecord_(mapped,'PUBLIC',false,'READY');});
     invalidateCache_(cid);
@@ -3050,20 +3076,27 @@ function saveRegistrationEdit(conferenceId,regId,emailOrPhone,editCode,payload){
       LastModifiedBy:'PARTICIPANT'
     };
 
-    const typeRow = findOne_('RegistrationTypes', {ConferenceID: cid, TypeCode: r.ParticipantType});
-    const isInternal = typeRow ? bool_(typeRow.IsInternal) : (r.ParticipantType === 'INTERNAL');
+    const typeMap = {};
+    findMany_('RegistrationTypes', {ConferenceID: cid}).forEach(function(t) {
+      if(t.TypeCode) typeMap[String(t.TypeCode).trim()] = bool_(t.IsInternal);
+      if(t.TypeNameTH) typeMap[String(t.TypeNameTH).trim()] = bool_(t.IsInternal);
+      if(t.TypeNameEN) typeMap[String(t.TypeNameEN).trim()] = bool_(t.IsInternal);
+      if(t.RegistrationTypeID) typeMap[String(t.RegistrationTypeID).trim()] = bool_(t.IsInternal);
+    });
+
+    const isInternal = isInternalParticipant_(r.ParticipantType, typeMap);
     const dailyQuota = getDailyQuotaStatus_(cid);
     const targetQuota = isInternal ? dailyQuota.internal : dailyQuota.external;
-    const typeLabel = isInternal ? 'บุคลากรภายใน' : 'บุคคลภายนอก';
+    const typeLabel = isInternal ? 'บุคลากรภายใน รพ.ธรรมศาสตร์' : 'บุคคลภายนอก';
 
     if (patch.AttendanceDay1 && !bool_(r.AttendanceDay1) && targetQuota.day1 >= targetQuota.max) {
-      throw new Error('วันที่ 1 เต็มโควตาสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+      throw new Error('วันที่ 1 (Day 1) เต็มโควตารายวันสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
     }
     if (patch.AttendanceDay2 && !bool_(r.AttendanceDay2) && targetQuota.day2 >= targetQuota.max) {
-      throw new Error('วันที่ 2 เต็มโควตาสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+      throw new Error('วันที่ 2 (Day 2) เต็มโควตารายวันสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
     }
     if (patch.AttendanceDay3 && !bool_(r.AttendanceDay3) && targetQuota.day3 >= targetQuota.max) {
-      throw new Error('วันที่ 3 เต็มโควตาสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
+      throw new Error('วันที่ 3 (Day 3) เต็มโควตารายวันสำหรับ ' + typeLabel + ' แล้ว (จำกัด ' + targetQuota.max + ' ท่าน/วัน)');
     }
 
     updateRecord_('Registrations',r.__row,patch);invalidateCache_(cid);

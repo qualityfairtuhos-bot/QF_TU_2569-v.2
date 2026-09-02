@@ -93,7 +93,7 @@
           <div class="field"><label>ปิดส่งผลงาน<input class="date-input" type="text" name="SubmissionCloseAt" placeholder="31/08/2569 23:59"></label></div><div class="field"><label>ประกาศผล<input class="date-input" type="text" name="ResultAnnouncementAt" placeholder="22/10/2569 09:00"></label></div>
         </div>
         <h4>ค่าตั้งค่าระบบ<span class="en">System options</span></h4><div class="grid3">
-          <div class="field"><label>โควตาบุคลากรภายใน<input name="INTERNAL_QUOTA" type="number"></label></div><div class="field"><label>โควตาบุคคลทั่วไป<input name="EXTERNAL_QUOTA" type="number"></label></div><div class="field"><label>จำนวนผลงานสูงสุด (0=ไม่จำกัด)<input name="MAX_WORKS_PER_REGISTRATION" type="number"></label></div>
+          <div class="field"><label>โควตารายวัน บุคลากรภายใน (ท่าน/วัน)<input name="INTERNAL_QUOTA" type="number" placeholder="400"></label></div><div class="field"><label>โควตารายวัน บุคคลทั่วไป (ท่าน/วัน)<input name="EXTERNAL_QUOTA" type="number" placeholder="200"></label></div><div class="field"><label>จำนวนผลงานสูงสุด (0=ไม่จำกัด)<input name="MAX_WORKS_PER_REGISTRATION" type="number"></label></div>
           <div class="field"><label>Reviewer ขั้นต่ำ<input name="MIN_REVIEWERS_PER_WORK" type="number"></label></div><div class="field"><label>Reviewer สูงสุด<input name="MAX_REVIEWERS_PER_WORK" type="number"></label></div>
           <div class="field"><label>วันจัดงาน JSON (ปี พ.ศ.)<input name="EVENT_DATES_JSON" placeholder='["2569-11-18","2569-11-19","2569-11-20"]'></label><small>สูงสุด 3 วัน</small></div>
         </div>
@@ -847,6 +847,8 @@ $('#settingsForm').onsubmit=async e=>{
     DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
     const settings={};
     ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);
+    settings.INTERNAL_DAILY_QUOTA = o.INTERNAL_QUOTA || '400';
+    settings.EXTERNAL_DAILY_QUOTA = o.EXTERNAL_QUOTA || '200';
     settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
     OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));
     settings.BANNER_SLIDES_JSON=JSON.stringify(window.BANNER_LIST || []);
