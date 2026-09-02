@@ -138,7 +138,10 @@ export async function POST(request:NextRequest){
     if(action==="logoutUser")clearSessionCookie(response);
     return response;
   }catch(err:unknown){
-    const errorMsg=err instanceof Error?err.message:String(err);
+    let errorMsg=err instanceof Error?err.message:String(err);
+    if(/aborted|AbortError|timeout|ECONNRESET/i.test(errorMsg)){
+      errorMsg="การเชื่อมต่อระบบส่วนกลางใช้เวลานานเกินกำหนด กรุณาตรวจสอบสถานะการลงทะเบียนในเมนู 'ตรวจสอบสถานะ' หรือลองใหม่อีกครั้ง";
+    }
     // If upstream call fails, check if we have a last known good cached response for read actions
     if(lastKnownGood.has(cacheKey)){
       const fallback=lastKnownGood.get(cacheKey)!;

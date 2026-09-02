@@ -3544,20 +3544,23 @@ function ensureMealEntitlements_(conferenceId,regId){
     if(!shouldBeActive&&upper_(e.Status)!=='REDEEMED'&&upper_(e.Status)!=='CANCELLED')updateRecord_('MealEntitlements',e.__row,{Eligible:false,Status:'CANCELLED'});
     if(shouldBeActive&&upper_(e.Status)==='CANCELLED')updateRecord_('MealEntitlements',e.__row,{Eligible:true,Status:'AVAILABLE'});
   });
-  let created=0;
+  const toInsert=[];
   dates.forEach(function(date,i){
     if(!selected[i])return;
     meals.forEach(function(m){
       const old=existing.find(function(x){return scannerDateKey_(x.EventDate)===scannerDateKey_(date)&&upper_(x.MealCode)===upper_(m.code);});
       if(!old){
         const token=signMealToken_(conferenceId,regId,date,m.code);
-        appendRecord_('MealEntitlements',{EntitlementID:nextId_('MEAL'),ConferenceID:conferenceId,RegID:regId,EventDate:date,MealCode:m.code,MealNameTH:m.th,Eligible:true,TokenHash:hashText_(token),Status:'AVAILABLE',CreatedAt:new Date()});created++;
+        toInsert.push({EntitlementID:nextId_('MEAL'),ConferenceID:conferenceId,RegID:regId,EventDate:date,MealCode:m.code,MealNameTH:m.th,Eligible:true,TokenHash:hashText_(token),Status:'AVAILABLE',CreatedAt:new Date()});
       }
     });
   });
+  if(toInsert.length>0){
+    appendRecords_('MealEntitlements',toInsert);
+  }
   const current=findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:regId}),total=current.filter(function(e){return upper_(e.Status)!=='CANCELLED';}).length;
   updateRecord_('Registrations',r.__row,{MealPassStatus:upper_(r.MealPassStatus)==='SENT'?'SENT':'READY',UpdatedAt:new Date()});
-  return {created:created,total:total,cancelled:current.filter(function(e){return upper_(e.Status)==='CANCELLED';}).length};
+  return {created:toInsert.length,total:total,cancelled:current.filter(function(e){return upper_(e.Status)==='CANCELLED';}).length};
 }
 function signMealToken_(cid,regId,date,meal){const payload=[cid,regId,date,meal].join('|'),sig=Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload,getAuthSecret_())).replace(/=+$/,'');return Utilities.base64EncodeWebSafe(payload).replace(/=+$/,'')+'.'+sig;}
 function parseMealToken_(token){const p=String(token).split('.');if(p.length!==2)throw new Error('QR ไม่ถูกต้อง');const payload=Utilities.newBlob(Utilities.base64DecodeWebSafe(p[0])).getDataAsString(),sig=Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload,getAuthSecret_())).replace(/=+$/,'');if(sig!==p[1])throw new Error('QR ไม่ถูกต้อง');const a=payload.split('|');return {conferenceId:a[0],regId:a[1],date:a[2],meal:a[3]};}
@@ -3835,13 +3838,9 @@ function sendMealPassEmail_(conferenceId,regId,user,reason){
   const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน '+regId);
   const type=registrationTypeMap_(conferenceId)[r.ParticipantType]||{};const eligibility=mealPassEligibility_(r,type);if(!eligibility.ok)throw new Error(eligibility.reason);
   ensureMealEntitlements_(conferenceId,regId);
-  const token=signMealPassToken_(conferenceId,regId),qrUrl='https://quickchart.io/qr?size=500&margin=2&text='+encodeURIComponent(token),subject='คูปองอาหาร QR Code '+regId;
-  const html=buildMealPassEmailHtml_(conferenceId,r,type,token);let options={to:r.Email,subject:subject,body:'คูปองอาหาร QR Code สำหรับ '+r.FullName+' เลขลงทะเบียน '+regId,htmlBody:html,name:'TUH Quality Fair'};
-  try{
-    const response=UrlFetchApp.fetch(qrUrl,{muteHttpExceptions:true,followRedirects:true});
-    if(response.getResponseCode()>=200&&response.getResponseCode()<300)options.inlineImages={mealQr:response.getBlob().setName('meal-pass-'+regId+'.png')};
-    else options.htmlBody=html.replace('cid:mealQr',qrUrl);
-  }catch(ignore){options.htmlBody=html.replace('cid:mealQr',qrUrl);}
+  const token=signMealPassToken_(conferenceId,regId),qrUrl='https://quickchart.io/qr?size=300&margin=2&text='+encodeURIComponent(token),subject='คูปองอาหาร QR Code '+regId;
+  const html=buildMealPassEmailHtml_(conferenceId,r,type,token).replace('cid:mealQr',qrUrl);
+  let options={to:r.Email,subject:subject,body:'คูปองอาหาร QR Code สำหรับ '+r.FullName+' เลขลงทะเบียน '+regId,htmlBody:html,name:'TUH Quality Fair'};
   try{
     MailApp.sendEmail(options);
     appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:r.Email,Subject:subject,RelatedType:'MEAL_PASS',RelatedID:regId,Status:'SENT'});
