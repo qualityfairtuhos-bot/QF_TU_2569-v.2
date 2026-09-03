@@ -1245,18 +1245,114 @@ function changePassword(token,currentPassword,newPassword){return runSafely_('ch
 
 function logAudit_(conferenceId,user,role,action,targetType,targetId,details){try{appendRecord_('AuditLogs',{AuditLogID:nextId_('AUD'),ConferenceID:conferenceId,Timestamp:new Date(),UserID:user&&user.UserID||'',UserEmail:user&&user.Email||'',Role:role||'',Action:action,TargetType:targetType,TargetID:targetId,DetailsJson:safeJson_(details||{}),ClientInfo:''});}catch(e){} }
 function logSystem_(name,e){try{appendRecord_('SystemLogs',{SystemLogID:nextId_('SYS'),Timestamp:new Date(),Level:'ERROR',FunctionName:name,Message:e.message||String(e),StackTrace:e.stack||'',ConferenceID:'',UserEmail:'',ClientInfo:''});}catch(ignore){} }
+function stripHtml_(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*[\/]?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function sendEmailLogged_(conferenceId,to,subject,html,relatedType,relatedId,user,attachments){
-  try{
-    const mailOpts = {to:to,subject:subject,htmlBody:html,name:'TUH Quality Fair'};
-    if (attachments && attachments.length) {
-      mailOpts.attachments = attachments;
-    }
+  const cleanTo = String(to || '').trim();
+  if (!cleanTo) {
+    appendRecord_('EmailLogs', {
+      EmailLogID: nextId_('MAIL'),
+      ConferenceID: conferenceId,
+      SentAt: new Date(),
+      SentBy: (user && user.Email) || 'SYSTEM',
+      To: cleanTo,
+      Subject: subject || '',
+      RelatedType: relatedType || '',
+      RelatedID: relatedId || '',
+      Status: 'ERROR',
+      ErrorMessage: 'ไม่มีอีเมลผู้รับ'
+    });
+    return { success: false, error: 'ไม่มีอีเมลผู้รับ' };
+  }
+
+  const plainBody = stripHtml_(html) || subject || 'TUH Quality Fair Notification';
+  const mailOpts = {
+    to: cleanTo,
+    subject: subject || 'แจ้งข้อมูลจากระบบ TUH Quality Fair',
+    body: plainBody,
+    htmlBody: html,
+    name: 'TUH Quality Fair'
+  };
+  if (attachments && attachments.length) {
+    mailOpts.attachments = attachments;
+  }
+
+  let sent = false;
+  let lastError = '';
+
+  // 1. Try MailApp first
+  try {
     MailApp.sendEmail(mailOpts);
-    appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'SENT'});
-    return true;
-  }catch(e){
-    appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'ERROR',ErrorMessage:e.message});
-    return false;
+    sent = true;
+  } catch(err1) {
+    lastError = err1.message || String(err1);
+    // 2. Try GmailApp as fallback
+    try {
+      const gmailAdvanced = {
+        htmlBody: html,
+        name: 'TUH Quality Fair'
+      };
+      if (attachments && attachments.length) {
+        gmailAdvanced.attachments = attachments;
+      }
+      GmailApp.sendEmail(cleanTo, subject || 'แจ้งข้อมูลจากระบบ TUH Quality Fair', plainBody, gmailAdvanced);
+      sent = true;
+      lastError = '';
+    } catch(err2) {
+      lastError = (err1.message ? err1.message : '') + (err2.message ? ((lastError ? '; ' : '') + err2.message) : '');
+    }
+  }
+
+  if (sent) {
+    try {
+      appendRecord_('EmailLogs', {
+        EmailLogID: nextId_('MAIL'),
+        ConferenceID: conferenceId,
+        SentAt: new Date(),
+        SentBy: (user && user.Email) || 'SYSTEM',
+        To: cleanTo,
+        Subject: subject,
+        RelatedType: relatedType || '',
+        RelatedID: relatedId || '',
+        Status: 'SENT'
+      });
+    } catch(ignore) {}
+    return { success: true };
+  } else {
+    try {
+      appendRecord_('EmailLogs', {
+        EmailLogID: nextId_('MAIL'),
+        ConferenceID: conferenceId,
+        SentAt: new Date(),
+        SentBy: (user && user.Email) || 'SYSTEM',
+        To: cleanTo,
+        Subject: subject,
+        RelatedType: relatedType || '',
+        RelatedID: relatedId || '',
+        Status: 'ERROR',
+        ErrorMessage: lastError
+      });
+    } catch(ignore) {}
+    return { success: false, error: lastError };
   }
 }
 
@@ -3406,7 +3502,10 @@ function adminSendDirectEmail(token, conferenceId, to, subject, body, attachment
     }
 
     const sent = sendEmailLogged_(conferenceId, to, subject, emailHtml, 'DIRECT_EMAIL', to, ctx.user, mailAttachments);
-    if (!sent) throw new Error('ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลในระบบ');
+    if (!sent || (typeof sent === 'object' && !sent.success) || sent === false) {
+      const errMsg = (sent && sent.error) ? (' (' + sent.error + ')') : '';
+      throw new Error('ไม่สามารถส่งอีเมลได้' + errMsg + ' กรุณาตรวจสอบการตั้งค่าอีเมลหรือสิทธิ์การส่งอีเมลใน Google Apps Script');
+    }
     logAudit_(conferenceId, ctx.user, ctx.role, 'SEND_DIRECT_EMAIL', 'Email', to, {subject: subject, attachmentsCount: (attachments||[]).length, filesCount: mailAttachments.length});
     return {success: true};
   });
@@ -3919,7 +4018,8 @@ function sendRegistrationStatusEmail_(conferenceId,r,status,note,user){
   let subject='อัปเดตสถานะการลงทะเบียน '+r.RegID,html='<p>สถานะการลงทะเบียนของท่านได้รับการอัปเดตเป็น <b>'+htmlEscape_(status)+'</b></p>';
   if(status==='REGISTRATION_RETURNED'){subject='กรุณาแก้ไขข้อมูลลงทะเบียน '+r.RegID;html='<p>เจ้าหน้าที่ส่งคืนข้อมูลลงทะเบียนเพื่อให้ท่านแก้ไข</p><p><b>เหตุผล:</b> '+htmlEscape_(note)+'</p><p><a href="'+url+'">เปิดระบบเพื่อแก้ไขข้อมูล</a></p>';}
   if(status==='REGISTRATION_VERIFIED'||status==='COMPLETED'){subject='ตรวจสอบข้อมูลลงทะเบียนเรียบร้อย '+r.RegID;html='<p>เจ้าหน้าที่ตรวจสอบข้อมูลลงทะเบียนของท่านเรียบร้อยแล้ว</p>';}
-  return sendEmailLogged_(conferenceId,r.Email,subject,html,'REGISTRATION_STATUS',r.RegID,user);
+  const res = sendEmailLogged_(conferenceId,r.Email,subject,html,'REGISTRATION_STATUS',r.RegID,user);
+  return res === true || (res && res.success);
 }
 function adminGetRegistration(token,conferenceId,regId){return runSafely_('adminGetRegistration',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF'],conferenceId);const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');return {registration:serialize_(r),optionConfig:getRegistrationOptionMap_(conferenceId),registrationTypes:serialize_(findMany_('RegistrationTypes',{ConferenceID:conferenceId}).filter(function(t){return bool_(t.Active);}))};});}
 function adminSaveRegistration(token,conferenceId,regId,payload){

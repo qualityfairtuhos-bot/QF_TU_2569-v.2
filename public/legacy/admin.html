@@ -93,7 +93,7 @@
           <div class="field"><label>ปิดส่งผลงาน<input class="date-input" type="text" name="SubmissionCloseAt" placeholder="31/08/2569 23:59"></label></div><div class="field"><label>ประกาศผล<input class="date-input" type="text" name="ResultAnnouncementAt" placeholder="22/10/2569 09:00"></label></div>
         </div>
         <h4>ค่าตั้งค่าระบบ<span class="en">System options</span></h4><div class="grid3">
-          <div class="field"><label>โควตาบุคลากรภายใน<input name="INTERNAL_QUOTA" type="number"></label></div><div class="field"><label>โควตาบุคคลทั่วไป<input name="EXTERNAL_QUOTA" type="number"></label></div><div class="field"><label>จำนวนผลงานสูงสุด (0=ไม่จำกัด)<input name="MAX_WORKS_PER_REGISTRATION" type="number"></label></div>
+          <div class="field"><label>โควตารายวัน บุคลากรภายใน (ท่าน/วัน)<input name="INTERNAL_QUOTA" type="number" placeholder="400"></label></div><div class="field"><label>โควตารายวัน บุคคลทั่วไป (ท่าน/วัน)<input name="EXTERNAL_QUOTA" type="number" placeholder="200"></label></div><div class="field"><label>จำนวนผลงานสูงสุด (0=ไม่จำกัด)<input name="MAX_WORKS_PER_REGISTRATION" type="number"></label></div>
           <div class="field"><label>Reviewer ขั้นต่ำ<input name="MIN_REVIEWERS_PER_WORK" type="number"></label></div><div class="field"><label>Reviewer สูงสุด<input name="MAX_REVIEWERS_PER_WORK" type="number"></label></div>
           <div class="field"><label>วันจัดงาน JSON (ปี พ.ศ.)<input name="EVENT_DATES_JSON" placeholder='["2569-11-18","2569-11-19","2569-11-20"]'></label><small>สูงสุด 3 วัน</small></div>
         </div>
@@ -101,7 +101,51 @@
         <div class="grid3">
           <div class="field"><label>คำนำหน้า<textarea name="PREFIX_OPTIONS_JSON"></textarea></label></div><div class="field"><label>ตำแหน่ง<textarea name="POSITION_OPTIONS_JSON"></textarea></label></div><div class="field"><label>วิชาชีพ<textarea name="PROFESSION_OPTIONS_JSON"></textarea></label></div>
           <div class="field"><label>ฝ่าย/กลุ่มงาน<textarea name="ORGANIZATION_GROUP_OPTIONS_JSON"></textarea></label></div><div class="field"><label>หน่วยงาน/สถาบัน<textarea name="ORGANIZATION_OPTIONS_JSON"></textarea></label></div><div class="field"><label>ประเภทอาหาร<textarea name="FOOD_TYPE_OPTIONS_JSON"></textarea></label></div>
-        </div><button class="btn btn-primary">บันทึกการตั้งค่า</button></form>
+        </div>
+
+        <!-- ส่วนจัดการรูปภาพ Banner ส่วนหัวเว็บไซต์ (Header Banners) -->
+        <div class="card" style="margin:20px 0 10px; border-left:4px solid #c8b278; background:#fffdf9; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <h4 style="margin:0; color:#0c385b;"><i class="fa-solid fa-images" style="color:#c8b278;"></i> จัดการรูปภาพ Banner ส่วนหัวเว็บไซต์ (Header Banners)<span class="en">Header Banner Carousel</span></h4>
+            <button type="button" class="btn btn-gold btn-sm" onclick="openAddBannerModal()" style="font-weight:600;"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner ใหม่</button>
+          </div>
+          
+          <!-- Banner Specification Guide -->
+          <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+            <div style="font-weight:700; color:#0369a1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+              <i class="fa-solid fa-circle-info"></i> คำแนะนำและสเปกขนาดภาพ Banner สำหรับผู้ดูแลระบบ
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:10px; font-size:0.85rem; color:#1e293b;">
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-expand"></i> ขนาดภาพที่แนะนำ (Pixels):</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">1920 × 600 px</span><br>
+                <span class="muted" style="font-size:0.75rem;">(อัตราส่วน 16:5 กว้างพิเศษ)</span>
+              </div>
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-ruler-combined"></i> ขนาดเซนติเมตร (cm):</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">50.8 × 15.88 cm</span><br>
+                <span class="muted" style="font-size:0.75rem;">(ที่ความละเอียดหน้าจอ 96–150 DPI)</span>
+              </div>
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-crosshairs"></i> Safe Zone กึ่งกลาง:</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">1200 × 500 px</span><br>
+                <span class="muted" style="font-size:0.75rem;">(พื้นที่ปลอดภัย ข้อความไม่ถูกตัดบนมือถือ)</span>
+              </div>
+              <div style="background:#fff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                <b style="color:#0284c7;"><i class="fa-solid fa-file-image"></i> นามสกุลไฟล์:</b><br>
+                <span style="font-size:1.02rem; font-weight:700; color:#0f172a;">JPG / WebP / PNG</span><br>
+                <span class="muted" style="font-size:0.75rem;">(แนะนำไฟล์ขนาดไม่เกิน 2–5 MB)</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="bannerListContainer" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+            <!-- รายการภาพ Banner จะถูก render อัตโนมัติ -->
+          </div>
+          <input type="hidden" name="BANNER_SLIDES_JSON" id="BANNER_SLIDES_JSON_INPUT" value="[]">
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:10px;">บันทึกการตั้งค่า</button></form>
       </div>
     </section>
 
@@ -555,8 +599,263 @@ async function loadDashboard(){
     if(!hasRenderedCache) hide();
   }
 }
-async function loadSettings(){show('กำลังโหลดการตั้งค่า');try{const d=await rpc('getAdminSettings',TOKEN,CID),f=$('#settingsForm');['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>f.elements[k].value=d.conference[k]||'');DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));const sm={};d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>f.elements[k].value=sm[k]||'');f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);const o=d.optionConfig||{};f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');f.elements.POSITION_OPTIONS_JSON.value=(o.positions||[]).join('\n');f.elements.PROFESSION_OPTIONS_JSON.value=(o.professions||[]).join('\n');f.elements.ORGANIZATION_GROUP_OPTIONS_JSON.value=(o.organizationGroups||[]).join('\n');f.elements.ORGANIZATION_OPTIONS_JSON.value=(o.organizations||[]).join('\n');f.elements.FOOD_TYPE_OPTIONS_JSON.value=(o.foodTypes||[]).join('\n');$$('.date-input').forEach(el=>el.onblur=()=>warnGregorianInput(el))}finally{hide()}}
-$('#settingsForm').onsubmit=async e=>{e.preventDefault();try{const o=formObj(e.target),conf={};['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));const settings={};['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));show('กำลังบันทึกการตั้งค่า');await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});hide();await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',text:'ตัวเลือกใหม่จะแสดงในหน้าลงทะเบียนเมื่อรีเฟรชหน้าเว็บ',confirmButtonColor:'#006D70'});await loadSettings()}catch(x){err(x)}};
+async function loadSettings(){
+  show('กำลังโหลดการตั้งค่า');
+  try{
+    const d=await rpc('getAdminSettings',TOKEN,CID),f=$('#settingsForm');
+    ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>f.elements[k].value=d.conference[k]||'');
+    DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));
+    const sm={};
+    d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>f.elements[k].value=sm[k]||'');
+    f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);
+    const o=d.optionConfig||{};
+    f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');
+    f.elements.POSITION_OPTIONS_JSON.value=(o.positions||[]).join('\n');
+    f.elements.PROFESSION_OPTIONS_JSON.value=(o.professions||[]).join('\n');
+    f.elements.ORGANIZATION_GROUP_OPTIONS_JSON.value=(o.organizationGroups||[]).join('\n');
+    f.elements.ORGANIZATION_OPTIONS_JSON.value=(o.organizations||[]).join('\n');
+    f.elements.FOOD_TYPE_OPTIONS_JSON.value=(o.foodTypes||[]).join('\n');
+    
+    // โหลดภาพ Banner
+    try {
+      const rawB = sm.BANNER_SLIDES_JSON || '[]';
+      window.BANNER_LIST = typeof rawB === 'string' ? JSON.parse(rawB) : rawB;
+      if (!Array.isArray(window.BANNER_LIST)) window.BANNER_LIST = [];
+    } catch(e) {
+      window.BANNER_LIST = [];
+    }
+    renderBannerList();
+
+    $$('.date-input').forEach(el=>el.onblur=()=>warnGregorianInput(el));
+  }finally{
+    hide();
+  }
+}
+
+function normalizeBannerImageUrl(url){
+  if(!url) return '';
+  let str = String(url).trim();
+  if(str.startsWith('data:image/')) return str;
+  if(str.startsWith('/')) return str;
+  const driveMatch = str.match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=view&)?id=|thumbnail\?id=)|lh3\.googleusercontent\.com\/d\/)([a-zA-Z0-9_-]+)/);
+  if(driveMatch && driveMatch[1]) {
+    return 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
+  }
+  return str;
+}
+
+function renderBannerList(){
+  const container = $('#bannerListContainer');
+  if(!container) return;
+  const list = window.BANNER_LIST || [];
+  if($('#BANNER_SLIDES_JSON_INPUT')) {
+    $('#BANNER_SLIDES_JSON_INPUT').value = JSON.stringify(list);
+  }
+  if(!list.length){
+    container.innerHTML = `
+      <div style="text-align:center; padding:24px 16px; border:2px dashed #cbd5e1; border-radius:12px; background:#fff; color:#64748b;">
+        <i class="fa-regular fa-image" style="font-size:2rem; color:#94a3b8; margin-bottom:8px; display:block;"></i>
+        <div style="font-weight:600; margin-bottom:4px;">ยังไม่มีภาพ Banner เพิ่มเติม</div>
+        <div style="font-size:0.8rem; margin-bottom:12px;">(ระบบจะใช้สไลด์แนะนำงานประชุมเริ่มต้นตามปกติ)</div>
+        <button type="button" class="btn btn-soft btn-sm" onclick="openAddBannerModal()"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner</button>
+      </div>
+    `;
+    return;
+  }
+  container.innerHTML = list.map((b, idx) => {
+    const normUrl = normalizeBannerImageUrl(b.imageUrl);
+    return `
+    <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#fff; border:1px solid ${b.active!==false?'#e2e8f0':'#fecaca'}; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.04); opacity:${b.active!==false?'1':'0.75'};">
+      <div style="width:140px; height:50px; flex-shrink:0; border-radius:6px; overflow:hidden; background:#0c385b; display:flex; align-items:center; justify-content:center; border:1px solid #cbd5e1;">
+        <img src="${esc(normUrl)}" alt="${esc(b.title||'Banner')}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://placehold.co/1920x600?text=Banner';">
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <b style="font-size:0.92rem; color:#0f172a;">${esc(b.title || ('ภาพ Banner #' + (idx+1)))}</b>
+          <span class="badge ${b.active!==false?'ok':'bad'}" style="cursor:pointer; font-size:0.72rem; padding:2px 8px;" onclick="toggleBannerActive(${idx})" title="คลิกเพื่อเปิด/ปิด">${b.active!==false?'กำลังแสดงผล':'ปิดใช้งาน'}</span>
+        </div>
+        ${b.subtitle ? `<div class="muted" style="font-size:0.8rem; margin-top:2px;">${esc(b.subtitle)}</div>` : ''}
+        ${b.linkUrl ? `<div style="font-size:0.75rem; color:#0284c7; margin-top:2px; word-break:break-all;"><i class="fa-solid fa-link"></i> ${esc(b.linkUrl)}</div>` : ''}
+      </div>
+      <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+        <button type="button" class="btn btn-soft btn-sm" onclick="moveBannerSlide(${idx}, -1)" ${idx===0?'disabled':''} title="เลื่อนขึ้น"><i class="fa-solid fa-arrow-up"></i></button>
+        <button type="button" class="btn btn-soft btn-sm" onclick="moveBannerSlide(${idx}, 1)" ${idx===list.length-1?'disabled':''} title="เลื่อนลง"><i class="fa-solid fa-arrow-down"></i></button>
+        <button type="button" class="btn btn-gold btn-sm" onclick="openAddBannerModal(${idx})" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="btn btn-bad btn-sm" onclick="deleteBannerSlide(${idx})" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    </div>
+  `;
+  }).join('');
+}
+
+function toggleBannerActive(idx){
+  if(!window.BANNER_LIST || !window.BANNER_LIST[idx]) return;
+  window.BANNER_LIST[idx].active = window.BANNER_LIST[idx].active === false ? true : false;
+  renderBannerList();
+}
+
+function moveBannerSlide(idx, dir){
+  if(!window.BANNER_LIST) return;
+  const target = idx + dir;
+  if(target < 0 || target >= window.BANNER_LIST.length) return;
+  const temp = window.BANNER_LIST[idx];
+  window.BANNER_LIST[idx] = window.BANNER_LIST[target];
+  window.BANNER_LIST[target] = temp;
+  renderBannerList();
+}
+
+async function deleteBannerSlide(idx){
+  if(!window.BANNER_LIST || !window.BANNER_LIST[idx]) return;
+  const res = await Swal.fire({
+    title: 'ยืนยันการลบภาพ Banner?',
+    text: window.BANNER_LIST[idx].title ? `"${window.BANNER_LIST[idx].title}"` : 'ภาพ Banner นี้',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'ลบภาพ',
+    cancelButtonText: 'ยกเลิก'
+  });
+  if(res.isConfirmed){
+    window.BANNER_LIST.splice(idx, 1);
+    renderBannerList();
+  }
+}
+
+async function openAddBannerModal(editIdx = null){
+  const isEdit = editIdx !== null && window.BANNER_LIST && window.BANNER_LIST[editIdx];
+  const item = isEdit ? window.BANNER_LIST[editIdx] : { imageUrl: '', title: '', subtitle: '', linkUrl: '', active: true };
+
+  const html = `
+    <div style="text-align:left; font-size:0.9rem;">
+      <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:0.82rem; color:#0369a1;">
+        <i class="fa-solid fa-lightbulb"></i> <b>ข้อแนะนำขนาดภาพ:</b> 1920 × 600 px (16:5) หรือ 50.8 × 15.88 ซม. โดยให้ข้อความสำคัญอยู่กึ่งกลางภาพ (Safe zone 1200 × 500 px)
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">1. เลือกอัปโหลดไฟล์ภาพ หรือ ระบุ URL ภาพ *</label>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <input type="file" id="bm_file" accept="image/*" style="padding:6px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; width:100%; box-sizing:border-box;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.8rem; color:#64748b;">หรือใส่ URL:</span>
+            <input type="url" id="bm_url" value="${esc(item.imageUrl||'')}" placeholder="https://..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">2. หัวข้อแบนเนอร์ (Title - ไม่บังคับ)</label>
+        <input type="text" id="bm_title" value="${esc(item.title||'')}" placeholder="เช่น ขอเชิญส่งผลงานวิจัยและนวัตกรรม" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">3. ข้อความย่อย (Subtitle - ไม่บังคับ)</label>
+        <input type="text" id="bm_subtitle" value="${esc(item.subtitle||'')}" placeholder="เช่น รับคะแนน CNEU และชิงเงินรางวัลรวมกว่า 50,000 บาท" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; margin-bottom:4px; color:#1e293b;">4. ลิงก์เมื่อกดแบนเนอร์ (Link URL - ไม่บังคับ)</label>
+        <input type="url" id="bm_link" value="${esc(item.linkUrl||'')}" placeholder="https://..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="bm_active" ${item.active!==false?'checked':''} style="width:18px; height:18px; cursor:pointer;">
+        <label for="bm_active" style="cursor:pointer; font-weight:600; color:#1e293b;">เปิดใช้งานแบนเนอร์นี้ทันที</label>
+      </div>
+    </div>
+  `;
+
+  const res = await Swal.fire({
+    title: isEdit ? 'แก้ไขภาพ Banner' : 'เพิ่มภาพ Banner ใหม่',
+    html: html,
+    width: '600px',
+    showCancelButton: true,
+    confirmButtonText: isEdit ? 'บันทึกการแก้ไข' : 'เพิ่มภาพ Banner',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70',
+    preConfirm: async () => {
+      const fileInput = document.getElementById('bm_file');
+      const urlInput = document.getElementById('bm_url');
+      const titleInput = document.getElementById('bm_title');
+      const subtitleInput = document.getElementById('bm_subtitle');
+      const linkInput = document.getElementById('bm_link');
+      const activeInput = document.getElementById('bm_active');
+
+      let imageUrl = (urlInput.value || '').trim();
+
+      if(fileInput && fileInput.files && fileInput.files[0]){
+        try {
+          const fObj = await fileObj(fileInput);
+          if(!fObj) throw new Error('ไม่สามารถอ่านไฟล์ภาพได้');
+          Swal.showLoading();
+          const uploadRes = await rpc('adminUploadBanner', TOKEN, CID, fObj);
+          if(uploadRes && uploadRes.fileUrl) {
+            imageUrl = uploadRes.fileUrl;
+          } else if (fObj.base64) {
+            imageUrl = 'data:' + fObj.type + ';base64,' + fObj.base64;
+          }
+        } catch(err) {
+          Swal.showValidationMessage('เกิดข้อผิดพลาดในการอัปโหลดภาพ: ' + (err.message || err));
+          return false;
+        }
+      }
+
+      if(!imageUrl){
+        Swal.showValidationMessage('กรุณาเลือกไฟล์ภาพ หรือ ระบุ URL ภาพ');
+        return false;
+      }
+
+      imageUrl = normalizeBannerImageUrl(imageUrl);
+
+      return {
+        id: isEdit && item.id ? item.id : 'b_' + Date.now(),
+        imageUrl: imageUrl,
+        title: (titleInput.value || '').trim(),
+        subtitle: (subtitleInput.value || '').trim(),
+        linkUrl: (linkInput.value || '').trim(),
+        active: !!activeInput.checked
+      };
+    }
+  });
+
+  if(res.isConfirmed && res.value){
+    if(!window.BANNER_LIST) window.BANNER_LIST = [];
+    if(isEdit){
+      window.BANNER_LIST[editIdx] = res.value;
+    } else {
+      window.BANNER_LIST.push(res.value);
+    }
+    renderBannerList();
+    Swal.fire({
+      icon: 'success',
+      title: isEdit ? 'แก้ไขสำเร็จ' : 'เพิ่มภาพสำเร็จ',
+      text: 'กรุณากด "บันทึกการตั้งค่า" ด้านล่างเพื่อบันทึกข้อมูลถาวร',
+      timer: 2500,
+      showConfirmButton: false
+    });
+  }
+}
+
+$('#settingsForm').onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    const o=formObj(e.target),conf={};
+    ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);
+    DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
+    const settings={};
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);
+    settings.INTERNAL_DAILY_QUOTA = o.INTERNAL_QUOTA || '400';
+    settings.EXTERNAL_DAILY_QUOTA = o.EXTERNAL_QUOTA || '200';
+    settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
+    OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));
+    settings.BANNER_SLIDES_JSON=JSON.stringify(window.BANNER_LIST || []);
+    show('กำลังบันทึกการตั้งค่า');
+    await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});
+    hide();
+    await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',text:'การตั้งค่าและภาพ Banner ได้รับการอัปเดตเรียบร้อยแล้ว',confirmButtonColor:'#006D70'});
+    await loadSettings();
+  }catch(x){err(x)}
+};
 
 async function previewImport(){
   show('กำลังอ่านและวิเคราะห์ไฟล์ Excel...');
@@ -2039,6 +2338,16 @@ async function loadWorks(){
     });
     window.WORK_ROWS = rows;
     
+    // ตรวจหาผลงานที่มีชื่อซ้ำกัน (ตัดช่องว่างทุกจุดและเทียบแบบ case-insensitive)
+    function normTitle(t){
+      return String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '').trim().toLowerCase();
+    }
+    const titleCountMap = {};
+    (rows || []).forEach(w => {
+      const nt = normTitle(w.TitleTH || w.ThaiTitle);
+      if (nt) titleCountMap[nt] = (titleCountMap[nt] || 0) + 1;
+    });
+
     let filteredRows = rows || [];
     if (ptVal) {
       const ptf = ptVal.toLowerCase();
@@ -2076,9 +2385,26 @@ async function loadWorks(){
         ptDisplay = '-';
       }
 
+      const nt = normTitle(w.TitleTH || w.ThaiTitle);
+      const isDuplicate = nt && (titleCountMap[nt] > 1);
+      const dupCount = isDuplicate ? titleCountMap[nt] : 0;
+      const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
+
       return `<tr>
       <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
-      <td>${esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-')}${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}</td>
+      <td>
+        ${isDuplicate 
+          ? `<div style="color:#dc2626; font-weight:700; display:flex; align-items:flex-start; gap:6px;">
+              <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px; flex-shrink:0; color:#dc2626;" title="อาจมีชื่อผลงานซ้ำ (${dupCount} รายการ)"></i>
+              <div>
+                <span style="color:#dc2626;">${titleDisplay}</span>
+                <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.7rem; padding:1px 6px; margin-left:4px; font-weight:600;"><i class="fa-solid fa-clone"></i> ชื่อซ้ำ (${dupCount} เรื่อง)</span>
+              </div>
+             </div>`
+          : `<div>${titleDisplay}</div>`
+        }
+        ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
+      </td>
       <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||w.WorkType||w.Field||w.Theme||'-')}</td>
       <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
       <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
@@ -2184,16 +2510,198 @@ async function exportPayments(){
     });
   } catch(e) { err(e); }
 }
+function applyWorkEmailTemplate(type, to, wid, presenterName) {
+  const subjEl = document.getElementById('emSubj');
+  const bodyEl = document.getElementById('emMsg');
+  if (!subjEl || !bodyEl) return;
+
+  const nameStr = presenterName ? `คุณ ${presenterName}` : 'ท่านผู้นำเสนอผลงาน';
+  const widStr = wid ? `(${wid})` : '';
+
+  if (type === 'GENERAL') {
+    subjEl.value = `[TUH Quality Fair] แจ้งข้อมูลผลงานวิชาการ ${widStr}`.trim();
+    bodyEl.value = `เรียน ${nameStr}\n\nคณะกรรมการจัดงานมหกรรมคุณภาพ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแจ้งข้อมูลเกี่ยวกับผลงานวิชาการของท่าน ${widStr}\n\n(ระบุรายละเอียดเพิ่มเติมที่นี่)\n\nหากมีข้อสงสัยประการใด สามารถติดต่อสอบถามคณะกรรมการจัดงานได้\n\nขอแสดงความนับถือ\nคณะกรรมการจัดงานมหกรรมคุณภาพ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
+  } else if (type === 'REVISE') {
+    subjEl.value = `[TUH Quality Fair] ขอความกรุณาปรับปรุงแก้ไขเอกสาร/ส่งไฟล์นำเสนอเพิ่มเติม ${widStr}`.trim();
+    bodyEl.value = `เรียน ${nameStr}\n\nตามที่ท่านได้ส่งผลงานวิชาการเข้าร่วมงานมหกรรมคุณภาพ ${widStr} นั้น\nคณะกรรมการผู้ทรงคุณวุฒิได้ตรวจสอบเบื้องต้นแล้ว ขอความกรุณาท่านดำเนินการดังนี้:\n\n1. ปรับปรุงแก้ไขเนื้อหา/เอกสารตามคำแนะนำ\n2. อัปโหลดไฟล์ฉบับแก้ไข (Word / PDF / สไลด์นำเสนอ) ผ่านทางระบบส่งผลงาน\n\nขอความกรุณาดำเนินการให้แล้วเสร็จภายในเวลาที่กำหนด เพื่อประโยชน์ในการประเมินผลงานของท่าน\n\nขอแสดงความนับถือ\nคณะกรรมการฝ่ายวิชาการ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
+  } else if (type === 'PRESENTATION_SCHEDULE') {
+    subjEl.value = `[TUH Quality Fair] แจ้งกำหนดการและรูปแบบการนำเสนอผลงานวิชาการ ${widStr}`.trim();
+    bodyEl.value = `เรียน ${nameStr}\n\nคณะกรรมการจัดงานมหกรรมคุณภาพ ขอแจ้งกำหนดการและรายละเอียดสำหรับการนำเสนอผลงานวิชาการของท่าน ${widStr} ดังนี้:\n\n- รูปแบบการนำเสนอ: (Oral Presentation / E-Poster)\n- วันและเวลาที่นำเสนอ: (ระบุวันและเวลา)\n- สถานที่ / ห้องนำเสนอ: (ระบุห้องหรือลิงก์ออนไลน์)\n- เวลาในการนำเสนอ: (นำเสนอ ... นาที / ตอบข้อซักถาม ... นาที)\n\nขอความกรุณาท่านเตรียมไฟล์นำเสนอและเข้าร่วมก่อนเวลาอย่างน้อย 15 นาที\n\nขอแสดงความนับถือ\nคณะกรรมการฝ่ายวิชาการ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
+  } else if (type === 'APPROVED') {
+    subjEl.value = `[TUH Quality Fair] แจ้งผลการพิจารณาผลงานวิชาการผ่านการคัดเลือก ${widStr}`.trim();
+    bodyEl.value = `เรียน ${nameStr}\n\nคณะกรรมการฝ่ายวิชาการ งานมหกรรมคุณภาพ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแสดงความยินดีที่ผลงานวิชาการของท่าน ${widStr} ได้รับการคัดเลือกให้นำเสนอในงานมหกรรมคุณภาพประจำปี 2569\n\nท่านสามารถติดตามรายละเอียดกำหนดการนำเสนอและคำแนะนำสำหรับผู้นำเสนอได้ทางเว็บไซต์หลักของงาน\n\nขอแสดงความยินดีและขอบคุณที่ร่วมส่งผลงาน\n\nขอแสดงความนับถือ\nคณะกรรมการฝ่ายวิชาการ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
+  } else if (type === 'CUSTOM') {
+    subjEl.value = '';
+    bodyEl.value = `เรียน ${nameStr}\n\n\n\nขอแสดงความนับถือ\nคณะกรรมการจัดงานมหกรรมคุณภาพ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
+  }
+}
+
 async function openEmail(to, subj, msg, wid){
-  const h=`<div class="field" style="text-align:left"><label>ถึง: <input id="emTo" value="${esc(to)}"></label></div><div class="field" style="text-align:left"><label>หัวข้อ: <input id="emSubj" value="${esc(subj)}"></label></div><div class="field" style="text-align:left"><label>ข้อความ: <textarea id="emMsg" style="height:150px">${esc(msg)}</textarea></label></div>`;
-  const x=await Swal.fire({title:'ส่งอีเมลติดต่อผู้นำเสนอ',html:h,showCancelButton:true,confirmButtonText:'ส่งอีเมล',preConfirm:()=>({to:$('#emTo').value, subj:$('#emSubj').value, msg:$('#emMsg').value})});
-  if(x.isConfirmed){
-    show('กำลังส่งอีเมล');
-    try{
-      await rpc('adminSendDirectEmail',TOKEN,CID,x.value.to,x.value.subj,x.value.msg);
+  let targetWork = null;
+  if (wid && window.WORK_ROWS) {
+    targetWork = window.WORK_ROWS.find(w => w.WorkID === wid || w.WorkCode === wid);
+  }
+  const defaultTo = to || (targetWork && targetWork.PresenterEmail) || '';
+  const presenterName = (targetWork && targetWork.PresenterName) || '';
+  const defaultSubj = subj || (wid ? `[TUH Quality Fair] แจ้งข้อมูลผลงานวิชาการ (${wid})` : '[TUH Quality Fair] แจ้งข้อมูลจากระบบ');
+  const defaultMsg = msg || (presenterName ? `เรียน คุณ ${presenterName}\n\n` : 'เรียน ท่านผู้นำเสนอผลงาน\n\n');
+
+  const html = `<div style="text-align:left;font-family:'Prompt',sans-serif;font-size:0.9rem;">
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
+        <i class="fa-solid fa-at" style="color:#006D70;"></i> ถึง (Email ผู้รับ):
+      </label>
+      <input id="emTo" class="swal2-input" style="width:100%;margin:0;font-size:0.9rem;padding:8px 12px;box-sizing:border-box;" value="${esc(defaultTo)}" placeholder="example@domain.com">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
+        <i class="fa-solid fa-list-check" style="color:#006D70;"></i> เลือกเทมเพลตข้อความ:
+      </label>
+      <select id="emTpl" class="swal2-select" style="width:100%;margin:0;font-size:0.88rem;padding:6px;" onchange="applyWorkEmailTemplate(this.value, '${esc(defaultTo)}', '${esc(wid||'')}', '${esc(presenterName)}')">
+        <option value="">-- เลือกเทมเพลตเพื่อกรอกข้อความอัตโนมัติ --</option>
+        <option value="GENERAL">1. แจ้งข้อมูลผลงานวิชาการทั่วไป</option>
+        <option value="REVISE">2. ขอให้ปรับปรุงแก้ไขเอกสาร / ส่งไฟล์นำเสนอเพิ่มเติม</option>
+        <option value="PRESENTATION_SCHEDULE">3. แจ้งกำหนดการและรูปแบบการนำเสนอผลงาน</option>
+        <option value="APPROVED">4. แจ้งผลการพิจารณาผลงานผ่านการคัดเลือก</option>
+        <option value="CUSTOM">5. ข้อความกำหนดเอง</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
+        <i class="fa-solid fa-heading" style="color:#006D70;"></i> หัวข้ออีเมล (Subject):
+      </label>
+      <input id="emSubj" class="swal2-input" style="width:100%;margin:0;font-size:0.9rem;padding:8px 12px;box-sizing:border-box;" value="${esc(defaultSubj)}" placeholder="ระบุหัวข้ออีเมล">
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label style="font-weight:600;color:#1e293b;margin:0;">
+          <i class="fa-solid fa-message" style="color:#006D70;"></i> ข้อความอีเมล (Body):
+        </label>
+        <span class="muted" style="font-size:0.75rem;color:#64748b;">พิมพ์ข้อความเพิ่มเติมได้</span>
+      </div>
+      <textarea id="emMsg" class="swal2-textarea" style="width:100%;margin:0;height:180px;font-family:'Prompt',sans-serif;font-size:0.88rem;line-height:1.55;padding:10px;box-sizing:border-box;resize:vertical;" placeholder="ระบุเนื้อหาข้อความ...">${esc(defaultMsg)}</textarea>
+    </div>
+    <div style="margin-top:10px;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px dashed #94a3b8;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <label style="font-weight:600;font-size:0.84rem;color:#334155;margin:0;">
+          <i class="fa-solid fa-paperclip" style="color:#0284c7;"></i> แนบไฟล์ (ถ้ามี, สูงสุด 3.5MB):
+        </label>
+        <button type="button" id="btnCancelWorkAttachment" style="display:none;background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.78rem;font-weight:600;padding:0;">
+          <i class="fa-solid fa-xmark"></i> ยกเลิกไฟล์แนบ
+        </button>
+      </div>
+      <input type="file" id="emAttachment" style="width:100%;font-size:0.84rem;padding:5px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.ppt,.pptx">
+      <div id="emAttachmentInfo" style="font-size:0.8rem;color:#006D70;margin-top:4px;display:none;font-weight:500;"></div>
+    </div>
+  </div>`;
+
+  const x = await Swal.fire({
+    title: `<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:1.15rem;color:#006D70;"><i class="fa-solid fa-envelope"></i> ส่งอีเมลติดต่อผู้นำเสนอ ${wid ? '(' + esc(wid) + ')' : ''}</div>`,
+    html,
+    width: '640px',
+    showCancelButton: true,
+    confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> ส่งอีเมล',
+    confirmButtonColor: '#006D70',
+    cancelButtonText: 'ยกเลิก',
+    cancelButtonColor: '#64748b',
+    didOpen: () => {
+      const fileInput = document.getElementById('emAttachment');
+      const fileInfo = document.getElementById('emAttachmentInfo');
+      const clearBtn = document.getElementById('btnCancelWorkAttachment');
+      if (fileInput) {
+        fileInput.addEventListener('change', function() {
+          if (this.files && this.files[0]) {
+            const f = this.files[0];
+            if (f.size > 3.5 * 1024 * 1024) {
+              Swal.showValidationMessage('ไฟล์มีขนาดใหญ่เกินไป (จำกัดไม่เกิน 3.5MB)');
+              this.value = '';
+              fileInfo.style.display = 'none';
+              clearBtn.style.display = 'none';
+              return;
+            }
+            Swal.resetValidationMessage();
+            const kb = Math.round(f.size / 1024);
+            const sizeStr = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB';
+            fileInfo.innerHTML = `<i class="fa-solid fa-circle-check"></i> พร้อมแนบ: <b>${esc(f.name)}</b> (${sizeStr})`;
+            fileInfo.style.display = 'block';
+            clearBtn.style.display = 'inline-block';
+          } else {
+            fileInfo.style.display = 'none';
+            clearBtn.style.display = 'none';
+          }
+        });
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+          if (fileInput) fileInput.value = '';
+          fileInfo.style.display = 'none';
+          clearBtn.style.display = 'none';
+          Swal.resetValidationMessage();
+        });
+      }
+    },
+    preConfirm: () => {
+      const toVal = (document.getElementById('emTo')?.value || '').trim();
+      const subjVal = (document.getElementById('emSubj')?.value || '').trim();
+      const msgVal = (document.getElementById('emMsg')?.value || '').trim();
+      const fileInput = document.getElementById('emAttachment');
+      const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+      if (!toVal) {
+        Swal.showValidationMessage('กรุณาระบุอีเมลผู้รับ');
+        return false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toVal)) {
+        Swal.showValidationMessage('รูปแบบอีเมลไม่ถูกต้อง');
+        return false;
+      }
+      if (!subjVal) {
+        Swal.showValidationMessage('กรุณาระบุหัวข้ออีเมล');
+        return false;
+      }
+      if (!msgVal) {
+        Swal.showValidationMessage('กรุณาระบุข้อความอีเมล');
+        return false;
+      }
+      return { to: toVal, subj: subjVal, msg: msgVal, file };
+    }
+  });
+
+  if (!x.isConfirmed || !x.value) return;
+
+  show('กำลังส่งอีเมล...');
+  let attachments = [];
+  if (x.value.file) {
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(x.value.file);
+      });
+      attachments.push({
+        name: x.value.file.name,
+        mimeType: x.value.file.type || 'application/octet-stream',
+        base64: base64
+      });
+    } catch(errFile) {
       hide();
-      toast('ส่งอีเมลสำเร็จ');
-    }catch(e){err(e);}
+      return Swal.fire({ icon: 'error', title: 'ไม่สามารถอ่านไฟล์แนบได้', text: String(errFile) });
+    }
+  }
+
+  try {
+    await rpc('adminSendDirectEmail', TOKEN, CID, x.value.to, x.value.subj, x.value.msg, attachments);
+    hide();
+    await Swal.fire({
+      icon: 'success',
+      title: 'ส่งอีเมลเรียบร้อยแล้ว',
+      html: `ส่งอีเมลถึง <b>${esc(x.value.to)}</b> สำเร็จแล้ว${attachments.length ? '<br>พร้อมไฟล์แนบ: <b>' + esc(attachments[0].name) + '</b>' : ''}`,
+      confirmButtonColor: '#006D70'
+    });
+  } catch(e) {
+    hide();
+    err(e);
   }
 }
 async function openScoreSummary(wid){
