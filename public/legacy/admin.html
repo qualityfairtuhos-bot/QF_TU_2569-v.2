@@ -2510,198 +2510,16 @@ async function exportPayments(){
     });
   } catch(e) { err(e); }
 }
-function applyWorkEmailTemplate(type, to, wid, presenterName) {
-  const subjEl = document.getElementById('emSubj');
-  const bodyEl = document.getElementById('emMsg');
-  if (!subjEl || !bodyEl) return;
-
-  const nameStr = presenterName ? `คุณ ${presenterName}` : 'ท่านผู้นำเสนอผลงาน';
-  const widStr = wid ? `(${wid})` : '';
-
-  if (type === 'GENERAL') {
-    subjEl.value = `[TUH Quality Fair] แจ้งข้อมูลผลงานวิชาการ ${widStr}`.trim();
-    bodyEl.value = `เรียน ${nameStr}\n\nคณะกรรมการจัดงานมหกรรมคุณภาพ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแจ้งข้อมูลเกี่ยวกับผลงานวิชาการของท่าน ${widStr}\n\n(ระบุรายละเอียดเพิ่มเติมที่นี่)\n\nหากมีข้อสงสัยประการใด สามารถติดต่อสอบถามคณะกรรมการจัดงานได้\n\nขอแสดงความนับถือ\nคณะกรรมการจัดงานมหกรรมคุณภาพ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
-  } else if (type === 'REVISE') {
-    subjEl.value = `[TUH Quality Fair] ขอความกรุณาปรับปรุงแก้ไขเอกสาร/ส่งไฟล์นำเสนอเพิ่มเติม ${widStr}`.trim();
-    bodyEl.value = `เรียน ${nameStr}\n\nตามที่ท่านได้ส่งผลงานวิชาการเข้าร่วมงานมหกรรมคุณภาพ ${widStr} นั้น\nคณะกรรมการผู้ทรงคุณวุฒิได้ตรวจสอบเบื้องต้นแล้ว ขอความกรุณาท่านดำเนินการดังนี้:\n\n1. ปรับปรุงแก้ไขเนื้อหา/เอกสารตามคำแนะนำ\n2. อัปโหลดไฟล์ฉบับแก้ไข (Word / PDF / สไลด์นำเสนอ) ผ่านทางระบบส่งผลงาน\n\nขอความกรุณาดำเนินการให้แล้วเสร็จภายในเวลาที่กำหนด เพื่อประโยชน์ในการประเมินผลงานของท่าน\n\nขอแสดงความนับถือ\nคณะกรรมการฝ่ายวิชาการ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
-  } else if (type === 'PRESENTATION_SCHEDULE') {
-    subjEl.value = `[TUH Quality Fair] แจ้งกำหนดการและรูปแบบการนำเสนอผลงานวิชาการ ${widStr}`.trim();
-    bodyEl.value = `เรียน ${nameStr}\n\nคณะกรรมการจัดงานมหกรรมคุณภาพ ขอแจ้งกำหนดการและรายละเอียดสำหรับการนำเสนอผลงานวิชาการของท่าน ${widStr} ดังนี้:\n\n- รูปแบบการนำเสนอ: (Oral Presentation / E-Poster)\n- วันและเวลาที่นำเสนอ: (ระบุวันและเวลา)\n- สถานที่ / ห้องนำเสนอ: (ระบุห้องหรือลิงก์ออนไลน์)\n- เวลาในการนำเสนอ: (นำเสนอ ... นาที / ตอบข้อซักถาม ... นาที)\n\nขอความกรุณาท่านเตรียมไฟล์นำเสนอและเข้าร่วมก่อนเวลาอย่างน้อย 15 นาที\n\nขอแสดงความนับถือ\nคณะกรรมการฝ่ายวิชาการ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
-  } else if (type === 'APPROVED') {
-    subjEl.value = `[TUH Quality Fair] แจ้งผลการพิจารณาผลงานวิชาการผ่านการคัดเลือก ${widStr}`.trim();
-    bodyEl.value = `เรียน ${nameStr}\n\nคณะกรรมการฝ่ายวิชาการ งานมหกรรมคุณภาพ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแสดงความยินดีที่ผลงานวิชาการของท่าน ${widStr} ได้รับการคัดเลือกให้นำเสนอในงานมหกรรมคุณภาพประจำปี 2569\n\nท่านสามารถติดตามรายละเอียดกำหนดการนำเสนอและคำแนะนำสำหรับผู้นำเสนอได้ทางเว็บไซต์หลักของงาน\n\nขอแสดงความยินดีและขอบคุณที่ร่วมส่งผลงาน\n\nขอแสดงความนับถือ\nคณะกรรมการฝ่ายวิชาการ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
-  } else if (type === 'CUSTOM') {
-    subjEl.value = '';
-    bodyEl.value = `เรียน ${nameStr}\n\n\n\nขอแสดงความนับถือ\nคณะกรรมการจัดงานมหกรรมคุณภาพ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ`;
-  }
-}
-
 async function openEmail(to, subj, msg, wid){
-  let targetWork = null;
-  if (wid && window.WORK_ROWS) {
-    targetWork = window.WORK_ROWS.find(w => w.WorkID === wid || w.WorkCode === wid);
-  }
-  const defaultTo = to || (targetWork && targetWork.PresenterEmail) || '';
-  const presenterName = (targetWork && targetWork.PresenterName) || '';
-  const defaultSubj = subj || (wid ? `[TUH Quality Fair] แจ้งข้อมูลผลงานวิชาการ (${wid})` : '[TUH Quality Fair] แจ้งข้อมูลจากระบบ');
-  const defaultMsg = msg || (presenterName ? `เรียน คุณ ${presenterName}\n\n` : 'เรียน ท่านผู้นำเสนอผลงาน\n\n');
-
-  const html = `<div style="text-align:left;font-family:'Prompt',sans-serif;font-size:0.9rem;">
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
-        <i class="fa-solid fa-at" style="color:#006D70;"></i> ถึง (Email ผู้รับ):
-      </label>
-      <input id="emTo" class="swal2-input" style="width:100%;margin:0;font-size:0.9rem;padding:8px 12px;box-sizing:border-box;" value="${esc(defaultTo)}" placeholder="example@domain.com">
-    </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
-        <i class="fa-solid fa-list-check" style="color:#006D70;"></i> เลือกเทมเพลตข้อความ:
-      </label>
-      <select id="emTpl" class="swal2-select" style="width:100%;margin:0;font-size:0.88rem;padding:6px;" onchange="applyWorkEmailTemplate(this.value, '${esc(defaultTo)}', '${esc(wid||'')}', '${esc(presenterName)}')">
-        <option value="">-- เลือกเทมเพลตเพื่อกรอกข้อความอัตโนมัติ --</option>
-        <option value="GENERAL">1. แจ้งข้อมูลผลงานวิชาการทั่วไป</option>
-        <option value="REVISE">2. ขอให้ปรับปรุงแก้ไขเอกสาร / ส่งไฟล์นำเสนอเพิ่มเติม</option>
-        <option value="PRESENTATION_SCHEDULE">3. แจ้งกำหนดการและรูปแบบการนำเสนอผลงาน</option>
-        <option value="APPROVED">4. แจ้งผลการพิจารณาผลงานผ่านการคัดเลือก</option>
-        <option value="CUSTOM">5. ข้อความกำหนดเอง</option>
-      </select>
-    </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:600;display:block;margin-bottom:4px;color:#1e293b;">
-        <i class="fa-solid fa-heading" style="color:#006D70;"></i> หัวข้ออีเมล (Subject):
-      </label>
-      <input id="emSubj" class="swal2-input" style="width:100%;margin:0;font-size:0.9rem;padding:8px 12px;box-sizing:border-box;" value="${esc(defaultSubj)}" placeholder="ระบุหัวข้ออีเมล">
-    </div>
-    <div style="margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <label style="font-weight:600;color:#1e293b;margin:0;">
-          <i class="fa-solid fa-message" style="color:#006D70;"></i> ข้อความอีเมล (Body):
-        </label>
-        <span class="muted" style="font-size:0.75rem;color:#64748b;">พิมพ์ข้อความเพิ่มเติมได้</span>
-      </div>
-      <textarea id="emMsg" class="swal2-textarea" style="width:100%;margin:0;height:180px;font-family:'Prompt',sans-serif;font-size:0.88rem;line-height:1.55;padding:10px;box-sizing:border-box;resize:vertical;" placeholder="ระบุเนื้อหาข้อความ...">${esc(defaultMsg)}</textarea>
-    </div>
-    <div style="margin-top:10px;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px dashed #94a3b8;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <label style="font-weight:600;font-size:0.84rem;color:#334155;margin:0;">
-          <i class="fa-solid fa-paperclip" style="color:#0284c7;"></i> แนบไฟล์ (ถ้ามี, สูงสุด 3.5MB):
-        </label>
-        <button type="button" id="btnCancelWorkAttachment" style="display:none;background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.78rem;font-weight:600;padding:0;">
-          <i class="fa-solid fa-xmark"></i> ยกเลิกไฟล์แนบ
-        </button>
-      </div>
-      <input type="file" id="emAttachment" style="width:100%;font-size:0.84rem;padding:5px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.ppt,.pptx">
-      <div id="emAttachmentInfo" style="font-size:0.8rem;color:#006D70;margin-top:4px;display:none;font-weight:500;"></div>
-    </div>
-  </div>`;
-
-  const x = await Swal.fire({
-    title: `<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:1.15rem;color:#006D70;"><i class="fa-solid fa-envelope"></i> ส่งอีเมลติดต่อผู้นำเสนอ ${wid ? '(' + esc(wid) + ')' : ''}</div>`,
-    html,
-    width: '640px',
-    showCancelButton: true,
-    confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> ส่งอีเมล',
-    confirmButtonColor: '#006D70',
-    cancelButtonText: 'ยกเลิก',
-    cancelButtonColor: '#64748b',
-    didOpen: () => {
-      const fileInput = document.getElementById('emAttachment');
-      const fileInfo = document.getElementById('emAttachmentInfo');
-      const clearBtn = document.getElementById('btnCancelWorkAttachment');
-      if (fileInput) {
-        fileInput.addEventListener('change', function() {
-          if (this.files && this.files[0]) {
-            const f = this.files[0];
-            if (f.size > 3.5 * 1024 * 1024) {
-              Swal.showValidationMessage('ไฟล์มีขนาดใหญ่เกินไป (จำกัดไม่เกิน 3.5MB)');
-              this.value = '';
-              fileInfo.style.display = 'none';
-              clearBtn.style.display = 'none';
-              return;
-            }
-            Swal.resetValidationMessage();
-            const kb = Math.round(f.size / 1024);
-            const sizeStr = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB';
-            fileInfo.innerHTML = `<i class="fa-solid fa-circle-check"></i> พร้อมแนบ: <b>${esc(f.name)}</b> (${sizeStr})`;
-            fileInfo.style.display = 'block';
-            clearBtn.style.display = 'inline-block';
-          } else {
-            fileInfo.style.display = 'none';
-            clearBtn.style.display = 'none';
-          }
-        });
-      }
-      if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-          if (fileInput) fileInput.value = '';
-          fileInfo.style.display = 'none';
-          clearBtn.style.display = 'none';
-          Swal.resetValidationMessage();
-        });
-      }
-    },
-    preConfirm: () => {
-      const toVal = (document.getElementById('emTo')?.value || '').trim();
-      const subjVal = (document.getElementById('emSubj')?.value || '').trim();
-      const msgVal = (document.getElementById('emMsg')?.value || '').trim();
-      const fileInput = document.getElementById('emAttachment');
-      const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-
-      if (!toVal) {
-        Swal.showValidationMessage('กรุณาระบุอีเมลผู้รับ');
-        return false;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toVal)) {
-        Swal.showValidationMessage('รูปแบบอีเมลไม่ถูกต้อง');
-        return false;
-      }
-      if (!subjVal) {
-        Swal.showValidationMessage('กรุณาระบุหัวข้ออีเมล');
-        return false;
-      }
-      if (!msgVal) {
-        Swal.showValidationMessage('กรุณาระบุข้อความอีเมล');
-        return false;
-      }
-      return { to: toVal, subj: subjVal, msg: msgVal, file };
-    }
-  });
-
-  if (!x.isConfirmed || !x.value) return;
-
-  show('กำลังส่งอีเมล...');
-  let attachments = [];
-  if (x.value.file) {
-    try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(x.value.file);
-      });
-      attachments.push({
-        name: x.value.file.name,
-        mimeType: x.value.file.type || 'application/octet-stream',
-        base64: base64
-      });
-    } catch(errFile) {
+  const h=`<div class="field" style="text-align:left"><label>ถึง: <input id="emTo" value="${esc(to)}"></label></div><div class="field" style="text-align:left"><label>หัวข้อ: <input id="emSubj" value="${esc(subj)}"></label></div><div class="field" style="text-align:left"><label>ข้อความ: <textarea id="emMsg" style="height:150px">${esc(msg)}</textarea></label></div>`;
+  const x=await Swal.fire({title:'ส่งอีเมลติดต่อผู้นำเสนอ',html:h,showCancelButton:true,confirmButtonText:'ส่งอีเมล',preConfirm:()=>({to:$('#emTo').value, subj:$('#emSubj').value, msg:$('#emMsg').value})});
+  if(x.isConfirmed){
+    show('กำลังส่งอีเมล');
+    try{
+      await rpc('adminSendDirectEmail',TOKEN,CID,x.value.to,x.value.subj,x.value.msg);
       hide();
-      return Swal.fire({ icon: 'error', title: 'ไม่สามารถอ่านไฟล์แนบได้', text: String(errFile) });
-    }
-  }
-
-  try {
-    await rpc('adminSendDirectEmail', TOKEN, CID, x.value.to, x.value.subj, x.value.msg, attachments);
-    hide();
-    await Swal.fire({
-      icon: 'success',
-      title: 'ส่งอีเมลเรียบร้อยแล้ว',
-      html: `ส่งอีเมลถึง <b>${esc(x.value.to)}</b> สำเร็จแล้ว${attachments.length ? '<br>พร้อมไฟล์แนบ: <b>' + esc(attachments[0].name) + '</b>' : ''}`,
-      confirmButtonColor: '#006D70'
-    });
-  } catch(e) {
-    hide();
-    err(e);
+      toast('ส่งอีเมลสำเร็จ');
+    }catch(e){err(e);}
   }
 }
 async function openScoreSummary(wid){
@@ -2837,252 +2655,466 @@ async function openScoreSummary(wid){
   }
 }
 async function openUpdateWorkStatus(wid, currentStatus) {
-  const h = `<div style="text-align:left; margin-bottom:15px">เลือกสถานะใหม่สำหรับผลงาน <b>${esc(wid)}</b></div>
-  <select id="newWorkStatus" class="field" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc">
-    <option value="DRAFT" ${currentStatus==='DRAFT'?'selected':''}>DRAFT (ร่าง)</option>
-    <option value="SUBMITTED" ${currentStatus==='SUBMITTED'?'selected':''}>SUBMITTED (ส่งผลงานแล้ว)</option>
-    <option value="ACADEMIC_SCREENING" ${currentStatus==='ACADEMIC_SCREENING'?'selected':''}>ACADEMIC_SCREENING (ตรวจสอบวิชาการ)</option>
-    <option value="RETURNED_FOR_EDIT" ${currentStatus==='RETURNED_FOR_EDIT'?'selected':''}>RETURNED_FOR_EDIT (ส่งคืนให้แก้ไข)</option>
-    <option value="WAITING_REVIEWER_ASSIGN" ${currentStatus==='WAITING_REVIEWER_ASSIGN'?'selected':''}>WAITING_REVIEWER_ASSIGN (รอจ่ายงาน)</option>
-    <option value="UNDER_REVIEW" ${currentStatus==='UNDER_REVIEW'?'selected':''}>UNDER_REVIEW (กำลังพิจารณา)</option>
-    <option value="REVISION_REQUIRED" ${currentStatus==='REVISION_REQUIRED'?'selected':''}>REVISION_REQUIRED (ต้องแก้ไข)</option>
-    <option value="ACCEPTED_ORAL" ${currentStatus==='ACCEPTED_ORAL'?'selected':''}>ACCEPTED_ORAL (ผ่าน - นำเสนอวาจา)</option>
-    <option value="ACCEPTED_POSTER" ${currentStatus==='ACCEPTED_POSTER'?'selected':''}>ACCEPTED_POSTER (ผ่าน - โปสเตอร์)</option>
-    <option value="WAITING_PRESENTATION_FILE" ${currentStatus==='WAITING_PRESENTATION_FILE'?'selected':''}>WAITING_PRESENTATION_FILE (รอไฟล์นำเสนอ)</option>
-    <option value="PRESENTATION_FILE_SUBMITTED" ${currentStatus==='PRESENTATION_FILE_SUBMITTED'?'selected':''}>PRESENTATION_FILE_SUBMITTED (ส่งไฟล์นำเสนอแล้ว)</option>
-    <option value="PRESENTATION_FILE_APPROVED" ${currentStatus==='PRESENTATION_FILE_APPROVED'?'selected':''}>PRESENTATION_FILE_APPROVED (ไฟล์นำเสนอผ่านแล้ว)</option>
-    <option value="SCHEDULED" ${currentStatus==='SCHEDULED'?'selected':''}>SCHEDULED (จัดตารางนำเสนอแล้ว)</option>
-    <option value="PUBLISHED" ${currentStatus==='PUBLISHED'?'selected':''}>PUBLISHED (ตีพิมพ์เผยแพร่)</option>
-    <option value="REJECTED" ${currentStatus==='REJECTED'?'selected':''}>REJECTED (ไม่ผ่าน)</option>
-    <option value="WITHDRAWN" ${currentStatus==='WITHDRAWN'?'selected':''}>WITHDRAWN (ยกเลิก)</option>
-  </select>`;
+  const w = (window.WORK_ROWS || []).find(x => x.WorkID === wid || x.WorkCode === wid) || {};
+  const status = currentStatus || w.Status || w.CurrentStatus || 'SUBMITTED';
+  const currentCat = w.CategoryID || w.CategoryName || w.CategoryNameTH || w.Category || '';
+  const currentPt = w.PresentationTypeRequested || w.PresentationTypeFinal || w.PresentationType || w.PresentationTypeName || '';
+
+  // Get available categories
+  let categories = (BOOT && BOOT.workCategories && BOOT.workCategories.length) ? BOOT.workCategories : [];
+  if (!categories.length && window.BOOT && window.BOOT.categories) categories = window.BOOT.categories;
+  if (!categories.length) {
+    categories = [
+      { CategoryID: 'CAT-003', CategoryCode: 'SERVICE', CategoryNameTH: 'Service Excellence' },
+      { CategoryID: 'CAT-004', CategoryCode: 'CQI', CategoryNameTH: 'CQI/ Best Practice' },
+      { CategoryID: 'CAT-001', CategoryCode: 'RESEARCH', CategoryNameTH: 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย (Research)' },
+      { CategoryID: 'CAT-002', CategoryCode: 'INNOVATION', CategoryNameTH: 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย (Innovation)' },
+      { CategoryID: 'CAT-005', CategoryCode: 'PRIMARY', CategoryNameTH: 'Primary Care & Community Network Development' }
+    ];
+  }
+
+  // Get available presentation types
+  let presentationTypes = (BOOT && BOOT.presentationTypes && BOOT.presentationTypes.length) ? BOOT.presentationTypes : [];
+  if (!presentationTypes.length && window.BOOT && window.BOOT.presentations) presentationTypes = window.BOOT.presentations;
+  if (!presentationTypes.length) {
+    presentationTypes = [
+      { PresentationTypeID: 'PT-2026-000001', TypeCode: 'ORAL', TypeNameTH: 'แบบบรรยาย (Oral Presentation)' },
+      { PresentationTypeID: 'PT-2026-000002', TypeCode: 'EPOSTER', TypeNameTH: 'แบบโปสเตอร์ (e-poster)' }
+    ];
+  }
+
+  const statusList = [
+    { code: 'DRAFT', label: 'DRAFT (แบบร่าง)' },
+    { code: 'SUBMITTED', label: 'SUBMITTED (ส่งผลงานแล้ว)' },
+    { code: 'ACADEMIC_SCREENING', label: 'ACADEMIC_SCREENING (ตรวจสอบวิชาการ)' },
+    { code: 'RETURNED_FOR_EDIT', label: 'RETURNED_FOR_EDIT (ส่งคืนให้แก้ไข)' },
+    { code: 'WAITING_REVIEWER_ASSIGN', label: 'WAITING_REVIEWER_ASSIGN (รอจ่ายงานผู้ทรงคุณวุฒิ)' },
+    { code: 'UNDER_REVIEW', label: 'UNDER_REVIEW (กำลังพิจารณาประเมิน)' },
+    { code: 'REVISION_REQUIRED', label: 'REVISION_REQUIRED (ต้องแก้ไขตามข้อเสนอแนะ)' },
+    { code: 'ACCEPTED_ORAL', label: 'ACCEPTED_ORAL (ผ่านการพิจารณา - นำเสนอวาจา)' },
+    { code: 'ACCEPTED_POSTER', label: 'ACCEPTED_POSTER (ผ่านการพิจารณา - โปสเตอร์)' },
+    { code: 'WAITING_PRESENTATION_FILE', label: 'WAITING_PRESENTATION_FILE (รอไฟล์นำเสนอ)' },
+    { code: 'PRESENTATION_FILE_SUBMITTED', label: 'PRESENTATION_FILE_SUBMITTED (ส่งไฟล์นำเสนอแล้ว)' },
+    { code: 'PRESENTATION_FILE_APPROVED', label: 'PRESENTATION_FILE_APPROVED (ไฟล์นำเสนอผ่านแล้ว)' },
+    { code: 'SCHEDULED', label: 'SCHEDULED (จัดตารางนำเสนอแล้ว)' },
+    { code: 'PUBLISHED', label: 'PUBLISHED (ตีพิมพ์เผยแพร่)' },
+    { code: 'REJECTED', label: 'REJECTED (ไม่ผ่านการพิจารณา)' },
+    { code: 'WITHDRAWN', label: 'WITHDRAWN (ยกเลิกผลงาน)' }
+  ];
+
+  const catOptions = categories.map(c => {
+    const isSel = (c.CategoryID && c.CategoryID === w.CategoryID) ||
+                  (c.CategoryCode && (c.CategoryCode === w.CategoryID || c.CategoryCode === currentCat)) ||
+                  (c.CategoryNameTH && (c.CategoryNameTH === currentCat || c.CategoryNameTH === w.CategoryName)) ||
+                  (c.CategoryNameEN && (c.CategoryNameEN === currentCat || c.CategoryNameEN === w.CategoryName));
+    const name = c.CategoryNameTH || c.CategoryNameEN || c.CategoryCode || c.CategoryID;
+    return `<option value="${esc(c.CategoryID || c.CategoryCode)}" ${isSel ? 'selected' : ''}>${esc(name)}</option>`;
+  }).join('');
+
+  const ptOptions = presentationTypes.map(p => {
+    const isSel = (p.PresentationTypeID && (p.PresentationTypeID === w.PresentationTypeRequested || p.PresentationTypeID === currentPt)) ||
+                  (p.TypeCode && (p.TypeCode === w.PresentationTypeRequested || p.TypeCode === currentPt)) ||
+                  (p.TypeNameTH && (p.TypeNameTH === currentPt || p.TypeNameTH === w.PresentationTypeName)) ||
+                  (p.TypeNameEN && (p.TypeNameEN === currentPt || p.TypeNameEN === w.PresentationTypeName));
+    const name = p.TypeNameTH || p.TypeNameEN || p.TypeCode || p.PresentationTypeID;
+    return `<option value="${esc(p.PresentationTypeID || p.TypeCode)}" ${isSel ? 'selected' : ''}>${esc(name)}</option>`;
+  }).join('');
+
+  const statusOptions = statusList.map(s => {
+    return `<option value="${esc(s.code)}" ${s.code === status ? 'selected' : ''}>${esc(s.label)}</option>`;
+  }).join('');
+
+  const h = `
+    <style>
+      .edit-work-form { text-align: left; font-size: 0.92rem; }
+      .edit-work-form label { display: block; font-weight: 600; color: #334155; margin-bottom: 5px; margin-top: 12px; }
+      .edit-work-form select, .edit-work-form input { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; background: #fff; }
+      .work-header-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+    </style>
+    <div class="edit-work-form">
+      <div class="work-header-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="badge" style="background:#006D70; color:#fff; font-size:0.82rem; padding:3px 8px; border-radius:4px;">${esc(w.WorkCode || wid)}</span>
+          <span style="font-size:0.8rem; color:#64748b;">รหัสผลงาน</span>
+        </div>
+        <div style="font-weight:700; color:#0f172a; font-size:0.98rem; margin-top:6px; line-height:1.4;">${esc(w.TitleTH || w.ThaiTitle || w.TitleEN || 'ผลงานวิชาการ')}</div>
+        ${w.PresenterName ? `<div style="font-size:0.82rem; color:#475569; margin-top:4px;"><i class="fa-solid fa-user-pen"></i> ผู้ส่ง: ${esc(w.PresenterName)}</div>` : ''}
+      </div>
+
+      <div>
+        <label><i class="fa-solid fa-tags" style="color:#006D70;"></i> ประเภทผลงาน (Work Category):</label>
+        <select id="newWorkCategory">
+          ${catOptions}
+        </select>
+      </div>
+
+      <div>
+        <label><i class="fa-solid fa-chalkboard-user" style="color:#006D70;"></i> รูปแบบการนำเสนอ (Presentation Type):</label>
+        <select id="newWorkPresentationType">
+          ${ptOptions}
+        </select>
+      </div>
+
+      <div>
+        <label><i class="fa-solid fa-list-check" style="color:#006D70;"></i> สถานะผลงาน (Work Status):</label>
+        <select id="newWorkStatus">
+          ${statusOptions}
+        </select>
+      </div>
+    </div>
+  `;
+
   const x = await Swal.fire({
-    title: 'ปรับสถานะผลงาน',
+    title: 'แก้ไขข้อมูลผลงาน',
     html: h,
+    width: 560,
     showCancelButton: true,
-    confirmButtonText: 'บันทึก',
+    confirmButtonText: '<i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล',
+    cancelButtonText: 'ยกเลิก',
     confirmButtonColor: '#006D70',
-    preConfirm: () => { return $('#newWorkStatus').value; }
+    cancelButtonColor: '#64748b',
+    preConfirm: () => {
+      return {
+        status: $('#newWorkStatus').value,
+        categoryId: $('#newWorkCategory').value,
+        presentationTypeId: $('#newWorkPresentationType').value
+      };
+    }
   });
-  if (x.isConfirmed) {
-    show('กำลังบันทึกสถานะ...');
+
+  if (x.isConfirmed && x.value) {
+    show('กำลังบันทึกข้อมูลผลงาน...');
     try {
       await rpc('adminUpdateWorkStatus', TOKEN, CID, wid, x.value);
       hide();
-      toast('อัปเดตสถานะสำเร็จ');
+      toast('บันทึกข้อมูลผลงานสำเร็จ');
       loadWorks();
     } catch(e) { err(e); }
   }
 }
-async function loadReviewers(){
-  show('กำลังโหลด Reviewer');
-  try{
-    const rows=await rpc('adminListReviewers',TOKEN,CID);
-    const q = ($('#revSearch').value||'').toLowerCase();
-    const filtered = rows.filter(x=>{
-      const s = [x.reviewer.ReviewerID, x.reviewer.FullName, x.reviewer.Email, x.reviewer.Institution, x.reviewer.Department].join(' ').toLowerCase();
-      return !q || s.includes(q);
-    });
-    $('#reviewerRows').innerHTML=filtered.map(x=>`<tr>
-      <td>${esc(x.reviewer.ReviewerID)}</td>
-      <td><b>${esc(x.reviewer.Prefix||'')}${esc(x.reviewer.FirstName||'')} ${esc(x.reviewer.LastName||'')}</b><br><span class="muted">${esc(x.reviewer.Position||'')}</span></td>
-      <td>${esc(x.reviewer.Email)}</td>
-      <td>${esc(x.reviewer.Institution)}<br><span class="muted">${esc(x.reviewer.Department||'')}</span></td>
-      <td>${esc(x.reviewer.Phone||'-')}</td>
-      <td>${esc(x.ExpertiseCategories||x.reviewer.ExpertiseCategories)}</td>
-      <td>${x.CurrentAssignedCount}/${x.MaxWorkload}</td>
-      <td>${statusBadge(x.Status)}</td>
-      <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-        <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-key"></i></button>
-        <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(x.reviewer.Email)}','','เรียน ${esc(x.reviewer.FullName||'')}', '')"><i class="fa-solid fa-envelope"></i></button>
-      </td>
-    </tr>`).join('');
-  }finally{
-    hide();
+
+async function openUploadModal(workId, regId) {
+  window.CurrentUploadWorkId = workId;
+  window.CurrentUploadRegId = regId;
+  const w = (window.WORK_ROWS || []).find(x => x.WorkID === workId || x.WorkCode === workId) || {};
+  const activeFiles = (w.files || []).filter(f => f.Active !== false && f.Active !== 'false');
+
+  const getCatLabel = (c) => {
+    switch (c) {
+      case 'ORIGINAL': return { label: 'ไฟล์ต้นฉบับ (PDF)', icon: 'fa-file-pdf', color: '#0284c7', bg: '#e0f2fe' };
+      case 'WORD': return { label: 'ไฟล์ Word ต้นฉบับ', icon: 'fa-file-word', color: '#2563eb', bg: '#dbeafe' };
+      case 'BLIND': return { label: 'ไฟล์ปกปิดชื่อ (Blind)', icon: 'fa-user-secret', color: '#7c3aed', bg: '#ede9fe' };
+      case 'ETHICS': return { label: 'หนังสือรับรองจริยธรรม', icon: 'fa-certificate', color: '#059669', bg: '#d1fae5' };
+      case 'PRESENTER_BIO': return { label: 'ประวัติผู้นำเสนอ (CNEU)', icon: 'fa-address-card', color: '#d97706', bg: '#fef3c7' };
+      case 'REVISION': return { label: 'ไฟล์ฉบับแก้ไข', icon: 'fa-pen-ruler', color: '#ea580c', bg: '#ffedd5' };
+      case 'FINAL_PRESENTATION': return { label: 'ไฟล์นำเสนอจริง (Slide)', icon: 'fa-display', color: '#dc2626', bg: '#fee2e2' };
+      default: return { label: c || 'ไฟล์แนบ', icon: 'fa-file', color: '#475569', bg: '#f1f5f9' };
+    }
+  };
+
+  let filesHtml = '';
+  if (activeFiles.length > 0) {
+    filesHtml = activeFiles.map(f => {
+      const info = getCatLabel(f.FileCategory);
+      const uploadDateStr = f.UploadedAt ? (String(f.UploadedAt).replace('T', ' ').substring(0, 16)) : '';
+      return `
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+          <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+            <div style="width:34px; height:34px; border-radius:6px; background:${info.bg}; color:${info.color}; display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0;">
+              <i class="fa-solid ${info.icon}"></i>
+            </div>
+            <div style="min-width:0; flex:1; text-align:left;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="badge" style="background:${info.bg}; color:${info.color}; font-size:0.75rem; font-weight:600; padding:1px 6px; border-radius:4px;">${esc(info.label)}</span>
+                <span style="font-weight:600; font-size:0.86rem; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px;" title="${esc(f.FileName)}">${esc(f.FileName)}</span>
+              </div>
+              <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">
+                เวอร์ชัน: ${f.VersionNo || 1} ${uploadDateStr ? '· อัปโหลด: ' + esc(uploadDateStr) : ''}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:5px; align-items:center; flex-shrink:0;">
+            <a href="${esc(f.FileUrl)}" target="_blank" class="btn btn-sm btn-soft" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; font-size:0.8rem; text-decoration:none;" title="เปิดดูหรือดาวน์โหลดไฟล์">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> ดูไฟล์
+            </a>
+            <button class="btn btn-sm btn-gold" style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; font-size:0.8rem;" onclick="setUploadCategoryAndFocus('${esc(f.FileCategory)}')" title="เลือกหมวดนี้เพื่ออัปโหลดไฟล์ใหม่แทนที่">
+              <i class="fa-solid fa-arrows-rotate"></i> แทนที่
+            </button>
+            <button class="btn btn-sm" style="color:#dc2626; background:#fee2e2; border:1px solid #fca5a5; display:inline-flex; align-items:center; gap:4px; padding:5px 8px; font-size:0.8rem;" onclick="deleteWorkFileByAdmin('${esc(f.WorkFileID)}', '${esc(workId)}', '${esc(regId)}')" title="ลบไฟล์นี้">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    filesHtml = `
+      <div style="text-align:center; padding:16px; background:#f8fafc; border-radius:8px; border:1px dashed #cbd5e1; color:#94a3b8; font-size:0.88rem; margin-bottom:12px;">
+        <i class="fa-solid fa-circle-info" style="margin-right:4px;"></i> ยังไม่มีไฟล์แนบในระบบสำหรับผลงานนี้
+      </div>
+    `;
   }
+
+  const h = `
+    <style>
+      .file-modal-wrap { text-align: left; font-size: 0.92rem; }
+      .file-tab-btns { display:flex; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
+      .file-tab-btns button { flex:1; padding:8px 12px; border:none; background:none; cursor:pointer; font-weight:600; font-size:0.88rem; color:#64748b; border-bottom:3px solid transparent; }
+      .file-tab-btns button.active { color:#006D70; border-bottom-color:#006D70; }
+      .file-tab-pane { display:none; }
+      .file-tab-pane.active { display:block; }
+      .file-upload-box { padding:16px; text-align:center; border:2px dashed #cbd5e1; border-radius:8px; background:#fafafa; }
+    </style>
+    <div class="file-modal-wrap">
+      <!-- Work Info Header -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="badge" style="background:#006D70; color:#fff; font-size:0.8rem; padding:2px 8px; border-radius:4px;">${esc(w.WorkCode || workId)}</span>
+          <span style="font-size:0.78rem; color:#64748b;">${esc(w.CategoryName || '')}</span>
+        </div>
+        <div style="font-weight:700; color:#0f172a; font-size:0.95rem; margin-top:4px;">${esc(w.TitleTH || w.ThaiTitle || w.TitleEN || 'ผลงานวิชาการ')}</div>
+        <div style="font-size:0.8rem; color:#475569; margin-top:2px;"><i class="fa-solid fa-user-pen"></i> ผู้ส่ง: ${esc(w.PresenterName || '-')}</div>
+      </div>
+
+      <!-- Existing Files List -->
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700; color:#006D70; font-size:0.92rem; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+          <span><i class="fa-solid fa-folder-open"></i> ไฟล์เดิมที่แนบไว้ในระบบ (${activeFiles.length})</span>
+        </div>
+        <div style="max-height:180px; overflow-y:auto; padding-right:2px;">
+          ${filesHtml}
+        </div>
+      </div>
+
+      <!-- Upload New / Replace File Section -->
+      <div style="border-top:1px solid #e2e8f0; padding-top:12px;">
+        <div style="font-weight:700; color:#006D70; font-size:0.92rem; margin-bottom:8px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลด / แทนที่ไฟล์ผลงาน
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label style="display:block; font-weight:600; font-size:0.85rem; color:#334155; margin-bottom:4px;">หมวดหมู่ไฟล์ที่ต้องการแนบ / แทนที่:</label>
+          <select id="modalFileCategory" class="field" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; background:#fff;">
+            <option value="ORIGINAL">ไฟล์แบบฟอร์มผลงานฉบับเต็ม / PDF (ORIGINAL)</option>
+            <option value="WORD">ไฟล์ Word ต้นฉบับ (.doc / .docx) (WORD)</option>
+            <option value="BLIND">ไฟล์ปกปิดชื่อสำหรับผู้ประเมิน (BLIND)</option>
+            <option value="ETHICS">หนังสือรับรองจริยธรรมการวิจัย (ETHICS)</option>
+            <option value="PRESENTER_BIO">ประวัติผู้นำเสนอผลงาน CNEU (PRESENTER_BIO)</option>
+            <option value="REVISION">ไฟล์ฉบับแก้ไขตามข้อเสนอแนะ (REVISION)</option>
+            <option value="FINAL_PRESENTATION">ไฟล์นำเสนอฉบับจริง PowerPoint/Slide (FINAL_PRESENTATION)</option>
+          </select>
+        </div>
+
+        <div class="file-tab-btns">
+          <button id="tbLocal" class="active" type="button" onclick="switchUploadTab('local')"><i class="fa-solid fa-laptop"></i> อัปโหลดจากเครื่อง</button>
+          <button id="tbDrive" type="button" onclick="switchUploadTab('drive')"><i class="fa-brands fa-google-drive"></i> ค้นหาจาก Google Drive</button>
+          <button id="tbUrl" type="button" onclick="switchUploadTab('url')"><i class="fa-solid fa-link"></i> ระบุลิงก์ Drive URL</button>
+        </div>
+
+        <!-- Local Tab -->
+        <div id="tpLocal" class="file-tab-pane active">
+          <div class="file-upload-box">
+            <i class="fa-solid fa-file-arrow-up" style="font-size:32px; color:#006D70; margin-bottom:6px;"></i>
+            <div style="font-weight:600; font-size:0.9rem; color:#1e293b;">เลือกไฟล์จากคอมพิวเตอร์</div>
+            <p style="font-size:0.75rem; color:#64748b; margin:2px 0 10px 0;">รองรับไฟล์ PDF, Word (.doc, .docx), PowerPoint (.ppt, .pptx), รูปภาพ, ZIP</p>
+            <input type="file" id="localFileInput" class="field" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.zip" style="width:100%; font-size:0.85rem;">
+          </div>
+        </div>
+
+        <!-- Drive Search Tab -->
+        <div id="tpDrive" class="file-tab-pane">
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <input id="driveSearchInput" placeholder="พิมพ์ชื่อไฟล์เพื่อค้นหา..." style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.88rem;" value="${esc(w.WorkCode || '')}">
+            <button type="button" class="btn btn-soft" style="padding:7px 12px; font-size:0.85rem;" onclick="searchDriveFiles()"><i class="fa-solid fa-search"></i> ค้นหา</button>
+          </div>
+          <div id="driveRes" style="max-height:140px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:6px; background:#fafafa;">
+            <div style="padding:10px; text-align:center; font-size:0.82rem;" class="muted">กดค้นหาเพื่อค้นหาไฟล์ใน Google Drive</div>
+          </div>
+        </div>
+
+        <!-- Direct URL Tab -->
+        <div id="tpUrl" class="file-tab-pane">
+          <div style="padding:10px 0;">
+            <label style="display:block; font-size:0.85rem; color:#334155; margin-bottom:4px; font-weight:600;">วาง Google Drive Link หรือ File ID:</label>
+            <input id="driveUrlInput" placeholder="https://drive.google.com/file/d/..." style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.88rem; box-sizing:border-box;">
+          </div>
+        </div>
+
+        <div style="margin-top:10px; display:flex; align-items:center; gap:6px; font-size:0.84rem; color:#475569;">
+          <input type="checkbox" id="chkReplaceOld" checked style="accent-color:#006D70; cursor:pointer;">
+          <label for="chkReplaceOld" style="cursor:pointer;">แทนที่ไฟล์เดิมในหมวดนี้ทันที (Replace existing file in category)</label>
+        </div>
+
+        <div style="margin-top:14px;">
+          <button type="button" class="btn btn-primary" style="width:100%; padding:10px; font-size:0.95rem; display:flex; align-items:center; justify-content:center; gap:6px;" onclick="executeAdminUploadFile('${esc(workId)}', '${esc(regId)}')">
+            <i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดและบันทึกไฟล์
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  Swal.fire({
+    title: 'จัดการไฟล์ผลงานวิชาการ',
+    html: h,
+    width: 620,
+    showConfirmButton: false,
+    showCloseButton: true
+  });
 }
-async function resendReviewerCreds(id){
-  const x=await Swal.fire({title:'ยืนยันส่งรหัสผ่าน',text:'ระบบจะสร้างรหัสผ่านชั่วคราวใหม่และส่งไปยังอีเมลของ Reviewer ท่านนี้',icon:'question',showCancelButton:true,confirmButtonText:'ส่งอีเมล'});
-  if(!x.isConfirmed)return;
-  show('กำลังส่งอีเมล...');
-  try{
-    await rpc('adminResendReviewerCreds',TOKEN,CID,id);
-    hide();
-    toast('ส่งข้อมูลเข้าใช้งานเรียบร้อยแล้ว');
-  }catch(e){err(e);}
-}
-async function openReviewerForm(id){
-  show('กำลังโหลดข้อมูลฟอร์ม');
-  try {
-    let r = {};
-    if(id){
-      r = await rpc('adminGetReviewer',TOKEN,CID,id);
-    }
-    const d = await rpc('getAdminSettings',TOKEN,CID);
-    hide();
-    const o = d.optionConfig || {};
-    const h=`<style>.rv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;font-size:14px;margin-bottom:15px}.rv-grid label{display:block;margin-bottom:3px;color:#666}.rv-grid input,.rv-grid select{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}</style><div class="rv-grid">
-      <div><label>คำนำหน้า</label><input id="rvPrefix" list="dlPrefix" value="${esc(r.Prefix||'')}">${dataList('dlPrefix',o.prefixes)}</div>
-      <div><label>ชื่อ</label><input id="rvFirst" value="${esc(r.FirstName||'')}"></div>
-      <div><label>นามสกุล</label><input id="rvLast" value="${esc(r.LastName||'')}"></div>
-      <div><label>ตำแหน่ง</label><input id="rvPos" list="dlPos" value="${esc(r.Position||'')}">${dataList('dlPos',o.positions)}</div>
-      <div><label>สถาบัน/หน่วยงาน</label><input id="rvInst" list="dlOrg" value="${esc(r.Institution||'')}">${dataList('dlOrg',o.organizations)}</div>
-      <div><label>แผนก/กลุ่มงาน</label><input id="rvDept" list="dlGrp" value="${esc(r.Department||'')}">${dataList('dlGrp',o.organizationGroups)}</div>
-      <div><label>จังหวัด</label><input id="rvProv" value="${esc(r.Province||'')}"></div>
-      <div><label>เขตสุขภาพ</label><input id="rvReg" value="${esc(r.HealthRegion||'')}"></div>
-      <div><label>อีเมล</label><input id="rvEmail" value="${esc(r.Email||'')}"></div>
-      <div><label>โทรศัพท์</label><input id="rvPhone" value="${esc(r.Phone||'')}"></div>
-      <div><label>หมวดความเชี่ยวชาญ</label><input id="rvExpCat" value="${esc(r.ExpertiseCategories||'')}"></div>
-      <div><label>ประเภทความเชี่ยวชาญ</label><input id="rvExpType" value="${esc(r.ExpertiseTypes||'')}"></div>
-      <div><label>ภาระงานสูงสุด (Max)</label><input type="number" id="rvMax" value="${r.MaxWorkload||10}"></div>
-      <div><label>การแจ้งเตือน</label><select id="rvNotif"><option value="EMAIL" ${r.NotificationPreference==='EMAIL'?'selected':''}>Email</option><option value="LINE" ${r.NotificationPreference==='LINE'?'selected':''}>Line</option><option value="TELEGRAM" ${r.NotificationPreference==='TELEGRAM'?'selected':''}>Telegram</option></select></div>
-      <div><label>Line Token</label><input id="rvLine" value="${esc(r.LineToken||'')}"></div>
-      <div><label>Telegram ID</label><input id="rvTel" value="${esc(r.TelegramID||'')}"></div>
-      ${id?'':`<div style="grid-column:1/-1"><label>รหัสผ่านชั่วคราว (เว้นว่างเพื่อสุ่ม)</label><input id="rvPass"></div>`}
-      <div style="grid-column:1/-1"><label>หมายเหตุ</label><input id="rvNote" value="${esc(r.Note||'')}"></div>
-    </div>`;
-    const x=await Swal.fire({title:id?'แก้ไข Reviewer':'เพิ่ม Reviewer',html:h,width:600,showCancelButton:true,preConfirm:()=>({Prefix:$('#rvPrefix').value,FirstName:$('#rvFirst').value,LastName:$('#rvLast').value,Position:$('#rvPos').value,Institution:$('#rvInst').value,Department:$('#rvDept').value,Province:$('#rvProv').value,HealthRegion:$('#rvReg').value,Email:$('#rvEmail').value,Phone:$('#rvPhone').value,ExpertiseCategories:$('#rvExpCat').value,ExpertiseTypes:$('#rvExpType').value,MaxWorkload:$('#rvMax').value,NotificationPreference:$('#rvNotif').value,LineToken:$('#rvLine').value,TelegramID:$('#rvTel').value,Note:$('#rvNote').value,Password:id?null:$('#rvPass').value,SendCredentials:id?false:true})});
-    if(!x.isConfirmed)return;
-    show(id?'กำลังบันทึกข้อมูล':'กำลังเพิ่ม Reviewer');
-    if(id){
-      await rpc('adminUpdateReviewer',TOKEN,CID,id,x.value);
-      hide();
-      toast('บันทึกสำเร็จ');
-    }else{
-      const res=await rpc('adminAddReviewer',TOKEN,CID,x.value);
-      hide();
-      Swal.fire({icon:'success',title:'เพิ่ม Reviewer แล้ว',html:res.TemporaryPassword?`Temporary password: <b>${esc(res.TemporaryPassword)}</b>`:'',confirmButtonColor:'#006D70'});
-    }
-    loadReviewers();
-  } catch(e) { err(e); }
-}
-async function loadReviewConfig(){const d=await rpc('adminGetReviewConfig',TOKEN,CID);$('#reviewConfig').innerHTML='<h4>รอบประเมิน</h4>'+d.rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers}-${r.MaxReviewers}</div>`).join('')+'<h4>เกณฑ์คะแนน</h4>'+d.criteria.map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('')}
 
 function switchUploadTab(t){
-  if(t==='local'){
-    document.getElementById('tbLocal').classList.add('active');
-    document.getElementById('tbDrive').classList.remove('active');
-    document.getElementById('tpLocal').classList.add('active');
-    document.getElementById('tpDrive').classList.remove('active');
-  } else {
-    document.getElementById('tbLocal').classList.remove('active');
-    document.getElementById('tbDrive').classList.add('active');
-    document.getElementById('tpLocal').classList.remove('active');
-    document.getElementById('tpDrive').classList.add('active');
+  ['local', 'drive', 'url'].forEach(tab => {
+    const btn = document.getElementById('tb' + tab.charAt(0).toUpperCase() + tab.slice(1));
+    const pane = document.getElementById('tp' + tab.charAt(0).toUpperCase() + tab.slice(1));
+    if (btn) btn.classList.toggle('active', tab === t);
+    if (pane) pane.classList.toggle('active', tab === t);
+  });
+}
+
+function setUploadCategoryAndFocus(cat) {
+  const sel = document.getElementById('modalFileCategory');
+  if (sel) {
+    sel.value = cat;
+    sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    sel.style.boxShadow = '0 0 0 3px rgba(0, 109, 112, 0.3)';
+    setTimeout(() => { sel.style.boxShadow = ''; }, 1500);
+  }
+}
+
+async function executeAdminUploadFile(workId, regId) {
+  const cat = (document.getElementById('modalFileCategory') && document.getElementById('modalFileCategory').value) || 'ORIGINAL';
+  const replace = document.getElementById('chkReplaceOld') ? document.getElementById('chkReplaceOld').checked : true;
+  
+  const isLocal = document.getElementById('tpLocal') && document.getElementById('tpLocal').classList.contains('active');
+  const isDrive = document.getElementById('tpDrive') && document.getElementById('tpDrive').classList.contains('active');
+  const isUrl = document.getElementById('tpUrl') && document.getElementById('tpUrl').classList.contains('active');
+
+  if (isLocal) {
+    const fileInput = document.getElementById('localFileInput');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) return Swal.fire('กรุณาเลือกไฟล์', 'โปรดเลือกไฟล์ที่ต้องการอัปโหลดจากเครื่อง', 'warning');
+
+    show('กำลังอัปโหลดไฟล์...');
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      await rpc('adminUploadWorkFiles', TOKEN, CID, workId, regId, {
+        method: 'LOCAL',
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        fileSize: file.size || 0,
+        base64: b64,
+        fileCategory: cat,
+        replace: replace
+      });
+      hide();
+      toast('อัปโหลดไฟล์สำเร็จ');
+      await loadWorks();
+      openUploadModal(workId, regId);
+    } catch(e) { err(e); }
+  } else if (isUrl) {
+    const urlInput = document.getElementById('driveUrlInput');
+    const url = urlInput ? urlInput.value.trim() : '';
+    if (!url) return Swal.fire('กรุณาระบุลิงก์', 'โปรดระบุ Google Drive URL หรือ File ID', 'warning');
+
+    show('กำลังดึงข้อมูลไฟล์จาก Drive...');
+    try {
+      await rpc('adminUploadWorkFiles', TOKEN, CID, workId, regId, {
+        method: 'URL',
+        url: url,
+        fileCategory: cat,
+        replace: replace
+      });
+      hide();
+      toast('แนบไฟล์จาก Drive สำเร็จ');
+      await loadWorks();
+      openUploadModal(workId, regId);
+    } catch(e) { err(e); }
+  } else if (isDrive) {
+    Swal.fire('กรุณาค้นหาและเลือกไฟล์', 'พิมพ์ชื่อไฟล์แล้วกดปุ่ม "เลือก" ด้านข้างไฟล์ที่ต้องการ', 'info');
   }
 }
 
 async function uploadLocalFile(wid, regId){
-  const file = document.getElementById('localFile').files[0];
-  const type = document.getElementById('localType').value;
-  if(!file) return Swal.fire('กรุณาเลือกไฟล์','','warning');
-  show('กำลังอัปโหลดไฟล์...');
-  try {
-    const b64 = await new Promise((res,rej)=>{
-      const r = new FileReader();
-      r.onload = ()=>res(r.result.split(',')[1]);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-    await rpc('adminUploadWorkFiles', TOKEN, CID, wid, regId, {
-      method: 'LOCAL',
-      fileName: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      base64: b64,
-      fileCategory: type
-    });
-    hide();
-    Swal.fire('อัปโหลดไฟล์สำเร็จ','','success');
-    loadWorks();
-  } catch(e) { err(e); }
+  return executeAdminUploadFile(wid, regId);
 }
 
 async function searchDriveFiles(){
-  const q = document.getElementById('driveSearch').value.trim();
+  const input = document.getElementById('driveSearchInput') || document.getElementById('driveSearch');
+  const q = input ? input.value.trim() : '';
   const resBox = document.getElementById('driveRes');
-  resBox.innerHTML = '<div style="padding:15px; text-align:center">กำลังค้นหา...</div>';
+  if (!resBox) return;
+  resBox.innerHTML = '<div style="padding:12px; text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังค้นหาไฟล์ใน Drive...</div>';
   try {
     const files = await rpc('adminSearchDriveFiles', TOKEN, CID, q);
-    if(!files.length) { resBox.innerHTML = '<div style="padding:15px; text-align:center" class="muted">ไม่พบข้อมูล</div>'; return; }
-    resBox.innerHTML = files.map(f=>
-      `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center">
-        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:10px;">
-          <b style="display:block">${esc(f.name)}</b>
+    if (!files || !files.length) {
+      resBox.innerHTML = '<div style="padding:12px; text-align:center;" class="muted">ไม่พบไฟล์ที่ตรงกับคำค้นหา</div>';
+      return;
+    }
+    resBox.innerHTML = files.map(f =>
+      `<div style="padding:8px 10px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; text-align:left;">
+          <b style="font-size:0.85rem; color:#1e293b;">${esc(f.name)}</b>
         </div>
-        <button class="btn btn-sm btn-gold" onclick="selectDriveFile('${esc(window.CurrentUploadWorkId)}','${esc(window.CurrentUploadRegId)}','${esc(f.id)}','${esc(f.name)}')">เลือก</button>
+        <button type="button" class="btn btn-sm btn-gold" style="padding:3px 8px; font-size:0.78rem;" onclick="selectDriveFile('${esc(window.CurrentUploadWorkId)}','${esc(window.CurrentUploadRegId)}','${esc(f.id)}','${esc(f.name)}')">
+          <i class="fa-solid fa-check"></i> เลือก
+        </button>
       </div>`
     ).join('');
   } catch(e) {
-    resBox.innerHTML = '<div style="padding:15px; text-align:center; color:red">${esc(e.message)}</div>';
+    resBox.innerHTML = `<div style="padding:10px; text-align:center; color:#dc2626; font-size:0.85rem;">${esc(e.message)}</div>`;
   }
 }
 
 async function selectDriveFile(wid, regId, fileId, fileName){
-  const type = document.getElementById('driveType').value;
+  const cat = (document.getElementById('modalFileCategory') && document.getElementById('modalFileCategory').value) || 'ORIGINAL';
+  const replace = document.getElementById('chkReplaceOld') ? document.getElementById('chkReplaceOld').checked : true;
   show('กำลังคัดลอกไฟล์จาก Drive...');
   try {
     await rpc('adminUploadWorkFiles', TOKEN, CID, wid, regId, {
       method: 'DRIVE',
       driveFileId: fileId,
       fileName: fileName,
-      fileCategory: type
+      fileCategory: cat,
+      replace: replace
     });
     hide();
-    Swal.fire('ดึงข้อมูลไฟล์สำเร็จ','','success');
-    loadWorks();
+    toast('แนบไฟล์จาก Drive สำเร็จ');
+    await loadWorks();
+    openUploadModal(wid, regId);
+  } catch(e) { err(e); }
+}
+
+async function deleteWorkFileByAdmin(workFileId, workId, regId) {
+  const c = await Swal.fire({
+    title: 'ยืนยันการลบไฟล์?',
+    text: 'ไฟล์นี้จะถูกยกเลิกการใช้งานออกจากผลงานนี้',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ลบไฟล์',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#64748b'
+  });
+  if (!c.isConfirmed) return;
+
+  show('กำลังลบไฟล์...');
+  try {
+    await rpc('adminDeleteWorkFile', TOKEN, CID, workFileId);
+    hide();
+    toast('ลบไฟล์เรียบร้อยแล้ว');
+    await loadWorks();
+    openUploadModal(workId, regId);
   } catch(e) { err(e); }
 }
 
 async function promptReplaceWorkFile(workId, regId, existingFilesHtml) {
-  window.CurrentUploadWorkId = workId;
-  window.CurrentUploadRegId = regId;
-  const h = `
-    <style>
-      .tab-btns{display:flex; border-bottom:1px solid #ccc; margin-bottom:15px}
-      .tab-btns button{flex:1; padding:10px; border:none; background:none; cursor:pointer; font-weight:bold; border-bottom:3px solid transparent}
-      .tab-btns button.active{color:#006D70; border-bottom-color:#006D70}
-      .tab-pane{display:none; text-align:left}
-      .tab-pane.active{display:block}
-    </style>
-    ${existingFilesHtml}
-    <div class="tab-btns">
-      <button id="tbLocal" class="active" onclick="switchUploadTab('local')">อัปโหลดจากเครื่อง</button>
-      <button id="tbDrive" onclick="switchUploadTab('drive')">เลือกจาก Google Drive</button>
-    </div>
-    <div id="tpLocal" class="tab-pane active">
-      <div style="padding:20px; text-align:center; border:2px dashed #ccc; border-radius:10px">
-        <i class="fa-solid fa-cloud-arrow-up" style="font-size:40px; color:#006D70; margin-bottom:10px"></i>
-        <h5>อัปโหลดไฟล์</h5>
-        <p class="small muted">รองรับ PDF, DOC, DOCX</p>
-        <input type="file" id="localFile" accept=".pdf,.doc,.docx" class="field" style="width:100%">
-        <select id="localType" class="field" style="margin-top:10px">
-          <option value="PDF">ไฟล์ PDF (ฉบับสมบูรณ์)</option>
-          <option value="WORD">ไฟล์ Word (ต้นฉบับ)</option>
-          <option value="BLIND">ไฟล์ปกปิดชื่อ (Blind Review)</option>
-        </select>
-        <button class="btn btn-primary" style="margin-top:15px; width:100%" onclick="uploadLocalFile('${workId}','${regId}')">เริ่มอัปโหลด</button>
-      </div>
-    </div>
-    <div id="tpDrive" class="tab-pane">
-      <div class="field" style="display:flex; gap:10px">
-        <input id="driveSearch" placeholder="ค้นหาชื่อไฟล์..." style="flex:1" value="${workId}">
-        <button class="btn btn-soft" onclick="searchDriveFiles()"><i class="fa-solid fa-search"></i> ค้นหา</button>
-      </div>
-      <div id="driveRes" style="max-height:200px; overflow-y:auto; border:1px solid #ccc; border-radius:8px; margin-top:10px">
-        <div style="padding:15px; text-align:center" class="muted">พิมพ์ชื่อไฟล์แล้วกดค้นหา</div>
-      </div>
-      <div style="margin-top:10px">
-        <label>ประเภทไฟล์:</label>
-        <select id="driveType" class="field">
-          <option value="PDF">ไฟล์ PDF</option>
-          <option value="WORD">ไฟล์ Word</option>
-          <option value="BLIND">ไฟล์ปกปิดชื่อ (Blind Review)</option>
-        </select>
-      </div>
-    </div>
-  `;
-  Swal.fire({title:'อัปโหลดไฟล์ผลงาน', html:h, width:600, showConfirmButton:false, showCloseButton:true});
+  return openUploadModal(workId, regId);
 }
 // Users Management
 async function loadUsers(){

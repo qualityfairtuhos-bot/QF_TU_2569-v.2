@@ -48,34 +48,60 @@
     @media(max-width:800px){.top{align-items:flex-start;flex-direction:column}.nav{width:100%}.grid,.grid3,.attendance-list{grid-template-columns:1fr}.hero{min-height:auto;padding:0;background-position:center top}.hero-inner{grid-template-columns:1fr 1fr;gap:8px 12px}.hero-logo.left{grid-column:1;grid-row:1}.hero-logo.right{grid-column:2;grid-row:1}.hero-copy{grid-column:1/-1;grid-row:2;text-align:center}.hero-logo img{max-width:130px;max-height:85px}.hero-logo.left img{max-width:135px}.hero-logo.right img{max-width:125px}.hero h1{font-size:clamp(1.3rem,5.5vw,2rem)}.hero-title-fixed{font-size:clamp(1.2rem,4.6vw,1.75rem)!important;line-height:1.16!important}.hero p{margin-left:auto;margin-right:auto;font-size:.85rem}.brand{min-width:0}}
     @media(max-width:480px){.top{padding:8px 10px}.mark{width:38px;height:38px;flex-basis:38px;font-size:15px}.brand-text{font-size:.9rem}.hero-inner{gap:6px 8px}.hero-logo img{max-height:70px}.hero h1{font-size:clamp(1.2rem,6.5vw,1.7rem);line-height:1.16}.hero-title-fixed{font-size:clamp(1.05rem,4.8vw,1.4rem)!important;line-height:1.18!important;letter-spacing:-.015em}.pill{font-size:.78rem;padding:4px 8px}}
 
-    /* ===== v1.5: Hero information carousel + PDPA notice ===== */
-    .hero{padding:0;min-height:0}
-    .hero-carousel{position:relative;display:grid;min-height:230px}
-    .hero-slide{grid-area:1/1;display:flex;align-items:center;min-height:230px;padding:20px 48px 28px;opacity:0;visibility:hidden;pointer-events:none;transform:translateX(18px);transition:opacity .55s ease,transform .55s ease,visibility .55s}
-    .hero-slide.active{opacity:1;visibility:visible;pointer-events:auto;transform:translateX(0)}
-    .hero-slide .hero-inner{width:100%}
-    .hero-controls{position:absolute;z-index:5;left:50%;bottom:8px;transform:translateX(-50%);display:flex;align-items:center;gap:6px}
-    .hero-dot{width:8px;height:8px;padding:0;border:1px solid rgba(255,255,255,.85);border-radius:50%;background:rgba(255,255,255,.28);cursor:pointer;box-shadow:none}
-    .hero-dot.active{width:22px;border-radius:999px;background:#fff}
-    .hero-arrow{position:absolute;z-index:5;top:50%;transform:translateY(-50%);width:32px;height:32px;border:1px solid rgba(255,255,255,.55);border-radius:50%;background:rgba(2,35,58,.38);color:#fff;font-size:18px;line-height:1;cursor:pointer;backdrop-filter:blur(8px)}
-    .hero-arrow:hover{background:rgba(0,109,112,.82)}
-    .hero-arrow.prev{left:12px}.hero-arrow.next{right:12px}
-    .announcement-wrap{width:min(1080px,100%);margin:auto}
-    .announcement-panel{padding:14px 20px;border:1px solid rgba(255,255,255,.32);border-radius:14px;background:linear-gradient(145deg,rgba(4,47,75,.84),rgba(0,92,97,.76));box-shadow:0 12px 36px rgba(0,15,35,.25);backdrop-filter:blur(10px)}
-    .announcement-panel h2{margin:0 0 4px;font-size:clamp(1.1rem,1.8vw,1.45rem);line-height:1.22;color:#fff}
-    .announcement-theme{margin:0 0 10px!important;max-width:none!important;color:#edf9fa!important;font-size:.86rem;line-height:1.45}
-    .announcement-theme strong{color:#ffe39a}
-    .announcement-grid{display:grid;grid-template-columns:1fr 1.08fr;gap:10px}
-    .announcement-box{padding:10px 14px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.10)}
-    .announcement-box h3{margin:0 0 4px;font-size:.92rem;color:#fff}
-    .announcement-box ul{margin:0;padding-left:18px;line-height:1.5;font-size:.84rem}
-    .announcement-box li+li{margin-top:2px}
-    .announcement-fees{display:grid;gap:6px}
-    .fee-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.24);font-size:.84rem}
-    .fee-row:last-child{border-bottom:0}.fee-amount{white-space:nowrap;font-weight:700;color:#ffe39a}
-    .announcement-note{margin-top:8px;padding:6px 10px;border-radius:10px;background:rgba(200,178,120,.20);border-left:3px solid #ffe39a;line-height:1.4;font-size:.82rem}
-    .announcement-link{display:inline-flex;align-items:center;gap:5px;margin-top:4px;border:0;border-radius:999px;padding:5px 10px;background:#fff;color:var(--teal);font-weight:600;font-size:.82rem;cursor:pointer}
-    .announcement-link:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.16)}
+    /* ===== v2.0: High-Resolution Graphic Hero Carousel ===== */
+    .hero{padding:0;min-height:0;background:#021422}
+    .hero-carousel{position:relative;display:grid;min-height:220px;width:100%;max-width:100%;overflow:hidden;background:#021422;box-shadow:0 8px 30px rgba(0,18,36,.25)}
+    .hero-slide{grid-area:1/1;display:flex;align-items:center;justify-content:center;min-height:220px;padding:0;opacity:0;visibility:hidden;pointer-events:none;transform:scale(0.99);transition:opacity .55s ease-in-out,transform .55s cubic-bezier(0.16,1,0.3,1),visibility .55s;background-size:cover;background-position:center;position:relative}
+    .hero-slide.active{opacity:1;visibility:visible;pointer-events:auto;transform:scale(1)}
+    
+    .banner-img-container{position:relative;width:100%;display:flex;justify-content:center;align-items:center;background:#021422;overflow:hidden}
+    .banner-responsive-img{width:100%;max-height:540px;object-fit:cover;display:block}
+    @media(max-width:768px){.banner-responsive-img{min-height:160px;object-fit:cover}}
+    
+    /* Main Banner Stage (Matching sample layout) */
+    .banner-stage{position:relative;z-index:2;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;width:min(1240px,100%);margin:0 auto;padding:24px 36px 36px}
+    .banner-side{display:flex;align-items:center;justify-content:center}
+    
+    /* Left: TUH 19th 3D Star Badge */
+    .banner-star-badge{display:flex;align-items:center;gap:12px;background:rgba(12,56,91,0.55);border:1px solid rgba(255,215,0,0.35);padding:10px 16px;border-radius:18px;backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+    .star-emblem-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:72px;height:72px;filter:drop-shadow(0 4px 12px rgba(230,194,82,0.45))}
+    .star-emblem-wrap svg{width:100%;height:100%}
+    .star-content-wrap{display:flex;flex-direction:column;text-align:left}
+    .star-content-wrap .tuh-brand{font-size:1.65rem;font-weight:900;letter-spacing:1px;color:#fff;line-height:1;font-family:system-ui,-apple-system,sans-serif;text-shadow:0 2px 8px rgba(0,0,0,0.6)}
+    .star-content-wrap .tuh-brand span{color:#e6c252;font-size:1.1rem;margin-left:2px;font-weight:700}
+    .star-content-wrap .qf-brand{font-size:0.85rem;font-weight:700;letter-spacing:0.5px;color:#f0fdfa;background:linear-gradient(90deg,#e6c252,#fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.2}
+    .tuh-logo-mini{height:46px;width:auto;margin-left:4px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4))}
+    
+    /* Center: Title & Capsule Pills */
+    .banner-center{text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px}
+    .banner-title{font-size:clamp(1.2rem,2.1vw,1.75rem);font-weight:800;color:#ffffff;line-height:1.28;margin:0 0 8px;text-shadow:0 3px 12px rgba(0,0,0,0.65);letter-spacing:-0.01em}
+    .banner-title span{display:inline-block;margin:0 3px}
+    .banner-sub{font-size:clamp(0.85rem,1.05vw,1rem);color:#cffafe;margin:0 0 14px;font-weight:500;text-shadow:0 2px 6px rgba(0,0,0,0.5)}
+    .banner-pills{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+    .banner-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.28);border-radius:999px;padding:6px 14px;color:#fff;font-size:0.82rem;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.2)}
+    .banner-pill i{color:#6ee7b7;font-size:0.88rem}
+    .banner-pill small{color:#bae6fd;font-weight:400;margin-left:3px}
+    
+    /* Right: HACC 4 Badge */
+    .banner-hacc-badge{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;background:rgba(12,56,91,0.55);border:1px solid rgba(255,255,255,0.22);padding:10px 14px;border-radius:18px;backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+    .hacc-circle-wrap{width:70px;height:70px;border-radius:50%;background:#ffffff;padding:4px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(230,194,82,0.6),0 4px 12px rgba(0,0,0,0.3)}
+    .hacc-circle-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+    .hacc-caption-text{display:flex;flex-direction:column}
+    .hacc-caption-text b{font-size:0.78rem;color:#f8fafc;font-weight:700}
+    .hacc-caption-text span{font-size:0.74rem;color:#e6c252;font-weight:600}
+    
+    /* Custom Admin Banner Slide */
+    .custom-banner-overlay{position:absolute;z-index:2;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:center;padding:12px;background:linear-gradient(0deg,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0) 100%)}
+    .custom-banner-card{background:rgba(3,23,38,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:8px 18px;max-width:850px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+    
+    /* Carousel Controls */
+    .hero-controls{position:absolute;z-index:10;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.35);padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18)}
+    .hero-dot{width:9px;height:9px;padding:0;border:1px solid rgba(255,255,255,0.7);border-radius:50%;background:rgba(255,255,255,0.3);cursor:pointer;transition:all 0.3s ease}
+    .hero-dot.active{width:24px;border-radius:999px;background:#38bdf8;border-color:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,0.6)}
+    .hero-arrow{position:absolute;z-index:10;top:50%;transform:translateY(-50%);width:38px;height:38px;border:1px solid rgba(255,255,255,0.35);border-radius:50%;background:rgba(3,23,38,0.65);color:#fff;font-size:20px;line-height:1;cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:background 0.2s,transform 0.2s}
+    .hero-arrow:hover{background:rgba(0,109,112,0.85);transform:translateY(-50%) scale(1.08)}
+    .hero-arrow.prev{left:16px}.hero-arrow.next{right:16px}
+    
     .consent-block{margin-top:16px;padding:16px 18px;border:1px solid #cbdce3;border-radius:14px;background:#f8fcfd}
     .privacy-link{display:inline;padding:0;border:0;background:transparent;color:#006d70;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:3px;font-weight:600;cursor:pointer;text-align:left}
     .privacy-link:hover{color:#0c385b}
@@ -88,8 +114,29 @@
     .pdpa-content h3{margin:16px 0 7px;color:#0c385b;font-size:1.02rem}
     .pdpa-content p{margin:0 0 10px}.pdpa-content ol{margin:0;padding-left:24px}.pdpa-content li{margin-bottom:12px}
     .pdpa-content .pdpa-intro{padding:14px;border-radius:12px;background:#eef8f8;border-left:4px solid #006d70}
-    @media(max-width:900px){.hero-slide{padding:16px 36px 28px}.announcement-grid{grid-template-columns:1fr}.hero-carousel,.hero-slide{min-height:auto}}
-    @media(max-width:680px){.hero-slide{padding:14px 12px 28px}.hero-carousel,.hero-slide{min-height:auto}.hero-arrow{display:none}.announcement-panel{padding:12px 10px;border-radius:12px}.announcement-grid{gap:8px}.announcement-box{padding:10px}.fee-row{grid-template-columns:1fr}.fee-amount{white-space:normal}.hero-controls{bottom:6px}.consent-block{padding:12px}}
+    
+    @media(max-width:960px){
+      .banner-stage{grid-template-columns:1fr 1fr;gap:12px}
+      .banner-side.left{grid-column:1;grid-row:1;justify-content:flex-start}
+      .banner-side.right{grid-column:2;grid-row:1;justify-content:flex-end}
+      .banner-center{grid-column:1/-1;grid-row:2}
+      .theme-pillars-grid{grid-template-columns:1fr}
+      .hero-slide{padding:18px 20px 38px}
+    }
+    @media(max-width:680px){
+      .banner-stage{grid-template-columns:1fr;gap:10px}
+      .banner-side.left,.banner-side.right{justify-content:center}
+      .banner-star-badge{padding:6px 12px}
+      .star-emblem-wrap{width:54px;height:54px}
+      .banner-hacc-badge{padding:6px 12px}
+      .hacc-circle-wrap{width:54px;height:54px}
+      .hero-arrow{display:none}
+      .hero-carousel,.hero-slide{min-height:360px}
+      .hero-slide{padding:14px 12px 34px}
+      .banner-pills{flex-direction:column;gap:6px;width:100%}
+      .banner-pill{width:100%;justify-content:center;box-sizing:border-box}
+      .consent-block{padding:12px}
+    }
 
   
 .meal-pass-public{max-width:430px;margin:0 auto;background:#0d1429;color:#fff;border-radius:20px;padding:24px;box-shadow:0 20px 50px rgba(12,56,91,.22);text-align:center;position:relative;overflow:hidden}.meal-pass-public:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(200,178,120,.18),transparent 34%),linear-gradient(135deg,rgba(0,109,112,.16),transparent 50%);pointer-events:none}.meal-pass-public>*{position:relative}.meal-pass-top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:13px;margin-bottom:15px;font-size:.76rem;letter-spacing:.04em}.meal-pass-event{color:#e6c252;font-weight:700}.meal-pass-name{font-size:1.22rem;font-weight:700;margin:10px 0 2px}.meal-pass-id{font-size:.78rem;color:#93a2bd}.meal-pass-public img{width:210px;max-width:75%;background:#fff;border-radius:12px;padding:8px;margin:16px auto;display:block}.meal-pass-meta{display:grid;grid-template-columns:1fr 1fr;text-align:left;background:rgba(255,255,255,.055);border-radius:10px;padding:10px 12px;font-size:.75rem}.meal-pass-meta b{display:block;color:#f0c94f}.meal-entitlements{margin-top:16px;text-align:left}.meal-entitlements .ent-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:.78rem}.meal-pass-note{margin-top:15px;color:#f5acb5;font-size:.72rem}@media(max-width:560px){.meal-pass-public{padding:18px}.meal-pass-meta{grid-template-columns:1fr}}
@@ -116,50 +163,66 @@
 </header>
 <section class="hero" id="homeHero" aria-label="ข้อมูลงานประชุม">
   <div class="hero-carousel" id="heroCarousel">
+    <!-- Default Conference Banner Slide (Shown if no custom admin banner is uploaded) -->
     <article class="hero-slide active" data-hero-slide="0" aria-hidden="false">
-      <div class="hero-inner">
-        <div class="hero-logo left"><img id="heroLeftLogo" src="/images/tuh-logo.png" alt="TUH Quality Fair logo" referrerpolicy="no-referrer"></div>
-        <div class="hero-copy"><h1 id="confName" class="hero-title-fixed" aria-label="งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569"><span>งานมหกรรมคุณภาพ</span><span>โรงพยาบาล ครั้งที่ 19 และ</span><span>งาน HA-Regional Forum</span><span>ครั้งที่ 1 ประจำปี 2569</span></h1><p id="confDesc">กรุณารอสักครู่ ระบบกำลังโหลดข้อมูลปัจจุบัน</p><div id="confMeta"></div></div>
-        <div class="hero-logo right"><img id="heroRightLogo" src="/images/hacc-logo.png" alt="HACC HA Regional Forum logo" referrerpolicy="no-referrer"></div>
-      </div>
-    </article>
-    <article class="hero-slide" data-hero-slide="1" aria-hidden="true">
-      <div class="announcement-wrap">
-        <div class="announcement-panel">
-          <h2>ลงทะเบียนผู้เข้าร่วมงานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 ประจำปี 2569 × HACC เขต 4 ครั้งที่ 1</h2>
-          <p class="announcement-theme">งานนี้จัดขึ้นภายใต้แนวคิด <strong>“VAR for Sustainability Healthcare”</strong> เพื่อเป็นเวทีแลกเปลี่ยนเรียนรู้ประสบการณ์ ทั้งจุดประกายแนวคิดและทิศทางการพัฒนาคุณภาพด้านสุขภาพและสิ่งแวดล้อมให้บุคลากรในระบบบริการสุขภาพ โดยเน้น <strong>V – Value, A – Accountability และ R – Real Impact</strong></p>
-          <div class="announcement-grid">
-            <div class="announcement-box">
-              <h3>ข้อมูลสำคัญ</h3>
-              <ul>
-                <li><button type="button" class="announcement-link" onclick="showScheduleNotice()">ร่างกำหนดการ › คลิกอ่าน</button></li>
-                <li>รับสมัครตั้งแต่บัดนี้จนถึง <strong id="announceRegistrationClose">6 พฤศจิกายน 2569</strong></li>
-                <li>กำหนดชำระค่าลงทะเบียนภายใน <strong id="announcePaymentClose">18 พฤศจิกายน 2569</strong></li>
-              </ul>
+      <div class="banner-stage">
+        <!-- Left: TUH 19th Star Emblem -->
+        <div class="banner-side left">
+          <div class="banner-star-badge">
+            <div class="star-emblem-wrap">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#fff4cc"/>
+                    <stop offset="35%" stop-color="#f59e0b"/>
+                    <stop offset="70%" stop-color="#b45309"/>
+                    <stop offset="100%" stop-color="#fef08a"/>
+                  </linearGradient>
+                  <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur"/>
+                    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                  </filter>
+                </defs>
+                <polygon points="50,5 64,36 98,36 70,57 81,90 50,70 19,90 30,57 2,36 36,36" fill="url(#goldGrad)" stroke="#fff" stroke-width="1.5" filter="url(#glow)"/>
+              </svg>
             </div>
-            <div class="announcement-box">
-              <h3>อัตราค่าลงทะเบียน & ช่องทางชำระเงิน</h3>
-              <div class="announcement-fees" id="announceFees">
-                <div class="fee-row"><span>สาธารณสุขจังหวัด โรงพยาบาลศูนย์ โรงพยาบาลทั่วไป (ภาครัฐ/เอกชน)</span><span class="fee-amount">2,500 บาท/ท่าน</span></div>
-                <div class="fee-row"><span>โรงพยาบาลชุมชน สาธารณสุขอำเภอ โรงพยาบาลส่งเสริมสุขภาพตำบล</span><span class="fee-amount">1,500 บาท/ท่าน</span></div>
-              </div>
-              <div style="margin-top:10px;padding:10px 12px;background:#ffffff;border:1.5px solid #0d9488;border-radius:8px;font-size:0.88rem;line-height:1.55;color:#0f172a;box-shadow:0 2px 6px rgba(0,0,0,0.12)">
-                <div style="font-weight:700;color:#0f766e;font-size:0.92rem;margin-bottom:2px"><i class="fa-solid fa-building-columns"></i> ธนาคารกรุงเทพ สาขาตลาดไท</div>
-                <div style="color:#1e293b">ชื่อบัญชี: <b style="color:#0f172a;font-size:0.92rem">รพ.ธรรมศาสตร์เฉลิมพระเกียรติ</b></div>
-                <div style="color:#1e293b">เลขที่บัญชี: <strong style="color:#006D70;font-size:1.05rem;letter-spacing:0.5px">856-0-30455-5</strong></div>
-              </div>
+            <div class="star-content-wrap">
+              <div class="tuh-brand">TUH <span>19<sup>th</sup></span></div>
+              <div class="qf-brand">QUALITY FAIR</div>
+            </div>
+            <img class="tuh-logo-mini" id="heroLeftLogo" src="/images/tuh-logo.png" alt="TUH Logo" referrerpolicy="no-referrer">
+          </div>
+        </div>
+
+        <!-- Center: Headline & Info Pills -->
+        <div class="banner-center">
+          <h1 class="banner-title" id="confName">
+            <span>งานมหกรรมคุณภาพ</span>
+            <span>โรงพยาบาล ครั้งที่ 19 และ</span>
+            <span>งาน HA-Regional Forum</span>
+            <span>ครั้งที่ 1 ประจำปี 2569</span>
+          </h1>
+          <p class="banner-sub" id="confDesc">ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ</p>
+          <div class="banner-pills" id="confMeta">
+            <div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</span></div>
+            <div class="banner-pill"><i class="fa-regular fa-calendar-days"></i> <span>18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 <small>(18 - 20 Nov 2026)</small></span></div>
+          </div>
+        </div>
+
+        <!-- Right: HACC 4 Badge -->
+        <div class="banner-side right">
+          <div class="banner-hacc-badge">
+            <div class="hacc-circle-wrap">
+              <img id="heroRightLogo" src="/images/hacc-logo.png" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
+            </div>
+            <div class="hacc-caption-text">
+              <b>HACC นครจตุรศรีปทุมทอง</b>
+              <span>HA Regional Forum เขต 4</span>
             </div>
           </div>
-          <div class="announcement-note"><strong>หมายเหตุ:</strong> สำหรับผู้ที่ผ่านการคัดเลือกผลงานในวันที่ <strong id="announceResultDate">22 ตุลาคม 2569</strong> ขอให้ลงทะเบียนเข้าร่วมงานและชำระค่าลงทะเบียนตามวันและเวลาที่กำหนด</div>
         </div>
       </div>
     </article>
-    <button class="hero-arrow prev" type="button" aria-label="ข้อมูลก่อนหน้า" onclick="nextHeroSlide(-1)">‹</button>
-    <button class="hero-arrow next" type="button" aria-label="ข้อมูลถัดไป" onclick="nextHeroSlide(1)">›</button>
-    <div class="hero-controls" aria-label="เลือกข้อมูลบนส่วนหัว">
-      <button class="hero-dot active" type="button" aria-label="หน้าหลัก" onclick="setHeroSlide(0,true)"></button>
-      <button class="hero-dot" type="button" aria-label="รายละเอียดการลงทะเบียน" onclick="setHeroSlide(1,true)"></button>
-    </div>
   </div>
 </section>
 <main>
@@ -167,24 +230,59 @@
     <div class="card">
       <div class="section-title"><b>ระบบบริการผู้เข้าร่วมงาน</b><span class="en">Participant services</span></div>
       <div class="grid3">
-        <button class="btn btn-primary" onclick="go('register')">ลงทะเบียน<span class="en">Registration</span></button>
-        <button class="btn btn-blue" onclick="go('status')">แก้ไขข้อมูล / ตรวจสอบสถานะ<span class="en">Edit profile / Check status</span></button>
-        <button class="btn btn-gold" onclick="go('work')">ส่งผลงาน<span class="en">Submit work</span></button>
+        <button class="btn btn-primary" onclick="go('register')"><i class="fa-solid fa-user-plus" style="margin-right:6px;"></i> ลงทะเบียน<span class="en">Registration</span></button>
+        <button class="btn btn-blue" onclick="go('status')"><i class="fa-solid fa-address-card" style="margin-right:6px;"></i> แก้ไขข้อมูล / ตรวจสอบสถานะ<span class="en">Edit profile / Check status</span></button>
+        <button class="btn btn-gold" onclick="go('work')"><i class="fa-solid fa-file-arrow-up" style="margin-right:6px;"></i> ส่งผลงาน<span class="en">Submit work</span></button>
       </div>
     </div>
-    <div class="card" style="margin-top:16px;background:linear-gradient(135deg, #f0fdfa, #f8fafc);border:1px solid #99f6e4">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-        <div style="width:38px;height:38px;border-radius:10px;background:#006D70;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.1rem"><i class="fa-solid fa-building-columns"></i></div>
-        <div>
-          <div style="font-weight:700;font-size:1.02rem;color:#0f766e">ช่องทางการชำระเงินค่าลงทะเบียน</div>
-          <div class="en" style="font-size:0.8rem;color:#0d9488">Bank Account for Registration Payment</div>
+
+    <!-- บล็อกข้อมูลกำหนดการ อัตราค่าลงทะเบียน และช่องทางชำระเงิน -->
+    <div class="card" style="margin-top:16px; border:1px solid #99f6e4; background:linear-gradient(135deg, #f0fdfa, #f8fafc);">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; border-bottom:1px solid #ccfbf1; padding-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:36px; height:36px; border-radius:10px; background:#006D70; color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.1rem;"><i class="fa-solid fa-circle-info"></i></div>
+          <div>
+            <div style="font-weight:700; font-size:1.05rem; color:#0f766e;">ข้อมูลสำคัญและอัตราค่าลงทะเบียน</div>
+            <div class="en" style="font-size:0.8rem; color:#0d9488;">Important Information & Registration Details</div>
+          </div>
+        </div>
+        <button type="button" class="announcement-link" onclick="go('schedule')"><i class="fa-regular fa-calendar-days"></i> กำหนดการจัดงาน › คลิกอ่าน</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+        <!-- กรอบกำหนดการสำคัญ -->
+        <div style="background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1;">
+          <div style="font-weight:700; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><i class="fa-regular fa-clock"></i> กำหนดการสำคัญ</div>
+          <ul style="margin:0; padding-left:18px; line-height:1.65; font-size:0.88rem; color:#334155;">
+            <li>รับสมัครลงทะเบียนถึง <strong id="announceRegistrationClose" style="color:#0f766e;">6 พฤศจิกายน 2569</strong></li>
+            <li>กำหนดชำระค่าลงทะเบียนภายใน <strong id="announcePaymentClose" style="color:#0f766e;">18 พฤศจิกายน 2569</strong></li>
+            <li>ประกาศผลการคัดเลือกผลงาน <strong id="announceResultDate" style="color:#0f766e;">22 ตุลาคม 2569</strong></li>
+            <li>วันจัดงานประชุม: <strong>18 – 20 พฤศจิกายน 2569</strong></li>
+          </ul>
+        </div>
+
+        <!-- กรอบอัตราค่าลงทะเบียน -->
+        <div style="background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1;">
+          <div style="font-weight:700; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-tags"></i> อัตราค่าลงทะเบียน (Registration Fees)</div>
+          <div id="announceFees" style="display:grid; gap:6px;">
+            <div class="fee-row" style="display:flex; justify-content:space-between; font-size:0.86rem; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+              <span>สสจ. / รพศ. / รพท. (รัฐและเอกชน)</span>
+              <strong style="color:#006D70;">2,500 บาท/ท่าน</strong>
+            </div>
+            <div class="fee-row" style="display:flex; justify-content:space-between; font-size:0.86rem; padding:4px 0;">
+              <span>รพช. / สสอ. / รพ.สต.</span>
+              <strong style="color:#006D70;">1,500 บาท/ท่าน</strong>
+            </div>
+          </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:12px;background:#fff;padding:14px;border-radius:10px;border:1px solid #ccfbf1">
-        <div><span style="color:#64748b;font-size:0.82rem;display:block">ธนาคาร / Bank</span><div style="font-weight:600;color:#0f172a">ธนาคารกรุงเทพ (Bangkok Bank)</div></div>
-        <div><span style="color:#64748b;font-size:0.82rem;display:block">สาขา / Branch</span><div style="font-weight:600;color:#0f172a">สาขาตลาดไท (Talat Thai)</div></div>
-        <div><span style="color:#64748b;font-size:0.82rem;display:block">ชื่อบัญชี / Account Name</span><div style="font-weight:600;color:#0f172a">รพ.ธรรมศาสตร์เฉลิมพระเกียรติ</div></div>
-        <div><span style="color:#64748b;font-size:0.82rem;display:block">เลขที่บัญชี / Account Number</span><div style="font-weight:700;font-size:1.12rem;color:#006D70;letter-spacing:0.5px">856-0-30455-5</div></div>
+
+      <!-- ช่องทางชำระเงินธนาคาร -->
+      <div style="margin-top:12px; background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1; display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px;">
+        <div><span style="color:#64748b; font-size:0.82rem; display:block;"><i class="fa-solid fa-building-columns"></i> ธนาคาร / Bank</span><div style="font-weight:600; color:#0f172a;">ธนาคารกรุงเทพ (Bangkok Bank)</div></div>
+        <div><span style="color:#64748b; font-size:0.82rem; display:block;">สาขา / Branch</span><div style="font-weight:600; color:#0f172a;">สาขาตลาดไท (Talat Thai)</div></div>
+        <div><span style="color:#64748b; font-size:0.82rem; display:block;">ชื่อบัญชี / Account Name</span><div style="font-weight:600; color:#0f172a;">รพ.ธรรมศาสตร์เฉลิมพระเกียรติ</div></div>
+        <div><span style="color:#64748b; font-size:0.82rem; display:block;">เลขที่บัญชี / Account Number</span><div style="font-weight:700; font-size:1.12rem; color:#006D70; letter-spacing:0.5px;">856-0-30455-5</div></div>
       </div>
     </div>
   </section>
@@ -301,6 +399,72 @@
 
   <section class="page" id="page-author-status"><div class="card"><div class="section-title"><b>สถานะผลงาน</b><span class="en">Work Status</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="authorWorkRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="authorWorkKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="lookupAuthorWorks()">ค้นหา<span class="en">Search</span></button></div></div></div><div id="authorWorkResult"></div></section>
 
+  <section class="page" id="page-schedule">
+    <div class="card" style="border:1px solid #99f6e4; background:linear-gradient(135deg, #f0fdfa, #f8fafc); margin-bottom:16px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:42px; height:42px; border-radius:12px; background:#006D70; color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.25rem;">
+            <i class="fa-regular fa-calendar-days"></i>
+          </div>
+          <div>
+            <div style="font-weight:800; font-size:1.2rem; color:#0f766e;">กำหนดการจัดงานประชุมวิชาการ</div>
+            <div class="en" style="font-size:0.85rem; color:#0d9488;">Conference Schedule & Program Agenda</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="go('register')"><i class="fa-solid fa-user-plus" style="margin-right:6px;"></i> ลงทะเบียนเข้าร่วมงาน</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><b>ตารางกำหนดการจัดงานรายวัน</b><span class="en">Daily Agenda Schedule</span></div>
+      <div id="scheduleTimelineHost" style="display:grid; gap:16px;">
+        <div style="background:#fff; border:1px solid #cbdce3; border-radius:12px; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:1.05rem; color:#006D70;"><i class="fa-solid fa-calendar-day" style="margin-right:6px;"></i> วันที่ 1 : วันพุธที่ 18 พฤศจิกายน 2569</span>
+            <span class="en" style="color:#64748b; font-size:0.88rem;">Wednesday, 18 November 2026</span>
+          </div>
+          <div style="line-height:1.8; color:#334155; font-size:0.92rem;">
+            <div>• <b>08:00 - 08:45 น.</b> ลงทะเบียนผู้เข้าร่วมงาน / รับเอกสารประกอบการประชุม</div>
+            <div>• <b>08:45 - 09:30 น.</b> พิธีเปิดการประชุมวิชาการ โดย ผู้บริหารโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ และ คณะผู้บริหารองค์กรสาธารณสุข</div>
+            <div>• <b>09:30 - 12:00 น.</b> การบรรยายพิเศษ (Keynote Lecture): ทิศทางและนโยบายการพัฒนาคุณภาพระบบบริการสุขภาพไทยในทศวรรษหน้า</div>
+            <div>• <b>12:00 - 13:00 น.</b> พักรับประทานอาหารกลางวัน (Meal Pass QR Code)</div>
+            <div>• <b>13:00 - 16:30 น.</b> การนำเสนอผลงานวิชาการและนวัตกรรม (Oral Presentation & Poster Exhibition Session)</div>
+          </div>
+        </div>
+
+        <div style="background:#fff; border:1px solid #cbdce3; border-radius:12px; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:1.05rem; color:#006D70;"><i class="fa-solid fa-calendar-day" style="margin-right:6px;"></i> วันที่ 2 : วันพฤหัสบดีที่ 19 พฤศจิกายน 2569</span>
+            <span class="en" style="color:#64748b; font-size:0.88rem;">Thursday, 19 November 2026</span>
+          </div>
+          <div style="line-height:1.8; color:#334155; font-size:0.92rem;">
+            <div>• <b>08:30 - 09:00 น.</b> ลงทะเบียนและเยี่ยมชมนิทรรศการผลงานคุณภาพ / นวัตกรรมโรงพยาบาล</div>
+            <div>• <b>09:00 - 12:00 น.</b> การเสวนาวิชาการ HA Regional Forum เขตสุขภาพที่ 4: Value & Accountability in Healthcare</div>
+            <div>• <b>12:00 - 13:00 น.</b> พักรับประทานอาหารกลางวัน</div>
+            <div>• <b>13:00 - 16:30 น.</b> การประชุมกลุ่มย่อย (Parallel Sessions): CQI / Lean / Patient Safety / Green Hospital</div>
+          </div>
+        </div>
+
+        <div style="background:#fff; border:1px solid #cbdce3; border-radius:12px; padding:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+            <span style="font-weight:700; font-size:1.05rem; color:#006D70;"><i class="fa-solid fa-calendar-day" style="margin-right:6px;"></i> วันที่ 3 : วันศุกร์ที่ 20 พฤศจิกายน 2569</span>
+            <span class="en" style="color:#64748b; font-size:0.88rem;">Friday, 20 November 2026</span>
+          </div>
+          <div style="line-height:1.8; color:#334155; font-size:0.92rem;">
+            <div>• <b>08:30 - 09:00 น.</b> ลงทะเบียนและสรุปบทเรียนผลงานเด่น</div>
+            <div>• <b>09:00 - 11:30 น.</b> บรรยายพิเศษ: การขับเคลื่อนสู่ Smart & Sustainable Hospital</div>
+            <div>• <b>11:30 - 12:30 น.</b> พิธีมอบรางวัลผลงานวิจัย นวัตกรรม และผลงานคุณภาพยอดเยี่ยม พร้อมพิธีปิดการประชุม</div>
+            <div>• <b>12:30 - 13:30 น.</b> รับประทานอาหารกลางวันและเดินทางกลับโดยสวัสดิภาพ</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; padding:14px 18px; background:#f0fdfa; border:1px solid #99f6e4; border-radius:10px; font-size:0.9rem; color:#0f766e;">
+        <i class="fa-solid fa-location-dot" style="margin-right:6px;"></i> <b>สถานที่จัดงาน:</b> อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต ตำบลคลองหนึ่ง อำเภอคลองหลวง จังหวัดปทุมธานี
+      </div>
+    </div>
+  </section>
+
   <section class="page" id="page-pass"><div class="card"><div class="section-title"><b>คูปองอาหาร QR Code</b><span class="en">Meal QR pass</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="passRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="passKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="loadPass()">แสดงคูปอง<span class="en">Show pass</span></button><button class="btn btn-soft" style="margin-top:29px;margin-left:8px;" onclick="emailMyPass()">ส่งเข้า Email<span class="en">Send to Email</span></button></div></div></div><div id="passResult"></div></section>
 </main>
 
@@ -337,7 +501,7 @@ const HACC_LOGO='/images/hacc-logo.png';
 let BOOT=null;
 let HERO_INDEX=0,HERO_TIMER=null,PDPA_READ=false;
 const $=s=>document.querySelector(s);
-async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
+async function rpc(n,...a){const maxRetries=/^(getPublicBootstrap|adminBootstrap)/.test(n)?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){const err=new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');if(response.status>=400&&response.status<500){throw err;}lastErr=err;if(attempt+1>=maxRetries)throw err;continue;}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
 function load(t){$('#loadingText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}
 function done(){$('#loading').classList.remove('show')}
 function alertErr(e){done();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
@@ -346,19 +510,74 @@ function formObj(f){const o={};new FormData(f).forEach((v,k)=>o[k]=v);f.querySel
 function fileObj(el){return new Promise((res,rej)=>{const f=el.files[0];if(!f)return res(null);const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 
-function setHeroSlide(index,userAction=false){
-  const slides=[...document.querySelectorAll('[data-hero-slide]')],dots=[...document.querySelectorAll('.hero-dot')];
-  if(!slides.length)return;HERO_INDEX=(Number(index)+slides.length)%slides.length;
-  slides.forEach((el,i)=>{const active=i===HERO_INDEX;el.classList.toggle('active',active);el.setAttribute('aria-hidden',String(!active))});
-  dots.forEach((el,i)=>el.classList.toggle('active',i===HERO_INDEX));
-  if(userAction)startHeroCarousel();
+function normalizeBannerImageUrl(url){
+  if(!url) return '';
+  let str = String(url).trim();
+  if(str.startsWith('data:image/')) return str;
+  if(str.startsWith('/')) return str;
+  const driveFileMatch = str.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=|thumbnail\?id=)([a-zA-Z0-9_-]+)/);
+  if(driveFileMatch && driveFileMatch[1]) {
+    return 'https://lh3.googleusercontent.com/d/' + driveFileMatch[1];
+  }
+  return str;
 }
-function nextHeroSlide(step=1){setHeroSlide(HERO_INDEX+step,true)}
-function startHeroCarousel(){clearInterval(HERO_TIMER);HERO_TIMER=setInterval(()=>setHeroSlide(HERO_INDEX+1),9000)}
+
+function setHeroSlide(index,userAction=false){
+  const slides=[...document.querySelectorAll('[data-hero-slide]')];
+  const dots=[...document.querySelectorAll('.hero-dot')];
+  if(!slides.length) return;
+  HERO_INDEX=((Number(index)%slides.length)+slides.length)%slides.length;
+  slides.forEach((el,i)=>{
+    const active=i===HERO_INDEX;
+    el.classList.toggle('active',active);
+    el.setAttribute('aria-hidden',String(!active));
+  });
+  dots.forEach((el,i)=>el.classList.toggle('active',i===HERO_INDEX));
+  if(userAction) startHeroCarousel();
+}
+
+function nextHeroSlide(step=1){
+  setHeroSlide(HERO_INDEX+step,true);
+}
+
+let CAROUSEL_EVENTS_BOUND = false;
+function startHeroCarousel(){
+  clearInterval(HERO_TIMER);
+  HERO_TIMER=setInterval(()=>setHeroSlide(HERO_INDEX+1),6500);
+  
+  if(!CAROUSEL_EVENTS_BOUND){
+    CAROUSEL_EVENTS_BOUND = true;
+    const c = $('#heroCarousel');
+    if(c){
+      c.addEventListener('mouseenter',()=>clearInterval(HERO_TIMER));
+      c.addEventListener('mouseleave',()=>startHeroCarousel());
+      
+      // Touch swipe support for mobile
+      let touchStartX = 0;
+      c.addEventListener('touchstart',e=>{
+        if(e.changedTouches && e.changedTouches[0]) touchStartX = e.changedTouches[0].screenX;
+      },{passive:true});
+      c.addEventListener('touchend',e=>{
+        if(e.changedTouches && e.changedTouches[0]){
+          const diff = e.changedTouches[0].screenX - touchStartX;
+          if(diff > 45) nextHeroSlide(-1);
+          else if(diff < -45) nextHeroSlide(1);
+        }
+      },{passive:true});
+    }
+  }
+}
+
 function showScheduleNotice(){
   const dates=getEventDates();
-  const dateHtml=dates.length?dates.map((d,i)=>`<div style="padding:7px 0;border-bottom:1px solid #e6edf0"><b>วันที่ ${i+1}</b> — ${esc(formatThaiDate(d))}<span class="en">${esc(formatEnglishDate(d))}</span></div>`).join(''):'ผู้ดูแลระบบยังไม่ได้กำหนดรายละเอียดกำหนดการ';
-  Swal.fire({title:'ร่างกำหนดการจัดงาน',html:`<div style="text-align:left;line-height:1.7">${dateHtml}<p style="margin-top:14px;color:#60758a">รายละเอียดกิจกรรมรายช่วงเวลาจะประกาศเพิ่มเติมโดยคณะผู้จัดงาน</p></div>`,width:650,confirmButtonText:'ปิด',confirmButtonColor:'#006D70'});
+  const dateHtml=dates.length?dates.map((d,i)=>`<div style="padding:8px 0;border-bottom:1px solid #e6edf0;display:flex;justify-content:space-between;align-items:center;"><span><b>วันที่ ${i+1}:</b> ${esc(formatThaiDate(d))}</span><span class="en" style="color:#006D70;font-size:0.85rem;">${esc(formatEnglishDate(d))}</span></div>`).join(''):'ผู้ดูแลระบบยังไม่ได้กำหนดรายละเอียดกำหนดการ';
+  Swal.fire({
+    title:'ร่างกำหนดการจัดงานประชุมวิชาการ',
+    html:`<div style="text-align:left;line-height:1.7"><div style="margin-bottom:12px;padding:10px 12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;font-size:0.9rem;color:#0f766e;"><i class="fa-solid fa-location-dot"></i> สถานที่จัดงาน: <b>อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</b></div>${dateHtml}<p style="margin-top:14px;color:#60758a;font-size:0.85rem;"><i class="fa-solid fa-circle-info"></i> รายละเอียดตารางบรรยายและกิจกรรมรายช่วงเวลาจะประกาศเพิ่มเติมโดยคณะผู้จัดงาน</p></div>`,
+    width:650,
+    confirmButtonText:'ปิดหน้าต่าง',
+    confirmButtonColor:'#006D70'
+  });
 }
 async function openPdpaNotice(){
   const tpl=$('#pdpaNoticeTemplate');
@@ -368,20 +587,33 @@ async function openPdpaNotice(){
 function resetConsentState(){PDPA_READ=false;const cb=$('#consentAccepted'),label=$('#consentLabel'),hint=$('#consentHint');if(cb){cb.checked=false;cb.disabled=true}if(label)label.classList.add('locked');if(hint){hint.textContent='กรุณากดเปิดอ่านข้อความขอความยินยอมก่อน จึงจะสามารถเลือกให้ความยินยอมได้';hint.classList.remove('ready')}}
 function renderAnnouncement(){
   if(!BOOT)return;const c=BOOT.conference||{};
-  const regClose=$('#announceRegistrationClose'),payClose=$('#announcePaymentClose'),resultDate=$('#announceResultDate');
+  const regClose=$('#announceRegistrationClose'),payClose=$('#announcePaymentClose'),resultDate=$('#announceResultDate'),subClose=$('#announceSubmissionCloseHero');
   if(regClose&&c.RegistrationCloseAt)regClose.textContent=formatThaiDate(c.RegistrationCloseAt);
   if(payClose&&c.PaymentCloseAt)payClose.textContent=formatThaiDate(c.PaymentCloseAt);
   if(resultDate&&c.ResultAnnouncementAt)resultDate.textContent=formatThaiDate(c.ResultAnnouncementAt);
+  if(subClose&&c.SubmissionCloseAt)subClose.textContent=formatThaiDate(c.SubmissionCloseAt);
   const external=(BOOT.registrationTypes||[]).filter(x=>Number(x.FeeAmount||0)>0).sort((a,b)=>Number(b.FeeAmount||0)-Number(a.FeeAmount||0));
-  const host=$('#announceFees');if(host&&external.length)host.innerHTML=external.map(x=>`<div class="fee-row"><span>${esc(x.TypeNameTH||x.TypeCode)}</span><span class="fee-amount">${Number(x.FeeAmount||0).toLocaleString('th-TH')} บาท/ท่าน</span></div>`).join('');
+  const host=$('#announceFees');
+  if(host&&external.length){
+    host.innerHTML=external.map(x=>`<div class="fee-row" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:0.86rem;"><span>${esc(x.TypeNameTH||x.TypeCode)}</span><strong style="color:#006D70;">${Number(x.FeeAmount||0).toLocaleString('th-TH')} บาท/ท่าน</strong></div>`).join('');
+  }
 }
 function dateObject(v){if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12,0,0);const d=new Date(s);return isNaN(d)?null:d}
 function formatThaiDate(v,withTime=false){const d=dateObject(v);if(!d)return '';const options={day:'2-digit',month:'long',year:'numeric',timeZone:'Asia/Bangkok'};if(withTime){options.hour='2-digit';options.minute='2-digit';options.hour12=false}return new Intl.DateTimeFormat('th-TH-u-ca-buddhist',options).format(d)}
 function formatEnglishDate(v,withTime=false){const d=dateObject(v);if(!d)return '';const options={day:'2-digit',month:'long',year:'numeric',timeZone:'Asia/Bangkok'};if(withTime){options.hour='2-digit';options.minute='2-digit';options.hour12=false}return new Intl.DateTimeFormat('en-GB',options).format(d)}
 function getEventDates(){if(Array.isArray(BOOT?.eventDates)&&BOOT.eventDates.length)return BOOT.eventDates;try{const a=JSON.parse(BOOT?.settings?.EVENT_DATES_JSON||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
 function renderCurrentDate(){$('#brandDate').textContent='TUH 19 & HA-Regional 1'}
-function renderConferenceTitle(title){const el=$('#confName');if(!el)return;const normalized=String(title||'').replace(/\s+/g,' ').trim();const isTarget=/งานมหกรรมคุณภาพ/.test(normalized)&&/HA-Regional Forum/i.test(normalized)&&/ครั้งที่\s*19/.test(normalized)&&/ครั้งที่\s*1/.test(normalized);if(isTarget||!normalized){el.classList.add('hero-title-fixed');el.setAttribute('aria-label','งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569');el.innerHTML='<span>งานมหกรรมคุณภาพ</span><span>โรงพยาบาล ครั้งที่ 19 และ</span><span>งาน HA-Regional Forum</span><span>ครั้งที่ 1 ประจำปี 2569</span>';}else{el.classList.remove('hero-title-fixed');el.textContent=normalized;el.setAttribute('aria-label',normalized);}}
-function eventRangeHtml(dates){if(!dates.length)return '<span class="pill">กำหนดวันโดยผู้ดูแลระบบ</span>';const th=dates.length===1?formatThaiDate(dates[0]):formatThaiDate(dates[0])+' – '+formatThaiDate(dates[dates.length-1]);const en=dates.length===1?formatEnglishDate(dates[0]):formatEnglishDate(dates[0])+' – '+formatEnglishDate(dates[dates.length-1]);return '<span class="pill">'+esc(th)+'<span class="en" style="color:#e4f1f2">'+esc(en)+'</span></span>'}
+function renderConferenceTitle(title){
+  const el=$('#confName');if(!el)return;
+  const normalized=String(title||'').replace(/\s+/g,' ').trim();
+  const isTarget=/งานมหกรรมคุณภาพ/.test(normalized)&&/HA-Regional Forum/i.test(normalized)&&/ครั้งที่\s*19/.test(normalized)&&/ครั้งที่\s*1/.test(normalized);
+  if(isTarget||!normalized){
+    el.innerHTML='<span>งานมหกรรมคุณภาพ</span><span>โรงพยาบาล ครั้งที่ 19 และ</span><span>งาน HA-Regional Forum</span><span>ครั้งที่ 1 ประจำปี 2569</span>';
+  }else{
+    el.textContent=normalized;
+  }
+}
+function eventRangeHtml(dates){if(!dates.length)return '<div class="banner-pill"><i class="fa-regular fa-calendar-days"></i> <span>กำหนดวันโดยผู้ดูแลระบบ</span></div>';const th=dates.length===1?formatThaiDate(dates[0]):formatThaiDate(dates[0])+' – '+formatThaiDate(dates[dates.length-1]);const en=dates.length===1?formatEnglishDate(dates[0]):formatEnglishDate(dates[0])+' – '+formatEnglishDate(dates[dates.length-1]);return '<div class="banner-pill"><i class="fa-regular fa-calendar-days"></i> <span>'+esc(th)+' <small>('+esc(en)+')</small></span></div>'}
 function renderAttendanceDates(){const dates=getEventDates().slice(0,3),host=$('#attendanceDates');if(!dates.length){host.innerHTML='<div class="notice">ผู้ดูแลระบบยังไม่ได้กำหนดวันจัดงาน กรุณาติดต่อเจ้าหน้าที่</div>';return}host.innerHTML=dates.map((d,i)=>`<label class="attendance-option"><input type="checkbox" name="AttendanceDay${i+1}"><span><b>วันที่ ${i+1}: ${esc(formatThaiDate(d))}</b><span class="en">Day ${i+1}: ${esc(formatEnglishDate(d))}</span></span></label>`).join('')}
 function settingOptions(key,fallback){try{const raw=BOOT&&BOOT.settings?BOOT.settings[key]:'';const v=JSON.parse(raw||'[]');if(Array.isArray(v)&&v.length)return [...new Set(v.map(x=>String(x||'').trim()).filter(Boolean))];}catch(e){}return fallback||[]}
 function optionTags(values){return (values||[]).map(v=>`<option value="${esc(v)}">`).join('')}
@@ -400,13 +632,13 @@ function applyBootData(data){
   const leftLogo=$('#heroLeftLogo');if(leftLogo)leftLogo.src=BOOT.conference.LogoUrl||DEFAULT_LOGO;
   const rightLogo=$('#heroRightLogo');if(rightLogo)rightLogo.src=HACC_LOGO;
   renderConferenceTitle(BOOT.conference.ConferenceNameTH||'');
-  const desc=$('#confDesc');if(desc)desc.textContent=BOOT.conference.DescriptionTH||'';
+  const desc=$('#confDesc');if(desc)desc.textContent=BOOT.conference.DescriptionTH||'ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ';
   const dates=getEventDates();
   renderAnnouncement();
-  const meta=$('#confMeta');if(meta)meta.innerHTML='<span class="pill">'+esc(BOOT.conference.Venue||'กำหนดสถานที่ภายหลัง')+'</span>'+eventRangeHtml(dates);
+  const meta=$('#confMeta');if(meta)meta.innerHTML='<div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>'+esc(BOOT.conference.Venue||'อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')+'</span></div>'+eventRangeHtml(dates);
   document.documentElement.style.setProperty('--blue',BOOT.conference.PrimaryColor||'#0C385B');
   document.documentElement.style.setProperty('--teal',BOOT.conference.SecondaryColor||'#006D70');
-  const pages=[['home','หน้าหลัก','Home'],['register','ลงทะเบียน','Registration'],['status','แก้ไข/สถานะ','Edit/Status'],['payment','ชำระเงิน','Payment'],['work','ส่งผลงาน','Submit work'],['author-status','สถานะผลงาน','Work Status'],['pass','คูปองอาหาร','Meal pass']];
+  const pages=[['home','หน้าหลัก','Home'],['register','ลงทะเบียน','Registration'],['status','แก้ไข/สถานะ','Edit/Status'],['payment','ชำระเงิน','Payment'],['work','ส่งผลงาน','Submit work'],['author-status','สถานะผลงาน','Work Status'],['schedule','กำหนดการ','Schedule'],['pass','คูปองอาหาร','Meal pass']];
   const nav=$('#nav');if(nav)nav.innerHTML=pages.map((p,i)=>`<button data-page="${p[0]}" class="${i===0?'active':''}" onclick="go('${p[0]}')">${p[1]}<span class="en">${p[2]}</span></button>`).join('');
   const pType=$('#participantType');
   if(pType&&Array.isArray(BOOT.registrationTypes)&&BOOT.registrationTypes.length){
@@ -414,9 +646,124 @@ function applyBootData(data){
   }
   renderConfiguredRegistrationOptions();
   renderAttendanceDates();
+  renderHeroBanners();
 
   const fs=$('#regFieldSet');if(fs)fs.disabled=false;
   const statusEl=$('#regBootStatus');if(statusEl)statusEl.style.display='none';
+}
+
+function renderHeroBanners(){
+  if(!BOOT) return;
+  const raw = BOOT.settings?.BANNER_SLIDES_JSON || '[]';
+  let bannerList = [];
+  try {
+    bannerList = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if(!Array.isArray(bannerList)) bannerList = [];
+  } catch(e) {
+    bannerList = [];
+  }
+  
+  const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false);
+  const carousel = $('#heroCarousel');
+  if(!carousel) return;
+
+  // Render ONLY banners uploaded by Admin
+  if(activeBanners.length > 0) {
+    let html = '';
+    activeBanners.forEach((b, idx) => {
+      const normalizedUrl = normalizeBannerImageUrl(b.imageUrl);
+      const cursorStyle = b.linkUrl ? 'cursor:pointer;' : '';
+      const clickAttr = b.linkUrl ? `onclick="window.open('${esc(b.linkUrl)}','_blank')"` : '';
+      html += `
+        <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
+          <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
+            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" onerror="this.onerror=null; this.src='https://placehold.co/1920x600?text=Banner+Image';">
+            ${(b.title || b.subtitle) ? `
+              <div class="custom-banner-overlay">
+                <div class="custom-banner-card">
+                  ${b.title ? `<div style="font-size:1.15rem; font-weight:800; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,0.6);">${esc(b.title)}</div>` : ''}
+                  ${b.subtitle ? `<div style="font-size:0.88rem; color:#bae6fd; margin-top:4px; text-shadow:0 1px 4px rgba(0,0,0,0.6);">${esc(b.subtitle)}</div>` : ''}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </article>
+      `;
+    });
+
+    if(activeBanners.length > 1) {
+      html += `
+        <button class="hero-arrow prev" type="button" aria-label="ภาพก่อนหน้า" onclick="nextHeroSlide(-1)">‹</button>
+        <button class="hero-arrow next" type="button" aria-label="ภาพถัดไป" onclick="nextHeroSlide(1)">›</button>
+        <div class="hero-controls" aria-label="เลือกแบนเนอร์">
+          ${activeBanners.map((b, idx) => `<button class="hero-dot ${idx === 0 ? 'active' : ''}" type="button" aria-label="${esc(b.title || 'แบนเนอร์ ' + (idx+1))}" onclick="setHeroSlide(${idx}, true)"></button>`).join('')}
+        </div>
+      `;
+    }
+
+    carousel.innerHTML = html;
+    HERO_INDEX = 0;
+    if(activeBanners.length > 1) {
+      startHeroCarousel();
+    } else {
+      clearInterval(HERO_TIMER);
+    }
+  } else {
+    // Fallback single conference header when no admin banners are uploaded
+    carousel.innerHTML = `
+      <article class="hero-slide active" data-hero-slide="0" aria-hidden="false">
+        <div class="banner-stage">
+          <div class="banner-side left">
+            <div class="banner-star-badge">
+              <div class="star-emblem-wrap">
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#fff4cc"/>
+                      <stop offset="35%" stop-color="#f59e0b"/>
+                      <stop offset="70%" stop-color="#b45309"/>
+                      <stop offset="100%" stop-color="#fef08a"/>
+                    </linearGradient>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="3" result="blur"/>
+                      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                    </filter>
+                  </defs>
+                  <polygon points="50,5 64,36 98,36 70,57 81,90 50,70 19,90 30,57 2,36 36,36" fill="url(#goldGrad)" stroke="#fff" stroke-width="1.5" filter="url(#glow)"/>
+                </svg>
+              </div>
+              <div class="star-content-wrap">
+                <div class="tuh-brand">TUH <span>19<sup>th</sup></span></div>
+                <div class="qf-brand">QUALITY FAIR</div>
+              </div>
+              <img class="tuh-logo-mini" id="heroLeftLogo" src="${BOOT?.conference?.LogoUrl || DEFAULT_LOGO}" alt="TUH Logo" referrerpolicy="no-referrer">
+            </div>
+          </div>
+          <div class="banner-center">
+            <h1 class="banner-title" id="confName">${esc(BOOT?.conference?.ConferenceNameTH || 'งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569')}</h1>
+            <p class="banner-sub" id="confDesc">${esc(BOOT?.conference?.DescriptionTH || 'ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ')}</p>
+            <div class="banner-pills" id="confMeta">
+              <div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>${esc(BOOT?.conference?.Venue || 'อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')}</span></div>
+              ${eventRangeHtml(getEventDates())}
+            </div>
+          </div>
+          <div class="banner-side right">
+            <div class="banner-hacc-badge">
+              <div class="hacc-circle-wrap">
+                <img id="heroRightLogo" src="${HACC_LOGO}" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
+              </div>
+              <div class="hacc-caption-text">
+                <b>HACC นครจตุรศรีปทุมทอง</b>
+                <span>HA Regional Forum เขต 4</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+    HERO_INDEX = 0;
+    clearInterval(HERO_TIMER);
+  }
 }
 
 async function init(){
@@ -638,11 +985,38 @@ function renderAuthorWorks(works,reg){works=works||[];if(!works.length){$('#auth
 async function promptReplaceWorkFile(workId,category,title){const {value:file}=await Swal.fire({title:title,input:'file',inputAttributes:{'accept':['ORIGINAL','REVISION','FINAL_PRESENTATION'].includes(category)?'.pdf,.doc,.docx,.ppt,.pptx':'*/*','aria-label':'Upload your file'},showCancelButton:true,confirmButtonText:'อัปโหลด',cancelButtonText:'ยกเลิก',confirmButtonColor:'#006D70'});if(file){load('กำลังอัปโหลดไฟล์...');try{const f=await fileObj({files:[file]});await rpc('replaceWorkFile',CID,$('#authorWorkRegId').value,$('#authorWorkKey').value,workId,category,f);done();Swal.fire({icon:'success',title:'อัปโหลดสำเร็จ',confirmButtonColor:'#006D70'});lookupAuthorWorks()}catch(e){alertErr(e)}}}
 function updateWorkRules(){const sel=$('#workCategory'),code=sel?.selectedOptions?.[0]?.dataset?.code||'',researchOrInnovation=['RESEARCH','INNOVATION'].includes(code),ethics=$('#ethicsRequired'),hint=$('#ethicsFileHint');if(hint)hint.textContent=researchOrInnovation?'หากผลงานเกี่ยวข้องกับมนุษย์ ต้องแนบไฟล์หลักฐานจริยธรรม':'แนบเมื่อผลงานเกี่ยวข้องกับมนุษย์';if(ethics&&researchOrInnovation)ethics.closest('.work-rule')?.classList.add('gold');else ethics?.closest('.work-rule')?.classList.remove('gold')}
 function updateRegion4Intent(){const yes=document.querySelector('input[name="Region4Affiliation"][value="YES"]')?.checked,box=$('#region4IntentBox');if(box)box.classList.toggle('show',!!yes);document.querySelectorAll('input[name="Region4AwardIntentChoice"]').forEach(x=>{x.required=!!yes;if(!yes)x.checked=false})}
-async function emailMyPass(){load('กำลังส่งคูปองเข้า Email');try{await rpc('emailMyMealPass',CID,$('#passRegId').value,$('#passKey').value);done();Swal.fire({icon:'success',title:'ส่ง Email สำเร็จ',text:'กรุณาตรวจสอบในกล่องจดหมาย หรือ Junk/Spam',confirmButtonColor:'#006D70'})}catch(e){alertErr(e)}}
+async function emailMyPass(){
+  const regId = ($('#passRegId')?.value || '').trim();
+  const key = ($('#passKey')?.value || '').trim();
+  if(!regId){
+    Swal.fire({icon:'warning',title:'กรุณากรอกเลขลงทะเบียน',text:'เช่น REG-2026-000123',confirmButtonColor:'#006D70'});
+    return;
+  }
+  if(!key){
+    Swal.fire({icon:'warning',title:'กรุณากรอกข้อมูลยืนยันตัวตน',text:'กรุณากรอก Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน',confirmButtonColor:'#006D70'});
+    return;
+  }
+  load('กำลังส่งคูปองเข้า Email');
+  try{
+    await rpc('emailMyMealPass',CID,regId,key);
+    done();
+    Swal.fire({icon:'success',title:'ส่ง Email สำเร็จ',text:'กรุณาตรวจสอบในกล่องจดหมาย หรือ Junk/Spam',confirmButtonColor:'#006D70'});
+  }catch(e){alertErr(e)}
+}
 async function loadPass(){
+  const regId = ($('#passRegId')?.value || '').trim();
+  const key = ($('#passKey')?.value || '').trim();
+  if(!regId){
+    Swal.fire({icon:'warning',title:'กรุณากรอกเลขลงทะเบียน',text:'เช่น REG-2026-000123',confirmButtonColor:'#006D70'});
+    return;
+  }
+  if(!key){
+    Swal.fire({icon:'warning',title:'กรุณากรอกข้อมูลยืนยันตัวตน',text:'กรุณากรอก Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน',confirmButtonColor:'#006D70'});
+    return;
+  }
   load('กำลังโหลดคูปอง');
   try{
-    const r=await rpc('getMealPass',CID,$('#passRegId').value,$('#passKey').value);
+    const r=await rpc('getMealPass',CID,regId,key);
     done();
     const reg=r.registration||{},active=(r.entitlements||[]).filter(e=>String(e.Status||'').toUpperCase()!=='CANCELLED');
     const confName=BOOT.conference?.ShortName||'มหกรรมคุณภาพ 2569';
@@ -650,6 +1024,7 @@ async function loadPass(){
     const passLabel=isInternal?'TUH STAFF EVENT PASS':'TUH EVENT PASS';
     const rows=active.map(e=>`<div class="ent-row"><span>${esc(formatThaiDate(e.EventDate))} · ${esc(e.MealNameTH||e.MealCode)}</span><b>${esc(e.Status)}</b></div>`).join('');
     $('#passResult').innerHTML=`<div class="card"><div class="meal-pass-public"><div class="meal-pass-top"><span class="meal-pass-event">${esc(confName)}</span><span>${esc(passLabel)}</span></div><div style="color:#e6c252;font-weight:600;font-size:0.95rem;margin-top:6px">ยินดีต้อนรับเข้าสู่งาน</div><div class="meal-pass-name">${esc(reg.FullName||'')}</div><div class="meal-pass-id">ID: ${esc(reg.RegID||'')}</div><div style="background:#fff;border-radius:14px;padding:10px;width:210px;margin:18px auto;box-sizing:border-box"><img src="https://quickchart.io/qr?size=360&margin=2&text=${encodeURIComponent(r.PassToken)}" alt="QR Code คูปองอาหาร" style="width:190px;height:190px;display:block;margin:0 auto"></div><div class="meal-pass-meta"><div>ประเภทบุคคล<b>${esc(reg.ParticipantTypeName||reg.ParticipantType||'')}</b></div><div>สถานะการชำระเงิน<b>${esc(reg.PaymentStatus||'')}</b></div></div><div class="meal-entitlements">${rows||'<div class="ent-row">ยังไม่มีรายการสิทธิ์อาหาร</div>'}</div><div class="meal-pass-note" style="margin-top:14px;color:#d7a7ba;font-size:0.75rem">กรุณาแสดง QR Code นี้ให้จุดสแกนอาหาร และไม่ส่งต่อให้ผู้อื่น</div></div></div>`;
+    $('#passResult').scrollIntoView({behavior:'smooth'});
   }catch(e){alertErr(e)}
 }
 const heroCarousel=$('#heroCarousel');if(heroCarousel){heroCarousel.addEventListener('mouseenter',()=>clearInterval(HERO_TIMER));heroCarousel.addEventListener('mouseleave',startHeroCarousel);heroCarousel.addEventListener('focusin',()=>clearInterval(HERO_TIMER));heroCarousel.addEventListener('focusout',startHeroCarousel)}

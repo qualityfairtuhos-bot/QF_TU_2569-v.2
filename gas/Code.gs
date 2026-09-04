@@ -2254,6 +2254,18 @@ function importGoogleFormSheetAndSendEmails() {
 }
 
 /**
+ * ฟังก์ชันสำหรับตรวจสอบโควตาการส่งอีเมลประจำวันที่เหลืออยู่ของบัญชี Google
+ * สามารถกด Run ใน Google Apps Script Editor เพื่อดูจำนวนที่เหลือได้ทันที
+ */
+function checkEmailQuota() {
+  const remaining = MailApp.getRemainingDailyQuota();
+  Logger.log('====================================');
+  Logger.log('โควตาส่งอีเมลที่เหลือของบัญชีวันนี้: ' + remaining + ' ฉบับ');
+  Logger.log('====================================');
+  return { remainingDailyQuota: remaining };
+}
+
+/**
  * ฟังก์ชันหลักในการส่งอีเมลแจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วน (INCOMPLETE)
  * - ส่งอีเมลแจ้งรหัสลงทะเบียน (RegID) พร้อมปุ่มลิงก์ตรงสำหรับเปิดหน้าเว็บกรอกเลขบัตรประชาชน 13 หลัก
  * - มีระบบป้องกันการส่งซ้ำ (เช็คจาก EmailLogs)
@@ -3710,11 +3722,26 @@ function signMealToken_(cid,regId,date,meal){const payload=[cid,regId,date,meal]
 function parseMealToken_(token){const p=String(token).split('.');if(p.length!==2)throw new Error('QR ไม่ถูกต้อง');const payload=Utilities.newBlob(Utilities.base64DecodeWebSafe(p[0])).getDataAsString(),sig=Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload,getAuthSecret_())).replace(/=+$/,'');if(sig!==p[1])throw new Error('QR ไม่ถูกต้อง');const a=payload.split('|');return {conferenceId:a[0],regId:a[1],date:a[2],meal:a[3]};}
 function getMealPass(conferenceId,regId,emailOrPhone){
   return runSafely_('getMealPass',function(){
-    const r=findOne_('Registrations',{ConferenceID:conferenceId||APP.DEFAULT_CONFERENCE_ID,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
-    const key=normalizeEmail_(emailOrPhone);if(normalizeEmail_(r.Email)!==key&&normalizePhone_(r.Phone)!==normalizePhone_(emailOrPhone))throw new Error('ข้อมูลยืนยันไม่ถูกต้อง');
-    if(['READY','SENT'].indexOf(upper_(r.MealPassStatus))<0)throw new Error('คูปองอาหารยังไม่พร้อม');
-    const ents=findMany_('MealEntitlements',{ConferenceID:r.ConferenceID,RegID:r.RegID});
-    return {registration:publicRegistration_(r),PassToken:signMealPassToken_(r.ConferenceID,r.RegID),entitlements:serialize_(ents)};
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cleanId = clean_(regId);
+    if(!cleanId) throw new Error('กรุณาระบุเลขลงทะเบียน');
+    const r = findOne_('Registrations', {ConferenceID: cid, RegID: cleanId});
+    if(!r) throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน ' + cleanId);
+    const key = clean_(emailOrPhone);
+    if(!key) throw new Error('กรุณาระบุ Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน');
+    const keyEmail = normalizeEmail_(key);
+    const keyPhone = normalizePhone_(key);
+    if(normalizeEmail_(r.Email) !== keyEmail && normalizePhone_(r.Phone) !== keyPhone){
+      throw new Error('Email หรือเบอร์โทรศัพท์ไม่ตรงกับข้อมูลในระบบ');
+    }
+    const type = registrationTypeMap_(cid)[r.ParticipantType] || {};
+    const elig = mealPassEligibility_(r, type);
+    if(!elig.ok){
+      throw new Error('ยังไม่สามารถออกคูปองอาหารได้ (' + elig.reason + ')');
+    }
+    ensureMealEntitlements_(cid, r.RegID);
+    const ents = findMany_('MealEntitlements', {ConferenceID: r.ConferenceID, RegID: r.RegID});
+    return {registration: publicRegistration_(r), PassToken: signMealPassToken_(r.ConferenceID, r.RegID), entitlements: serialize_(ents)};
   });
 }
 function scanMealToken(token,scannerToken,conferenceId,scannerPoint,eventDate,mealCode){
@@ -5128,6 +5155,8 @@ function adminBootstrap(token, conferenceId) {
     const conf = findOne_('Conferences', { ConferenceID: ctx.conferenceId });
     if (!conf) throw new Error('ไม่พบข้อมูลงานประชุม');
     const settings = settingsMap_(ctx.conferenceId);
+    const categories = findMany_('WorkCategories', { ConferenceID: ctx.conferenceId }).filter(function(x) { return bool_(x.Active); });
+    const presentations = findMany_('PresentationTypes', { ConferenceID: ctx.conferenceId }).filter(function(x) { return bool_(x.Active); });
     return {
       user: serialize_({
         UserID: ctx.user.UserID,
@@ -5137,7 +5166,9 @@ function adminBootstrap(token, conferenceId) {
       }),
       role: ctx.role,
       conference: serialize_(conf),
-      settings: settings
+      settings: settings,
+      workCategories: serialize_(categories),
+      presentationTypes: serialize_(presentations)
     };
   });
 }
@@ -5581,13 +5612,60 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
   });
 }
 
-function adminUpdateWorkStatus(token, conferenceId, workId, newStatus) {
+function adminUpdateWorkStatus(token, conferenceId, workId, newStatus, categoryId, presentationTypeId) {
   return runSafely_('adminUpdateWorkStatus', function() {
     var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
-    var w = findOne_('Works', { ConferenceID: conferenceId, WorkID: workId });
+    var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId });
     if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
-    updateRecord_('Works', w.__row, { Status: newStatus, UpdatedAt: new Date(), LastModifiedBy: ctx.user.Email });
-    return { newStatus: newStatus };
+
+    var patch = { UpdatedAt: new Date(), LastModifiedBy: ctx.user.Email || ctx.user.UserID };
+
+    if (typeof newStatus === 'object' && newStatus !== null) {
+      if (newStatus.status || newStatus.Status) {
+        patch.Status = newStatus.status || newStatus.Status;
+      }
+      var cVal = newStatus.categoryId || newStatus.CategoryID || newStatus.Category;
+      if (cVal) {
+        var cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: cVal }) ||
+                  findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: cVal }) ||
+                  findOne_('WorkCategories', { CategoryID: cVal }) ||
+                  findOne_('WorkCategories', { CategoryCode: cVal });
+        patch.CategoryID = cat ? cat.CategoryID : cVal;
+        patch.CategoryName = cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : cVal;
+      }
+      var pVal = newStatus.presentationTypeId || newStatus.PresentationTypeRequested || newStatus.PresentationType;
+      if (pVal) {
+        var pt = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: pVal }) ||
+                 findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: pVal }) ||
+                 findOne_('PresentationTypes', { PresentationTypeID: pVal }) ||
+                 findOne_('PresentationTypes', { TypeCode: pVal });
+        patch.PresentationTypeRequested = pt ? pt.PresentationTypeID : pVal;
+        patch.PresentationTypeName = pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : pVal;
+      }
+    } else {
+      if (newStatus) patch.Status = newStatus;
+      if (categoryId) {
+        var cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: categoryId }) ||
+                  findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: categoryId }) ||
+                  findOne_('WorkCategories', { CategoryID: categoryId }) ||
+                  findOne_('WorkCategories', { CategoryCode: categoryId });
+        patch.CategoryID = cat ? cat.CategoryID : categoryId;
+        patch.CategoryName = cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : categoryId;
+      }
+      if (presentationTypeId) {
+        var pt = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: presentationTypeId }) ||
+                 findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: presentationTypeId }) ||
+                 findOne_('PresentationTypes', { PresentationTypeID: presentationTypeId }) ||
+                 findOne_('PresentationTypes', { TypeCode: presentationTypeId });
+        patch.PresentationTypeRequested = pt ? pt.PresentationTypeID : presentationTypeId;
+        patch.PresentationTypeName = pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : presentationTypeId;
+      }
+    }
+
+    updateRecord_('Works', w.__row, patch);
+    logAudit_(cid, ctx.user, ctx.role, 'UPDATE_WORK_STATUS', 'Works', workId, patch);
+    return { success: true, workId: workId, patch: patch };
   });
 }
 
