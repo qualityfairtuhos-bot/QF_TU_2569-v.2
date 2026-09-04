@@ -2664,14 +2664,23 @@ async function openUpdateWorkStatus(wid, currentStatus) {
   const currentCatName = w.CategoryName || w.CategoryNameTH || w.Category || '';
   const currentPt = w.PresentationTypeRequested || w.PresentationTypeName || '';
 
-  let categories = window.WORK_CATEGORIES || [];
+  // 5 หมวดหมู่ผลงานมาตรฐานที่ถูกต้องตามประกาศงานประชุม
+  const OFFICIAL_WORK_CATEGORIES = [
+    { code: 'SERVICE', name: 'Service Excellence', en: 'Service Excellence' },
+    { code: 'CQI', name: 'CQI/ Best Practice', en: 'CQI/ Best Practice' },
+    { code: 'PRIMARY', name: 'Primary Care & Community Network Development', en: 'Primary Care & Community Network Development' },
+    { code: 'RESEARCH', name: 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย', en: 'Quality and Safety Research' },
+    { code: 'INNOVATION', name: 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย', en: 'Quality and Safety Innovation' }
+  ];
+
+  let rawCategories = window.WORK_CATEGORIES || [];
   let presentationTypes = window.PRESENTATION_TYPES || [];
-  if (!categories.length || !presentationTypes.length) {
+  if (!rawCategories.length || !presentationTypes.length) {
     try {
       const d = await rpc('getAdminSettings', TOKEN, CID);
       if (d.categories && d.categories.length) {
-        categories = d.categories;
-        window.WORK_CATEGORIES = categories;
+        rawCategories = d.categories;
+        window.WORK_CATEGORIES = rawCategories;
       }
       if (d.presentationTypes && d.presentationTypes.length) {
         presentationTypes = d.presentationTypes;
@@ -2682,16 +2691,30 @@ async function openUpdateWorkStatus(wid, currentStatus) {
     }
   }
 
-  if (!categories.length) {
-    categories = [
-      { CategoryID: 'CAT-CQI', CategoryCode: 'CQI', CategoryNameTH: 'การพัฒนาคุณภาพอย่างต่อเนื่อง (CQI)' },
-      { CategoryID: 'CAT-R2R', CategoryCode: 'R2R', CategoryNameTH: 'การพัฒนางานประจำสู่งานวิจัย (R2R)' },
-      { CategoryID: 'CAT-INNOVATION', CategoryCode: 'INNOVATION', CategoryNameTH: 'นวัตกรรมและสิ่งประดิษฐ์' },
-      { CategoryID: 'CAT-POLICY', CategoryCode: 'POLICY', CategoryNameTH: 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร' },
-      { CategoryID: 'CAT-STORYTELLING', CategoryCode: 'STORYTELLING', CategoryNameTH: 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์' },
-      { CategoryID: 'CAT-OTHER', CategoryCode: 'OTHER', CategoryNameTH: 'อื่น ๆ' }
-    ];
-  }
+  // จัดกลุ่มและผูกรหัส CategoryID กับ 5 หมวดหมู่มาตรฐานให้ตรงกันทุกเครื่อง
+  const categories = OFFICIAL_WORK_CATEGORIES.map((off, idx) => {
+    const matched = rawCategories.find(c => {
+      const cCode = String(c.CategoryCode || '').toUpperCase();
+      const cId = String(c.CategoryID || '').toUpperCase();
+      const cName = String(c.CategoryNameTH || c.CategoryNameEN || '');
+      if (cCode === off.code || cId === 'CAT-' + off.code) return true;
+      if (off.code === 'SERVICE' && (/service/i.test(cCode) || /service/i.test(cName))) return true;
+      if (off.code === 'CQI' && (/cqi/i.test(cCode) || /cqi|best/i.test(cName))) return true;
+      if (off.code === 'PRIMARY' && (/primary/i.test(cCode) || /primary|community/i.test(cName))) return true;
+      if (off.code === 'RESEARCH' && (/research/i.test(cCode) || /วิจัย|research/i.test(cName))) return true;
+      if (off.code === 'INNOVATION' && (/innovation/i.test(cCode) || /นวัตกรรม|innovation/i.test(cName))) return true;
+      return false;
+    });
+
+    return {
+      CategoryID: matched ? (matched.CategoryID || matched.CategoryCode || ('CAT-' + off.code)) : ('CAT-' + off.code),
+      CategoryCode: off.code,
+      CategoryNameTH: off.name,
+      CategoryNameEN: off.en,
+      SortOrder: idx + 1
+    };
+  });
+
   if (!presentationTypes.length) {
     presentationTypes = [
       { PresentationTypeID: 'PT-2026-000001', TypeCode: 'ORAL', TypeNameTH: 'แบบบรรยาย (Oral Presentation)' },
@@ -2739,8 +2762,15 @@ async function openUpdateWorkStatus(wid, currentStatus) {
           ${categories.map(c => {
             const cid = c.CategoryID || c.CategoryCode || '';
             const cName = c.CategoryNameTH || c.CategoryNameEN || c.CategoryCode || cid;
-            const isSelected = (currentCatId && (currentCatId === cid || currentCatId === c.CategoryCode)) || 
-                               (currentCatName && (currentCatName === cName || currentCatName.includes(c.CategoryCode || '___')));
+            const isSelected = (currentCatId && (currentCatId === cid || currentCatId === c.CategoryCode || (cid.startsWith('CAT-') && currentCatId.endsWith(c.CategoryCode)))) || 
+                               (currentCatName && (
+                                 currentCatName === cName || 
+                                 (c.CategoryCode === 'SERVICE' && /service/i.test(currentCatName)) ||
+                                 (c.CategoryCode === 'CQI' && /cqi|best/i.test(currentCatName)) ||
+                                 (c.CategoryCode === 'PRIMARY' && /primary|community/i.test(currentCatName)) ||
+                                 (c.CategoryCode === 'RESEARCH' && /วิจัย|research/i.test(currentCatName)) ||
+                                 (c.CategoryCode === 'INNOVATION' && /นวัตกรรม|innovation/i.test(currentCatName))
+                               ));
             return `<option value="${esc(cid)}" ${isSelected ? 'selected' : ''}>${esc(cName)}</option>`;
           }).join('')}
         </select>

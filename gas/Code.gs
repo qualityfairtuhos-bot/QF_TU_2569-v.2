@@ -345,11 +345,11 @@ function seedOrganizationUnits_(cid){
 
 function seedWorkCategories_(cid){
   const rows=[
-    ['RESEARCH','ผลงานวิจัยด้านคุณภาพและความปลอดภัย','Quality and Safety Research'],
-    ['INNOVATION','ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย','Quality and Safety Innovation'],
     ['SERVICE','Service Excellence','Service Excellence'],
     ['CQI','CQI/ Best Practice','CQI/ Best Practice'],
-    ['PRIMARY','Primary Care & Community Network Development','Primary Care & Community Network Development']
+    ['PRIMARY','Primary Care & Community Network Development','Primary Care & Community Network Development'],
+    ['RESEARCH','ผลงานวิจัยด้านคุณภาพและความปลอดภัย','Quality and Safety Research'],
+    ['INNOVATION','ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย','Quality and Safety Innovation']
   ];
   rows.forEach(function(r,i){ if(!findOne_('WorkCategories',{ConferenceID:cid,CategoryCode:r[0]})) appendRecord_('WorkCategories',{CategoryID:nextId_('CAT'),ConferenceID:cid,CategoryCode:r[0],CategoryNameTH:r[1],CategoryNameEN:r[2],Active:true,SortOrder:i+1}); });
 }
