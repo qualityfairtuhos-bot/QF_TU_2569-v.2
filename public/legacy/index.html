@@ -501,7 +501,7 @@ const HACC_LOGO='/images/hacc-logo.png';
 let BOOT=null;
 let HERO_INDEX=0,HERO_TIMER=null,PDPA_READ=false;
 const $=s=>document.querySelector(s);
-async function rpc(n,...a){const maxRetries=/^(getPublicBootstrap|adminBootstrap)/.test(n)?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){const err=new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');if(response.status>=400&&response.status<500){throw err;}lastErr=err;if(attempt+1>=maxRetries)throw err;continue;}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
+async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
 function load(t){$('#loadingText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}
 function done(){$('#loading').classList.remove('show')}
 function alertErr(e){done();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
@@ -985,38 +985,11 @@ function renderAuthorWorks(works,reg){works=works||[];if(!works.length){$('#auth
 async function promptReplaceWorkFile(workId,category,title){const {value:file}=await Swal.fire({title:title,input:'file',inputAttributes:{'accept':['ORIGINAL','REVISION','FINAL_PRESENTATION'].includes(category)?'.pdf,.doc,.docx,.ppt,.pptx':'*/*','aria-label':'Upload your file'},showCancelButton:true,confirmButtonText:'อัปโหลด',cancelButtonText:'ยกเลิก',confirmButtonColor:'#006D70'});if(file){load('กำลังอัปโหลดไฟล์...');try{const f=await fileObj({files:[file]});await rpc('replaceWorkFile',CID,$('#authorWorkRegId').value,$('#authorWorkKey').value,workId,category,f);done();Swal.fire({icon:'success',title:'อัปโหลดสำเร็จ',confirmButtonColor:'#006D70'});lookupAuthorWorks()}catch(e){alertErr(e)}}}
 function updateWorkRules(){const sel=$('#workCategory'),code=sel?.selectedOptions?.[0]?.dataset?.code||'',researchOrInnovation=['RESEARCH','INNOVATION'].includes(code),ethics=$('#ethicsRequired'),hint=$('#ethicsFileHint');if(hint)hint.textContent=researchOrInnovation?'หากผลงานเกี่ยวข้องกับมนุษย์ ต้องแนบไฟล์หลักฐานจริยธรรม':'แนบเมื่อผลงานเกี่ยวข้องกับมนุษย์';if(ethics&&researchOrInnovation)ethics.closest('.work-rule')?.classList.add('gold');else ethics?.closest('.work-rule')?.classList.remove('gold')}
 function updateRegion4Intent(){const yes=document.querySelector('input[name="Region4Affiliation"][value="YES"]')?.checked,box=$('#region4IntentBox');if(box)box.classList.toggle('show',!!yes);document.querySelectorAll('input[name="Region4AwardIntentChoice"]').forEach(x=>{x.required=!!yes;if(!yes)x.checked=false})}
-async function emailMyPass(){
-  const regId = ($('#passRegId')?.value || '').trim();
-  const key = ($('#passKey')?.value || '').trim();
-  if(!regId){
-    Swal.fire({icon:'warning',title:'กรุณากรอกเลขลงทะเบียน',text:'เช่น REG-2026-000123',confirmButtonColor:'#006D70'});
-    return;
-  }
-  if(!key){
-    Swal.fire({icon:'warning',title:'กรุณากรอกข้อมูลยืนยันตัวตน',text:'กรุณากรอก Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน',confirmButtonColor:'#006D70'});
-    return;
-  }
-  load('กำลังส่งคูปองเข้า Email');
-  try{
-    await rpc('emailMyMealPass',CID,regId,key);
-    done();
-    Swal.fire({icon:'success',title:'ส่ง Email สำเร็จ',text:'กรุณาตรวจสอบในกล่องจดหมาย หรือ Junk/Spam',confirmButtonColor:'#006D70'});
-  }catch(e){alertErr(e)}
-}
+async function emailMyPass(){load('กำลังส่งคูปองเข้า Email');try{await rpc('emailMyMealPass',CID,$('#passRegId').value,$('#passKey').value);done();Swal.fire({icon:'success',title:'ส่ง Email สำเร็จ',text:'กรุณาตรวจสอบในกล่องจดหมาย หรือ Junk/Spam',confirmButtonColor:'#006D70'})}catch(e){alertErr(e)}}
 async function loadPass(){
-  const regId = ($('#passRegId')?.value || '').trim();
-  const key = ($('#passKey')?.value || '').trim();
-  if(!regId){
-    Swal.fire({icon:'warning',title:'กรุณากรอกเลขลงทะเบียน',text:'เช่น REG-2026-000123',confirmButtonColor:'#006D70'});
-    return;
-  }
-  if(!key){
-    Swal.fire({icon:'warning',title:'กรุณากรอกข้อมูลยืนยันตัวตน',text:'กรุณากรอก Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน',confirmButtonColor:'#006D70'});
-    return;
-  }
   load('กำลังโหลดคูปอง');
   try{
-    const r=await rpc('getMealPass',CID,regId,key);
+    const r=await rpc('getMealPass',CID,$('#passRegId').value,$('#passKey').value);
     done();
     const reg=r.registration||{},active=(r.entitlements||[]).filter(e=>String(e.Status||'').toUpperCase()!=='CANCELLED');
     const confName=BOOT.conference?.ShortName||'มหกรรมคุณภาพ 2569';
@@ -1024,7 +997,6 @@ async function loadPass(){
     const passLabel=isInternal?'TUH STAFF EVENT PASS':'TUH EVENT PASS';
     const rows=active.map(e=>`<div class="ent-row"><span>${esc(formatThaiDate(e.EventDate))} · ${esc(e.MealNameTH||e.MealCode)}</span><b>${esc(e.Status)}</b></div>`).join('');
     $('#passResult').innerHTML=`<div class="card"><div class="meal-pass-public"><div class="meal-pass-top"><span class="meal-pass-event">${esc(confName)}</span><span>${esc(passLabel)}</span></div><div style="color:#e6c252;font-weight:600;font-size:0.95rem;margin-top:6px">ยินดีต้อนรับเข้าสู่งาน</div><div class="meal-pass-name">${esc(reg.FullName||'')}</div><div class="meal-pass-id">ID: ${esc(reg.RegID||'')}</div><div style="background:#fff;border-radius:14px;padding:10px;width:210px;margin:18px auto;box-sizing:border-box"><img src="https://quickchart.io/qr?size=360&margin=2&text=${encodeURIComponent(r.PassToken)}" alt="QR Code คูปองอาหาร" style="width:190px;height:190px;display:block;margin:0 auto"></div><div class="meal-pass-meta"><div>ประเภทบุคคล<b>${esc(reg.ParticipantTypeName||reg.ParticipantType||'')}</b></div><div>สถานะการชำระเงิน<b>${esc(reg.PaymentStatus||'')}</b></div></div><div class="meal-entitlements">${rows||'<div class="ent-row">ยังไม่มีรายการสิทธิ์อาหาร</div>'}</div><div class="meal-pass-note" style="margin-top:14px;color:#d7a7ba;font-size:0.75rem">กรุณาแสดง QR Code นี้ให้จุดสแกนอาหาร และไม่ส่งต่อให้ผู้อื่น</div></div></div>`;
-    $('#passResult').scrollIntoView({behavior:'smooth'});
   }catch(e){alertErr(e)}
 }
 const heroCarousel=$('#heroCarousel');if(heroCarousel){heroCarousel.addEventListener('mouseenter',()=>clearInterval(HERO_TIMER));heroCarousel.addEventListener('mouseleave',startHeroCarousel);heroCarousel.addEventListener('focusin',()=>clearInterval(HERO_TIMER));heroCarousel.addEventListener('focusout',startHeroCarousel)}

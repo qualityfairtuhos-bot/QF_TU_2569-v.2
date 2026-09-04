@@ -5536,7 +5536,11 @@ function getAdminSettings(token, conferenceId) {
     return {
       conference: serialize_(conf),
       settings: serialize_(findMany_('Settings', { ConferenceID: conferenceId })),
-      optionConfig: getRegistrationOptionMap_(conferenceId)
+      optionConfig: getRegistrationOptionMap_(conferenceId),
+      registrationTypes: serialize_(findMany_('RegistrationTypes', { ConferenceID: conferenceId })),
+      reviewRounds: serialize_(findMany_('ReviewRounds', { ConferenceID: conferenceId })),
+      categories: serialize_(findMany_('WorkCategories', { ConferenceID: conferenceId })),
+      presentationTypes: serialize_(findMany_('PresentationTypes', { ConferenceID: conferenceId }))
     };
   });
 }

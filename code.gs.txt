@@ -1245,18 +1245,114 @@ function changePassword(token,currentPassword,newPassword){return runSafely_('ch
 
 function logAudit_(conferenceId,user,role,action,targetType,targetId,details){try{appendRecord_('AuditLogs',{AuditLogID:nextId_('AUD'),ConferenceID:conferenceId,Timestamp:new Date(),UserID:user&&user.UserID||'',UserEmail:user&&user.Email||'',Role:role||'',Action:action,TargetType:targetType,TargetID:targetId,DetailsJson:safeJson_(details||{}),ClientInfo:''});}catch(e){} }
 function logSystem_(name,e){try{appendRecord_('SystemLogs',{SystemLogID:nextId_('SYS'),Timestamp:new Date(),Level:'ERROR',FunctionName:name,Message:e.message||String(e),StackTrace:e.stack||'',ConferenceID:'',UserEmail:'',ClientInfo:''});}catch(ignore){} }
+function stripHtml_(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*[\/]?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function sendEmailLogged_(conferenceId,to,subject,html,relatedType,relatedId,user,attachments){
-  try{
-    const mailOpts = {to:to,subject:subject,htmlBody:html,name:'TUH Quality Fair'};
-    if (attachments && attachments.length) {
-      mailOpts.attachments = attachments;
-    }
+  const cleanTo = String(to || '').trim();
+  if (!cleanTo) {
+    appendRecord_('EmailLogs', {
+      EmailLogID: nextId_('MAIL'),
+      ConferenceID: conferenceId,
+      SentAt: new Date(),
+      SentBy: (user && user.Email) || 'SYSTEM',
+      To: cleanTo,
+      Subject: subject || '',
+      RelatedType: relatedType || '',
+      RelatedID: relatedId || '',
+      Status: 'ERROR',
+      ErrorMessage: 'ไม่มีอีเมลผู้รับ'
+    });
+    return { success: false, error: 'ไม่มีอีเมลผู้รับ' };
+  }
+
+  const plainBody = stripHtml_(html) || subject || 'TUH Quality Fair Notification';
+  const mailOpts = {
+    to: cleanTo,
+    subject: subject || 'แจ้งข้อมูลจากระบบ TUH Quality Fair',
+    body: plainBody,
+    htmlBody: html,
+    name: 'TUH Quality Fair'
+  };
+  if (attachments && attachments.length) {
+    mailOpts.attachments = attachments;
+  }
+
+  let sent = false;
+  let lastError = '';
+
+  // 1. Try MailApp first
+  try {
     MailApp.sendEmail(mailOpts);
-    appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'SENT'});
-    return true;
-  }catch(e){
-    appendRecord_('EmailLogs',{EmailLogID:nextId_('MAIL'),ConferenceID:conferenceId,SentAt:new Date(),SentBy:user&&user.Email||'SYSTEM',To:to,Subject:subject,RelatedType:relatedType||'',RelatedID:relatedId||'',Status:'ERROR',ErrorMessage:e.message});
-    return false;
+    sent = true;
+  } catch(err1) {
+    lastError = err1.message || String(err1);
+    // 2. Try GmailApp as fallback
+    try {
+      const gmailAdvanced = {
+        htmlBody: html,
+        name: 'TUH Quality Fair'
+      };
+      if (attachments && attachments.length) {
+        gmailAdvanced.attachments = attachments;
+      }
+      GmailApp.sendEmail(cleanTo, subject || 'แจ้งข้อมูลจากระบบ TUH Quality Fair', plainBody, gmailAdvanced);
+      sent = true;
+      lastError = '';
+    } catch(err2) {
+      lastError = (err1.message ? err1.message : '') + (err2.message ? ((lastError ? '; ' : '') + err2.message) : '');
+    }
+  }
+
+  if (sent) {
+    try {
+      appendRecord_('EmailLogs', {
+        EmailLogID: nextId_('MAIL'),
+        ConferenceID: conferenceId,
+        SentAt: new Date(),
+        SentBy: (user && user.Email) || 'SYSTEM',
+        To: cleanTo,
+        Subject: subject,
+        RelatedType: relatedType || '',
+        RelatedID: relatedId || '',
+        Status: 'SENT'
+      });
+    } catch(ignore) {}
+    return { success: true };
+  } else {
+    try {
+      appendRecord_('EmailLogs', {
+        EmailLogID: nextId_('MAIL'),
+        ConferenceID: conferenceId,
+        SentAt: new Date(),
+        SentBy: (user && user.Email) || 'SYSTEM',
+        To: cleanTo,
+        Subject: subject,
+        RelatedType: relatedType || '',
+        RelatedID: relatedId || '',
+        Status: 'ERROR',
+        ErrorMessage: lastError
+      });
+    } catch(ignore) {}
+    return { success: false, error: lastError };
   }
 }
 
@@ -2155,6 +2251,18 @@ function importGoogleFormSheetAndSendEmails() {
   Logger.log('=== ขั้นตอนที่ 2: ส่งอีเมลแจ้งเตือนผู้ที่ข้อมูลยังไม่ครบถ้วนให้มากรอกเลขบัตรประชาชน ===');
   const emailResult = sendEmailToIncompleteRegistrationsNow(false);
   return { importResult: importResult, emailResult: emailResult };
+}
+
+/**
+ * ฟังก์ชันสำหรับตรวจสอบโควตาการส่งอีเมลประจำวันที่เหลืออยู่ของบัญชี Google
+ * สามารถกด Run ใน Google Apps Script Editor เพื่อดูจำนวนที่เหลือได้ทันที
+ */
+function checkEmailQuota() {
+  const remaining = MailApp.getRemainingDailyQuota();
+  Logger.log('====================================');
+  Logger.log('โควตาส่งอีเมลที่เหลือของบัญชีวันนี้: ' + remaining + ' ฉบับ');
+  Logger.log('====================================');
+  return { remainingDailyQuota: remaining };
 }
 
 /**
@@ -3406,7 +3514,10 @@ function adminSendDirectEmail(token, conferenceId, to, subject, body, attachment
     }
 
     const sent = sendEmailLogged_(conferenceId, to, subject, emailHtml, 'DIRECT_EMAIL', to, ctx.user, mailAttachments);
-    if (!sent) throw new Error('ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลในระบบ');
+    if (!sent || (typeof sent === 'object' && !sent.success) || sent === false) {
+      const errMsg = (sent && sent.error) ? (' (' + sent.error + ')') : '';
+      throw new Error('ไม่สามารถส่งอีเมลได้' + errMsg + ' กรุณาตรวจสอบการตั้งค่าอีเมลหรือสิทธิ์การส่งอีเมลใน Google Apps Script');
+    }
     logAudit_(conferenceId, ctx.user, ctx.role, 'SEND_DIRECT_EMAIL', 'Email', to, {subject: subject, attachmentsCount: (attachments||[]).length, filesCount: mailAttachments.length});
     return {success: true};
   });
@@ -3611,11 +3722,26 @@ function signMealToken_(cid,regId,date,meal){const payload=[cid,regId,date,meal]
 function parseMealToken_(token){const p=String(token).split('.');if(p.length!==2)throw new Error('QR ไม่ถูกต้อง');const payload=Utilities.newBlob(Utilities.base64DecodeWebSafe(p[0])).getDataAsString(),sig=Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload,getAuthSecret_())).replace(/=+$/,'');if(sig!==p[1])throw new Error('QR ไม่ถูกต้อง');const a=payload.split('|');return {conferenceId:a[0],regId:a[1],date:a[2],meal:a[3]};}
 function getMealPass(conferenceId,regId,emailOrPhone){
   return runSafely_('getMealPass',function(){
-    const r=findOne_('Registrations',{ConferenceID:conferenceId||APP.DEFAULT_CONFERENCE_ID,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
-    const key=normalizeEmail_(emailOrPhone);if(normalizeEmail_(r.Email)!==key&&normalizePhone_(r.Phone)!==normalizePhone_(emailOrPhone))throw new Error('ข้อมูลยืนยันไม่ถูกต้อง');
-    if(['READY','SENT'].indexOf(upper_(r.MealPassStatus))<0)throw new Error('คูปองอาหารยังไม่พร้อม');
-    const ents=findMany_('MealEntitlements',{ConferenceID:r.ConferenceID,RegID:r.RegID});
-    return {registration:publicRegistration_(r),PassToken:signMealPassToken_(r.ConferenceID,r.RegID),entitlements:serialize_(ents)};
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cleanId = clean_(regId);
+    if(!cleanId) throw new Error('กรุณาระบุเลขลงทะเบียน');
+    const r = findOne_('Registrations', {ConferenceID: cid, RegID: cleanId});
+    if(!r) throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน ' + cleanId);
+    const key = clean_(emailOrPhone);
+    if(!key) throw new Error('กรุณาระบุ Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน');
+    const keyEmail = normalizeEmail_(key);
+    const keyPhone = normalizePhone_(key);
+    if(normalizeEmail_(r.Email) !== keyEmail && normalizePhone_(r.Phone) !== keyPhone){
+      throw new Error('Email หรือเบอร์โทรศัพท์ไม่ตรงกับข้อมูลในระบบ');
+    }
+    const type = registrationTypeMap_(cid)[r.ParticipantType] || {};
+    const elig = mealPassEligibility_(r, type);
+    if(!elig.ok){
+      throw new Error('ยังไม่สามารถออกคูปองอาหารได้ (' + elig.reason + ')');
+    }
+    ensureMealEntitlements_(cid, r.RegID);
+    const ents = findMany_('MealEntitlements', {ConferenceID: r.ConferenceID, RegID: r.RegID});
+    return {registration: publicRegistration_(r), PassToken: signMealPassToken_(r.ConferenceID, r.RegID), entitlements: serialize_(ents)};
   });
 }
 function scanMealToken(token,scannerToken,conferenceId,scannerPoint,eventDate,mealCode){
@@ -3919,7 +4045,8 @@ function sendRegistrationStatusEmail_(conferenceId,r,status,note,user){
   let subject='อัปเดตสถานะการลงทะเบียน '+r.RegID,html='<p>สถานะการลงทะเบียนของท่านได้รับการอัปเดตเป็น <b>'+htmlEscape_(status)+'</b></p>';
   if(status==='REGISTRATION_RETURNED'){subject='กรุณาแก้ไขข้อมูลลงทะเบียน '+r.RegID;html='<p>เจ้าหน้าที่ส่งคืนข้อมูลลงทะเบียนเพื่อให้ท่านแก้ไข</p><p><b>เหตุผล:</b> '+htmlEscape_(note)+'</p><p><a href="'+url+'">เปิดระบบเพื่อแก้ไขข้อมูล</a></p>';}
   if(status==='REGISTRATION_VERIFIED'||status==='COMPLETED'){subject='ตรวจสอบข้อมูลลงทะเบียนเรียบร้อย '+r.RegID;html='<p>เจ้าหน้าที่ตรวจสอบข้อมูลลงทะเบียนของท่านเรียบร้อยแล้ว</p>';}
-  return sendEmailLogged_(conferenceId,r.Email,subject,html,'REGISTRATION_STATUS',r.RegID,user);
+  const res = sendEmailLogged_(conferenceId,r.Email,subject,html,'REGISTRATION_STATUS',r.RegID,user);
+  return res === true || (res && res.success);
 }
 function adminGetRegistration(token,conferenceId,regId){return runSafely_('adminGetRegistration',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF'],conferenceId);const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');return {registration:serialize_(r),optionConfig:getRegistrationOptionMap_(conferenceId),registrationTypes:serialize_(findMany_('RegistrationTypes',{ConferenceID:conferenceId}).filter(function(t){return bool_(t.Active);}))};});}
 function adminSaveRegistration(token,conferenceId,regId,payload){
@@ -5028,6 +5155,8 @@ function adminBootstrap(token, conferenceId) {
     const conf = findOne_('Conferences', { ConferenceID: ctx.conferenceId });
     if (!conf) throw new Error('ไม่พบข้อมูลงานประชุม');
     const settings = settingsMap_(ctx.conferenceId);
+    const categories = findMany_('WorkCategories', { ConferenceID: ctx.conferenceId }).filter(function(x) { return bool_(x.Active); });
+    const presentations = findMany_('PresentationTypes', { ConferenceID: ctx.conferenceId }).filter(function(x) { return bool_(x.Active); });
     return {
       user: serialize_({
         UserID: ctx.user.UserID,
@@ -5037,7 +5166,9 @@ function adminBootstrap(token, conferenceId) {
       }),
       role: ctx.role,
       conference: serialize_(conf),
-      settings: settings
+      settings: settings,
+      workCategories: serialize_(categories),
+      presentationTypes: serialize_(presentations)
     };
   });
 }
@@ -5405,7 +5536,11 @@ function getAdminSettings(token, conferenceId) {
     return {
       conference: serialize_(conf),
       settings: serialize_(findMany_('Settings', { ConferenceID: conferenceId })),
-      optionConfig: getRegistrationOptionMap_(conferenceId)
+      optionConfig: getRegistrationOptionMap_(conferenceId),
+      registrationTypes: serialize_(findMany_('RegistrationTypes', { ConferenceID: conferenceId })),
+      reviewRounds: serialize_(findMany_('ReviewRounds', { ConferenceID: conferenceId })),
+      categories: serialize_(findMany_('WorkCategories', { ConferenceID: conferenceId })),
+      presentationTypes: serialize_(findMany_('PresentationTypes', { ConferenceID: conferenceId }))
     };
   });
 }
@@ -5481,13 +5616,60 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
   });
 }
 
-function adminUpdateWorkStatus(token, conferenceId, workId, newStatus) {
+function adminUpdateWorkStatus(token, conferenceId, workId, newStatus, categoryId, presentationTypeId) {
   return runSafely_('adminUpdateWorkStatus', function() {
     var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
-    var w = findOne_('Works', { ConferenceID: conferenceId, WorkID: workId });
+    var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId });
     if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
-    updateRecord_('Works', w.__row, { Status: newStatus, UpdatedAt: new Date(), LastModifiedBy: ctx.user.Email });
-    return { newStatus: newStatus };
+
+    var patch = { UpdatedAt: new Date(), LastModifiedBy: ctx.user.Email || ctx.user.UserID };
+
+    if (typeof newStatus === 'object' && newStatus !== null) {
+      if (newStatus.status || newStatus.Status) {
+        patch.Status = newStatus.status || newStatus.Status;
+      }
+      var cVal = newStatus.categoryId || newStatus.CategoryID || newStatus.Category;
+      if (cVal) {
+        var cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: cVal }) ||
+                  findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: cVal }) ||
+                  findOne_('WorkCategories', { CategoryID: cVal }) ||
+                  findOne_('WorkCategories', { CategoryCode: cVal });
+        patch.CategoryID = cat ? cat.CategoryID : cVal;
+        patch.CategoryName = cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : cVal;
+      }
+      var pVal = newStatus.presentationTypeId || newStatus.PresentationTypeRequested || newStatus.PresentationType;
+      if (pVal) {
+        var pt = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: pVal }) ||
+                 findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: pVal }) ||
+                 findOne_('PresentationTypes', { PresentationTypeID: pVal }) ||
+                 findOne_('PresentationTypes', { TypeCode: pVal });
+        patch.PresentationTypeRequested = pt ? pt.PresentationTypeID : pVal;
+        patch.PresentationTypeName = pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : pVal;
+      }
+    } else {
+      if (newStatus) patch.Status = newStatus;
+      if (categoryId) {
+        var cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: categoryId }) ||
+                  findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: categoryId }) ||
+                  findOne_('WorkCategories', { CategoryID: categoryId }) ||
+                  findOne_('WorkCategories', { CategoryCode: categoryId });
+        patch.CategoryID = cat ? cat.CategoryID : categoryId;
+        patch.CategoryName = cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : categoryId;
+      }
+      if (presentationTypeId) {
+        var pt = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: presentationTypeId }) ||
+                 findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: presentationTypeId }) ||
+                 findOne_('PresentationTypes', { PresentationTypeID: presentationTypeId }) ||
+                 findOne_('PresentationTypes', { TypeCode: presentationTypeId });
+        patch.PresentationTypeRequested = pt ? pt.PresentationTypeID : presentationTypeId;
+        patch.PresentationTypeName = pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : presentationTypeId;
+      }
+    }
+
+    updateRecord_('Works', w.__row, patch);
+    logAudit_(cid, ctx.user, ctx.role, 'UPDATE_WORK_STATUS', 'Works', workId, patch);
+    return { success: true, workId: workId, patch: patch };
   });
 }
 

@@ -2658,41 +2658,338 @@ async function openScoreSummary(wid){
   }
 }
 async function openUpdateWorkStatus(wid, currentStatus) {
-  const h = `<div style="text-align:left; margin-bottom:15px">เลือกสถานะใหม่สำหรับผลงาน <b>${esc(wid)}</b></div>
-  <select id="newWorkStatus" class="field" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc">
-    <option value="DRAFT" ${currentStatus==='DRAFT'?'selected':''}>DRAFT (ร่าง)</option>
-    <option value="SUBMITTED" ${currentStatus==='SUBMITTED'?'selected':''}>SUBMITTED (ส่งผลงานแล้ว)</option>
-    <option value="ACADEMIC_SCREENING" ${currentStatus==='ACADEMIC_SCREENING'?'selected':''}>ACADEMIC_SCREENING (ตรวจสอบวิชาการ)</option>
-    <option value="RETURNED_FOR_EDIT" ${currentStatus==='RETURNED_FOR_EDIT'?'selected':''}>RETURNED_FOR_EDIT (ส่งคืนให้แก้ไข)</option>
-    <option value="WAITING_REVIEWER_ASSIGN" ${currentStatus==='WAITING_REVIEWER_ASSIGN'?'selected':''}>WAITING_REVIEWER_ASSIGN (รอจ่ายงาน)</option>
-    <option value="UNDER_REVIEW" ${currentStatus==='UNDER_REVIEW'?'selected':''}>UNDER_REVIEW (กำลังพิจารณา)</option>
-    <option value="REVISION_REQUIRED" ${currentStatus==='REVISION_REQUIRED'?'selected':''}>REVISION_REQUIRED (ต้องแก้ไข)</option>
-    <option value="ACCEPTED_ORAL" ${currentStatus==='ACCEPTED_ORAL'?'selected':''}>ACCEPTED_ORAL (ผ่าน - นำเสนอวาจา)</option>
-    <option value="ACCEPTED_POSTER" ${currentStatus==='ACCEPTED_POSTER'?'selected':''}>ACCEPTED_POSTER (ผ่าน - โปสเตอร์)</option>
-    <option value="WAITING_PRESENTATION_FILE" ${currentStatus==='WAITING_PRESENTATION_FILE'?'selected':''}>WAITING_PRESENTATION_FILE (รอไฟล์นำเสนอ)</option>
-    <option value="PRESENTATION_FILE_SUBMITTED" ${currentStatus==='PRESENTATION_FILE_SUBMITTED'?'selected':''}>PRESENTATION_FILE_SUBMITTED (ส่งไฟล์นำเสนอแล้ว)</option>
-    <option value="PRESENTATION_FILE_APPROVED" ${currentStatus==='PRESENTATION_FILE_APPROVED'?'selected':''}>PRESENTATION_FILE_APPROVED (ไฟล์นำเสนอผ่านแล้ว)</option>
-    <option value="SCHEDULED" ${currentStatus==='SCHEDULED'?'selected':''}>SCHEDULED (จัดตารางนำเสนอแล้ว)</option>
-    <option value="PUBLISHED" ${currentStatus==='PUBLISHED'?'selected':''}>PUBLISHED (ตีพิมพ์เผยแพร่)</option>
-    <option value="REJECTED" ${currentStatus==='REJECTED'?'selected':''}>REJECTED (ไม่ผ่าน)</option>
-    <option value="WITHDRAWN" ${currentStatus==='WITHDRAWN'?'selected':''}>WITHDRAWN (ยกเลิก)</option>
-  </select>`;
-  const x = await Swal.fire({
-    title: 'ปรับสถานะผลงาน',
-    html: h,
-    showCancelButton: true,
-    confirmButtonText: 'บันทึก',
-    confirmButtonColor: '#006D70',
-    preConfirm: () => { return $('#newWorkStatus').value; }
-  });
-  if (x.isConfirmed) {
-    show('กำลังบันทึกสถานะ...');
+  const w = (window.WORK_ROWS || []).find(x => x.WorkID === wid) || {};
+  const status = currentStatus || w.Status || w.CurrentStatus || 'SUBMITTED';
+  const currentCatId = w.CategoryID || '';
+  const currentCatName = w.CategoryName || w.CategoryNameTH || w.Category || '';
+  const currentPt = w.PresentationTypeRequested || w.PresentationTypeName || '';
+
+  let categories = window.WORK_CATEGORIES || [];
+  let presentationTypes = window.PRESENTATION_TYPES || [];
+  if (!categories.length || !presentationTypes.length) {
     try {
-      await rpc('adminUpdateWorkStatus', TOKEN, CID, wid, x.value);
+      const d = await rpc('getAdminSettings', TOKEN, CID);
+      if (d.categories && d.categories.length) {
+        categories = d.categories;
+        window.WORK_CATEGORIES = categories;
+      }
+      if (d.presentationTypes && d.presentationTypes.length) {
+        presentationTypes = d.presentationTypes;
+        window.PRESENTATION_TYPES = presentationTypes;
+      }
+    } catch(e) {
+      console.warn('Fallback settings', e);
+    }
+  }
+
+  if (!categories.length) {
+    categories = [
+      { CategoryID: 'CAT-CQI', CategoryCode: 'CQI', CategoryNameTH: 'การพัฒนาคุณภาพอย่างต่อเนื่อง (CQI)' },
+      { CategoryID: 'CAT-R2R', CategoryCode: 'R2R', CategoryNameTH: 'การพัฒนางานประจำสู่งานวิจัย (R2R)' },
+      { CategoryID: 'CAT-INNOVATION', CategoryCode: 'INNOVATION', CategoryNameTH: 'นวัตกรรมและสิ่งประดิษฐ์' },
+      { CategoryID: 'CAT-POLICY', CategoryCode: 'POLICY', CategoryNameTH: 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร' },
+      { CategoryID: 'CAT-STORYTELLING', CategoryCode: 'STORYTELLING', CategoryNameTH: 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์' },
+      { CategoryID: 'CAT-OTHER', CategoryCode: 'OTHER', CategoryNameTH: 'อื่น ๆ' }
+    ];
+  }
+  if (!presentationTypes.length) {
+    presentationTypes = [
+      { PresentationTypeID: 'PT-2026-000001', TypeCode: 'ORAL', TypeNameTH: 'แบบบรรยาย (Oral Presentation)' },
+      { PresentationTypeID: 'PT-2026-000002', TypeCode: 'POSTER', TypeNameTH: 'แบบโปสเตอร์ (E-Poster)' }
+    ];
+  }
+
+  const statusOptions = [
+    { value: 'DRAFT', label: 'DRAFT (ร่าง)' },
+    { value: 'SUBMITTED', label: 'SUBMITTED (ส่งผลงานแล้ว)' },
+    { value: 'ACADEMIC_SCREENING', label: 'ACADEMIC_SCREENING (ตรวจสอบวิชาการ)' },
+    { value: 'RETURNED_FOR_EDIT', label: 'RETURNED_FOR_EDIT (ส่งคืนให้แก้ไข)' },
+    { value: 'WAITING_REVIEWER_ASSIGN', label: 'WAITING_REVIEWER_ASSIGN (รอจ่ายงาน)' },
+    { value: 'UNDER_REVIEW', label: 'UNDER_REVIEW (กำลังพิจารณา)' },
+    { value: 'REVISION_REQUIRED', label: 'REVISION_REQUIRED (ต้องแก้ไข)' },
+    { value: 'ACCEPTED_ORAL', label: 'ACCEPTED_ORAL (ผ่าน - นำเสนอวาจา)' },
+    { value: 'ACCEPTED_POSTER', label: 'ACCEPTED_POSTER (ผ่าน - โปสเตอร์)' },
+    { value: 'WAITING_PRESENTATION_FILE', label: 'WAITING_PRESENTATION_FILE (รอไฟล์นำเสนอ)' },
+    { value: 'PRESENTATION_FILE_SUBMITTED', label: 'PRESENTATION_FILE_SUBMITTED (ส่งไฟล์นำเสนอแล้ว)' },
+    { value: 'PRESENTATION_FILE_APPROVED', label: 'PRESENTATION_FILE_APPROVED (ไฟล์นำเสนอผ่านแล้ว)' },
+    { value: 'SCHEDULED', label: 'SCHEDULED (จัดตารางนำเสนอแล้ว)' },
+    { value: 'PUBLISHED', label: 'PUBLISHED (ตีพิมพ์เผยแพร่)' },
+    { value: 'REJECTED', label: 'REJECTED (ไม่ผ่าน)' },
+    { value: 'WITHDRAWN', label: 'WITHDRAWN (ยกเลิก)' }
+  ];
+
+  const h = `
+    <div style="text-align:left; font-size:0.9rem;">
+      <div style="background:#f8fafc; padding:10px 14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
+        <div style="font-weight:700; color:#006D70; font-size:1rem;">${esc(w.WorkCode || wid)}</div>
+        <div style="color:#334155; margin-top:2px; font-size:0.85rem;">${esc(w.TitleTH || w.ThaiTitle || w.TitleEN || '-')}</div>
+      </div>
+      
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">1. สถานะผลงาน (Work Status)</label>
+        <select id="newWorkStatus" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.9rem;">
+          ${statusOptions.map(opt => `<option value="${opt.value}" ${status === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">2. ประเภทผลงาน (Work Category)</label>
+        <select id="newWorkCategory" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.9rem;">
+          <option value="">-- ไม่เปลี่ยนแปลง / ตามเดิม --</option>
+          ${categories.map(c => {
+            const cid = c.CategoryID || c.CategoryCode || '';
+            const cName = c.CategoryNameTH || c.CategoryNameEN || c.CategoryCode || cid;
+            const isSelected = (currentCatId && (currentCatId === cid || currentCatId === c.CategoryCode)) || 
+                               (currentCatName && (currentCatName === cName || currentCatName.includes(c.CategoryCode || '___')));
+            return `<option value="${esc(cid)}" ${isSelected ? 'selected' : ''}>${esc(cName)}</option>`;
+          }).join('')}
+        </select>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="display:block; font-weight:600; color:#1e293b; margin-bottom:4px;">3. รูปแบบการนำเสนอ (Presentation Type)</label>
+        <select id="newWorkPresentationType" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.9rem;">
+          <option value="">-- ไม่เปลี่ยนแปลง / ตามเดิม --</option>
+          ${presentationTypes.map(pt => {
+            const ptId = pt.PresentationTypeID || pt.TypeCode || '';
+            const ptName = pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode || ptId;
+            const isSelected = (currentPt && (currentPt === ptId || currentPt === pt.TypeCode)) || 
+                               (currentPt && ptName && (currentPt.toLowerCase().includes(pt.TypeCode ? pt.TypeCode.toLowerCase() : '___') || 
+                                                        (/oral|บรรยาย/i.test(currentPt) && /oral|บรรยาย/i.test(ptName)) || 
+                                                        (/poster|โปสเตอร์/i.test(currentPt) && /poster|โปสเตอร์/i.test(ptName))));
+            return `<option value="${esc(ptId)}" ${isSelected ? 'selected' : ''}>${esc(ptName)}</option>`;
+          }).join('')}
+        </select>
+      </div>
+    </div>
+  `;
+
+  const x = await Swal.fire({
+    title: 'แก้ไขข้อมูลและสถานะผลงาน',
+    html: h,
+    width: 600,
+    showCancelButton: true,
+    confirmButtonText: 'บันทึกการเปลี่ยนแปลง',
+    confirmButtonColor: '#006D70',
+    cancelButtonText: 'ยกเลิก',
+    preConfirm: () => {
+      return {
+        status: $('#newWorkStatus').value,
+        categoryId: $('#newWorkCategory').value,
+        presentationTypeId: $('#newWorkPresentationType').value
+      };
+    }
+  });
+
+  if (x.isConfirmed && x.value) {
+    show('กำลังบันทึกข้อมูลผลงาน...');
+    try {
+      await rpc('adminUpdateWorkStatus', TOKEN, CID, wid, x.value.status, x.value.categoryId, x.value.presentationTypeId);
       hide();
-      toast('อัปเดตสถานะสำเร็จ');
-      loadWorks();
-    } catch(e) { err(e); }
+      toast('อัปเดตข้อมูลและสถานะผลงานสำเร็จ');
+      await loadWorks();
+    } catch(e) {
+      hide();
+      err(e);
+    }
+  }
+}
+
+async function openUploadModal(wid, regId) {
+  show('กำลังโหลดข้อมูลไฟล์ผลงาน...');
+  try {
+    let w = (window.WORK_ROWS || []).find(x => x.WorkID === wid);
+    if (!w) {
+      await loadWorks();
+      w = (window.WORK_ROWS || []).find(x => x.WorkID === wid) || { WorkID: wid };
+    }
+    hide();
+
+    const files = (w.files || []).slice().sort((a,b) => {
+      const catOrder = { ORIGINAL: 1, BLIND: 2, ETHICS: 3, PRESENTER_BIO: 4, REVISION: 5, FINAL_PRESENTATION: 6 };
+      return (catOrder[a.FileCategory] || 99) - (catOrder[b.FileCategory] || 99);
+    });
+
+    const getCatLabel = (cat) => {
+      if (cat === 'BLIND') return { label: 'ไฟล์ปกปิดชื่อ (Blind)', color: '#6366f1', icon: 'fa-user-secret' };
+      if (cat === 'ETHICS') return { label: 'เอกสารจริยธรรม (Ethics)', color: '#059669', icon: 'fa-shield-halved' };
+      if (cat === 'PRESENTER_BIO') return { label: 'ประวัติผู้นำเสนอ (Bio)', color: '#0284c7', icon: 'fa-address-card' };
+      if (cat === 'REVISION') return { label: 'ไฟล์ฉบับแก้ไข (Revision)', color: '#d97706', icon: 'fa-file-lines' };
+      if (cat === 'FINAL_PRESENTATION' || (cat || '').includes('PRESENT')) return { label: 'ไฟล์นำเสนอ (Presentation)', color: '#9333ea', icon: 'fa-display' };
+      return { label: 'ไฟล์ต้นฉบับ (' + (cat || 'ORIGINAL') + ')', color: '#006D70', icon: 'fa-file-lines' };
+    };
+
+    let filesHtml = '';
+    if (files.length === 0) {
+      filesHtml = `<div class="muted" style="text-align:center; padding:18px; background:#f8fafc; border-radius:8px; border:1px dashed #cbd5e1;">ยังไม่มีไฟล์ที่แนบไว้ในระบบ</div>`;
+    } else {
+      filesHtml = `
+        <div style="max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:6px; background:#f8fafc;">
+          ${files.map(f => {
+            const meta = getCatLabel(f.FileCategory);
+            const sizeStr = f.FileSize ? ` (${(Number(f.FileSize)/1024).toFixed(0)} KB)` : '';
+            return `
+              <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; margin-bottom:6px; gap:10px;">
+                <div style="text-align:left; min-width:0; flex:1;">
+                  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span class="badge" style="background:${meta.color}15; color:${meta.color}; border:1px solid ${meta.color}40; font-size:0.75rem; padding:2px 8px; font-weight:600;">
+                      <i class="fa-solid ${meta.icon}"></i> ${esc(meta.label)}
+                    </span>
+                    <span style="font-size:0.72rem; color:#64748b;">v${esc(f.VersionNo || '1')}</span>
+                  </div>
+                  <div style="font-weight:600; font-size:0.85rem; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;" title="${esc(f.FileName || 'ไฟล์')}">
+                    ${esc(f.FileName || 'ไฟล์แนบ')}${sizeStr}
+                  </div>
+                </div>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                  <a href="${esc(f.FileUrl)}" target="_blank" class="btn btn-soft btn-sm" style="padding:4px 10px; font-size:0.8rem; text-decoration:none;" title="เปิดดู/ดาวน์โหลดไฟล์">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดดู
+                  </a>
+                  <button type="button" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; font-size:0.8rem; cursor:pointer;" onclick="deleteWorkFileAction('${esc(f.WorkFileID)}', '${esc(f.FileName || 'ไฟล์')}', '${esc(wid)}', '${esc(regId || w.RegID || '')}')" title="ลบไฟล์">
+                    <i class="fa-solid fa-trash-can"></i> ลบ
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    const html = `
+      <div style="text-align:left; font-size:0.9rem;">
+        <div style="background:#f1f5f9; padding:10px 14px; border-radius:8px; margin-bottom:16px;">
+          <div style="font-weight:700; color:#006D70; font-size:0.95rem;">${esc(w.WorkCode || wid)}: ${esc(w.TitleTH || w.ThaiTitle || '-')}</div>
+          <div style="color:#475569; font-size:0.82rem; margin-top:2px;">ผู้ส่ง/นำเสนอ: ${esc(w.PresenterName || '-')} (${esc(w.PresenterEmail || '-')})</div>
+        </div>
+
+        <div style="margin-bottom:18px;">
+          <div style="font-weight:700; color:#1e293b; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-folder-open" style="color:#006D70;"></i> 1. รายการไฟล์เดิมที่แนบมาในระบบ (${files.length} ไฟล์)
+          </div>
+          ${filesHtml}
+        </div>
+
+        <div style="border-top:1px solid #e2e8f0; padding-top:14px;">
+          <div style="font-weight:700; color:#1e293b; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-cloud-arrow-up" style="color:#006D70;"></i> 2. อัปโหลดไฟล์ใหม่ / อัปโหลดแทนที่ไฟล์เดิม
+          </div>
+          
+          <div style="margin-bottom:10px;">
+            <label style="display:block; font-weight:600; margin-bottom:4px; font-size:0.85rem; color:#334155;">เลือกหมวดหมู่ไฟล์ที่ต้องการอัปโหลด:</label>
+            <select id="admWorkFileCat" class="field" style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem;">
+              <option value="ORIGINAL">ไฟล์ต้นฉบับบทความ (Original / Full Paper / Word / PDF)</option>
+              <option value="BLIND">ไฟล์ปกปิดชื่อผู้แต่งและหน่วยงาน (Blind Submission สำหรับกรรมการ)</option>
+              <option value="ETHICS">เอกสารรับรองจริยธรรมการวิจัย (IRB / Human Ethics / Consent)</option>
+              <option value="PRESENTER_BIO">ประวัติและรูปถ่ายผู้นำเสนอ (Presenter Bio)</option>
+              <option value="REVISION">ไฟล์ฉบับปรับปรุงแก้ไขตามข้อเสนอแนะ (Revised Submission)</option>
+              <option value="FINAL_PRESENTATION">ไฟล์นำเสนอฉบับจริง (Presentation Slide / E-Poster)</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <label style="display:block; font-weight:600; margin-bottom:4px; font-size:0.85rem; color:#334155;">เลือกไฟล์จากคอมพิวเตอร์ของคุณ:</label>
+            <input type="file" id="admWorkFileInput" style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; font-size:0.85rem;" accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.zip,.rar">
+            <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">รองรับไฟล์ PDF, Word (.docx), PowerPoint (.pptx), รูปภาพ ขนาดไม่เกิน 25 MB</div>
+          </div>
+
+          <div style="margin-bottom:8px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:#334155; cursor:pointer;">
+              <input type="checkbox" id="admWorkFileReplace" checked style="width:16px; height:16px;">
+              <span>ตั้งเป็นไฟล์ฉบับล่าสุด (แทนที่ไฟล์เดิมที่เปิดใช้งานอยู่ในหมวดนี้)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+
+    Swal.fire({
+      title: 'จัดการไฟล์แนบผลงานวิชาการ',
+      html: html,
+      width: 680,
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์',
+      confirmButtonColor: '#006D70',
+      cancelButtonText: 'ปิด',
+      focusConfirm: false,
+      preConfirm: () => {
+        const fileInput = document.getElementById('admWorkFileInput');
+        if (!fileInput || !fileInput.files || !fileInput.files.length) {
+          return null;
+        }
+        return {
+          file: fileInput.files[0],
+          category: $('#admWorkFileCat').value,
+          replace: $('#admWorkFileReplace').checked
+        };
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed && result.value && result.value.file) {
+        const { file, category, replace } = result.value;
+        show('กำลังอัปโหลดไฟล์ไปยังระบบ Google Drive...');
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const res = reader.result;
+              const b64 = typeof res === 'string' ? res.split(',')[1] : '';
+              resolve(b64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          await rpc('adminUploadWorkFiles', TOKEN, CID, wid, regId || w.RegID || '', {
+            fileCategory: category,
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            fileSize: file.size,
+            base64: base64,
+            method: 'LOCAL',
+            replace: replace
+          });
+
+          hide();
+          toast('อัปโหลดไฟล์สำเร็จ');
+          await loadWorks();
+          openUploadModal(wid, regId);
+        } catch(errUp) {
+          hide();
+          err(errUp);
+        }
+      }
+    });
+
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
+
+async function deleteWorkFileAction(workFileId, fileName, wid, regId) {
+  const c = await Swal.fire({
+    title: 'ยืนยันการลบไฟล์',
+    text: `คุณต้องการลบไฟล์ "${fileName}" ออกจากระบบใช่หรือไม่?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: 'ใช่, ลบไฟล์',
+    cancelButtonText: 'ยกเลิก'
+  });
+
+  if (c.isConfirmed) {
+    show('กำลังลบไฟล์...');
+    try {
+      await rpc('adminDeleteWorkFile', TOKEN, CID, workFileId);
+      hide();
+      toast('ลบไฟล์เรียบร้อยแล้ว');
+      await loadWorks();
+      openUploadModal(wid, regId);
+    } catch(e) {
+      hide();
+      err(e);
+    }
   }
 }
 async function loadReviewers(){
