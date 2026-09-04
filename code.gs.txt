@@ -4724,7 +4724,7 @@ function exportWorksToExcel(token,conferenceId){
       const cat = categories[w.CategoryID] || {};
       const ptReq = ptMap[w.PresentationTypeRequested] || {};
       const ptFin = ptMap[w.PresentationTypeFinal] || {};
-      const catName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || '';
+      const catName = resolveCategoryName_(w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || '');
       const ptName = ptFin.TypeNameTH || w.PresentationTypeName || ptReq.TypeNameTH || ptReq.TypeCode || w.PresentationTypeRequested || '';
 
       return {
@@ -5439,7 +5439,7 @@ function adminListWorks(token, conferenceId, filters) {
       var regId = w.RegID || presenter.RegID || '';
       var reg = regMap[regId] || {};
 
-      var resolvedCatName = w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '';
+      var resolvedCatName = resolveCategoryName_(w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '');
       var rawPtName = clean_(w.PresentationTypeName || w['PresentationType Name'] || w['PresentationTypeName'] || w.presentationtypename || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
       var rawPtReq = clean_(w.PresentationTypeRequested || w['PresentationTypeRequested'] || w.presentationtyperequested || '');
       var rawPtFin = clean_(w.PresentationTypeFinal || w['PresentationTypeFinal'] || w.presentationtypefinal || '');
@@ -5616,6 +5616,21 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
   });
 }
 
+function resolveCategoryName_(cVal) {
+  if (!cVal || cVal === '-') return '';
+  var s = String(cVal).trim();
+  var up = s.toUpperCase();
+  if (up === 'CAT-SERVICE' || up === 'SERVICE' || /service\s*excellence/i.test(s)) return 'Service Excellence';
+  if (up === 'CAT-CQI' || up === 'CQI' || /cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
+  if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || /primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
+  if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || /วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || /นวัตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-R2R' || up === 'R2R') return 'การพัฒนางานประจำสู่งานวิจัย (R2R)';
+  if (up === 'CAT-POLICY' || up === 'POLICY') return 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร';
+  if (up === 'CAT-STORYTELLING' || up === 'STORYTELLING') return 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์';
+  return s;
+}
+
 function adminUpdateWorkStatus(token, conferenceId, workId, newStatus, categoryId, presentationTypeId) {
   return runSafely_('adminUpdateWorkStatus', function() {
     var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
@@ -5630,40 +5645,48 @@ function adminUpdateWorkStatus(token, conferenceId, workId, newStatus, categoryI
         patch.Status = newStatus.status || newStatus.Status;
       }
       var cVal = newStatus.categoryId || newStatus.CategoryID || newStatus.Category;
-      if (cVal) {
+      var cNameVal = newStatus.categoryName || newStatus.CategoryName || '';
+      if (cVal || cNameVal) {
+        var cleanCode = cVal ? String(cVal).replace(/^CAT-/, '') : '';
         var cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: cVal }) ||
                   findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: cVal }) ||
+                  findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: cleanCode }) ||
                   findOne_('WorkCategories', { CategoryID: cVal }) ||
-                  findOne_('WorkCategories', { CategoryCode: cVal });
+                  findOne_('WorkCategories', { CategoryCode: cVal }) ||
+                  findOne_('WorkCategories', { CategoryCode: cleanCode });
         patch.CategoryID = cat ? cat.CategoryID : cVal;
-        patch.CategoryName = cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : cVal;
+        patch.CategoryName = resolveCategoryName_(cNameVal || (cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : cVal));
       }
       var pVal = newStatus.presentationTypeId || newStatus.PresentationTypeRequested || newStatus.PresentationType;
-      if (pVal) {
+      var pNameVal = newStatus.presentationTypeName || newStatus.PresentationTypeName || '';
+      if (pVal || pNameVal) {
         var pt = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: pVal }) ||
                  findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: pVal }) ||
                  findOne_('PresentationTypes', { PresentationTypeID: pVal }) ||
                  findOne_('PresentationTypes', { TypeCode: pVal });
         patch.PresentationTypeRequested = pt ? pt.PresentationTypeID : pVal;
-        patch.PresentationTypeName = pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : pVal;
+        patch.PresentationTypeName = pNameVal || (pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : pVal);
       }
     } else {
       if (newStatus) patch.Status = newStatus;
       if (categoryId) {
-        var cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: categoryId }) ||
-                  findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: categoryId }) ||
-                  findOne_('WorkCategories', { CategoryID: categoryId }) ||
-                  findOne_('WorkCategories', { CategoryCode: categoryId });
-        patch.CategoryID = cat ? cat.CategoryID : categoryId;
-        patch.CategoryName = cat ? (cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode) : categoryId;
+        var cleanCode2 = String(categoryId).replace(/^CAT-/, '');
+        var cat2 = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: categoryId }) ||
+                   findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: categoryId }) ||
+                   findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: cleanCode2 }) ||
+                   findOne_('WorkCategories', { CategoryID: categoryId }) ||
+                   findOne_('WorkCategories', { CategoryCode: categoryId }) ||
+                   findOne_('WorkCategories', { CategoryCode: cleanCode2 });
+        patch.CategoryID = cat2 ? cat2.CategoryID : categoryId;
+        patch.CategoryName = resolveCategoryName_(cat2 ? (cat2.CategoryNameTH || cat2.CategoryNameEN || cat2.CategoryCode) : categoryId);
       }
       if (presentationTypeId) {
-        var pt = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: presentationTypeId }) ||
-                 findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: presentationTypeId }) ||
-                 findOne_('PresentationTypes', { PresentationTypeID: presentationTypeId }) ||
-                 findOne_('PresentationTypes', { TypeCode: presentationTypeId });
-        patch.PresentationTypeRequested = pt ? pt.PresentationTypeID : presentationTypeId;
-        patch.PresentationTypeName = pt ? (pt.TypeNameTH || pt.TypeNameEN || pt.TypeCode) : presentationTypeId;
+        var pt2 = findOne_('PresentationTypes', { ConferenceID: cid, PresentationTypeID: presentationTypeId }) ||
+                  findOne_('PresentationTypes', { ConferenceID: cid, TypeCode: presentationTypeId }) ||
+                  findOne_('PresentationTypes', { PresentationTypeID: presentationTypeId }) ||
+                  findOne_('PresentationTypes', { TypeCode: presentationTypeId });
+        patch.PresentationTypeRequested = pt2 ? pt2.PresentationTypeID : presentationTypeId;
+        patch.PresentationTypeName = pt2 ? (pt2.TypeNameTH || pt2.TypeNameEN || pt2.TypeCode) : presentationTypeId;
       }
     }
 

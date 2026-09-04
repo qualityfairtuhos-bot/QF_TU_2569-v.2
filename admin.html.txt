@@ -2327,6 +2327,21 @@ function applyEmailTemplate(type,regId,name){const subj=$('#swalEmailSubject'),b
 async function printPaymentReport(){show('กำลังเตรียมรายงานการเงิน');try{const rows=await rpc('adminListPayments',TOKEN,CID,{q:$('#paySearch').value,status:$('#payStatus').value});hide();if(!rows||!rows.length)return Swal.fire({icon:'info',title:'ไม่พบข้อมูลการเงินสำหรับพิมพ์'});const win=window.open('','_blank');if(!win)return Swal.fire({icon:'warning',title:'เบราว์เซอร์บล็อกหน้าต่างใหม่'});const trs=rows.map((p,i)=>`<tr><td style="text-align:center;">${i+1}</td><td style="text-align:center;font-weight:600;">${esc(p.RegID)}</td><td>${esc(p.FullName||p.Registration?.FullName||'')}</td><td>${esc(p.ParticipantType||'')}</td><td style="text-align:right;">${Number(p.RequiredAmount||p.Amount||0).toLocaleString('th-TH')} บาท</td><td style="text-align:center;">${esc(p.PaymentStatus||p.Status||'UNPAID')}</td><td style="text-align:center;">${(p.NeedInvoice||p.ReceiptRequirement==='INVOICE')?'ต้องการ':'ไม่ต้องการ'}</td><td style="text-align:center;">${(p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED')?'ออกแล้ว':'ยังไม่ออก'}</td><td>${esc(p.ReceiptNo||'-')}</td></tr>`).join('');win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานการชำระเงินและใบเสร็จ - TUH Quality Fair</title><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>@page{size:A4 landscape;margin:10mm;}body{font-family:'Prompt',sans-serif;font-size:11px;margin:0;color:#111;}h2{text-align:center;margin:0 0 4px;color:#006D70;}p{text-align:center;margin:0 0 12px;color:#64748b;font-size:10px;}table{width:100%;border-collapse:collapse;margin-bottom:10px;}th,td{border:1px solid #333;padding:4px 6px;font-size:10px;}th{background:#f1f5f9;text-align:center;font-weight:600;}@media print{button{display:none;}}</style></head><body><h2>รายงานการชำระเงินและใบเสร็จ - TUH Quality Fair</h2><p>วันที่พิมพ์: ${new Date().toLocaleString('th-TH')} | จำนวนทั้งหมด: ${rows.length} รายการ</p><table><thead><tr><th>ลำดับ</th><th>RegID</th><th>ชื่อ - นามสกุล</th><th>ประเภท</th><th>จำนวนเงิน</th><th>สถานะชำระเงิน</th><th>ต้องการใบแจ้งหนี้</th><th>สถานะใบเสร็จ</th><th>เลขที่ใบเสร็จ</th></tr></thead><tbody>${trs}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),350);<\/script></body></html>`);win.document.close()}catch(e){err(e)}}
 async function verifyPay(id,decision){const returning=decision==='RETURN';const x=await Swal.fire({title:returning?'ส่งคืนหลักฐาน':'อนุมัติการชำระเงิน',input:'textarea',inputLabel:returning?'เหตุผลที่ส่งคืน':'หมายเหตุ (ถ้ามี)',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืน':'อนุมัติ',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังบันทึกผลการเงิน');try{const r=await rpc('adminVerifyPayment',TOKEN,CID,id,decision,x.value||'',{});hide();await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',html:`สถานะ: <b>${esc(r.status)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});loadPayments()}catch(e){err(e)}}
 
+function formatWorkCategory(v) {
+  if (!v || v === '-') return '-';
+  const s = String(v).trim();
+  const up = s.toUpperCase();
+  if (up === 'CAT-SERVICE' || up === 'SERVICE' || /service\s*excellence/i.test(s)) return 'Service Excellence';
+  if (up === 'CAT-CQI' || up === 'CQI' || /cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
+  if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || /primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
+  if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || /วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || /นวัตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-R2R' || up === 'R2R') return 'การพัฒนางานประจำสู่งานวิจัย (R2R)';
+  if (up === 'CAT-POLICY' || up === 'POLICY') return 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร';
+  if (up === 'CAT-STORYTELLING' || up === 'STORYTELLING') return 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์';
+  return s;
+}
+
 async function loadWorks(){
   show('กำลังโหลดผลงาน');
   try{
@@ -2392,6 +2407,7 @@ async function loadWorks(){
       const isDuplicate = nt && (titleCountMap[nt] > 1);
       const dupCount = isDuplicate ? titleCountMap[nt] : 0;
       const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
+      const catDisplay = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
 
       return `<tr>
       <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
@@ -2408,7 +2424,7 @@ async function loadWorks(){
         }
         ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
       </td>
-      <td>${esc(w.CategoryName||w.CategoryNameTH||w.Category||w.WorkType||w.Field||w.Theme||'-')}</td>
+      <td>${esc(catDisplay)}</td>
       <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
       <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
       <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
@@ -2803,10 +2819,20 @@ async function openUpdateWorkStatus(wid, currentStatus) {
     confirmButtonColor: '#006D70',
     cancelButtonText: 'ยกเลิก',
     preConfirm: () => {
+      const catSelect = $('#newWorkCategory');
+      const selectedCatOption = catSelect ? catSelect.options[catSelect.selectedIndex] : null;
+      const categoryName = (selectedCatOption && catSelect.value) ? selectedCatOption.text : '';
+
+      const ptSelect = $('#newWorkPresentationType');
+      const selectedPtOption = ptSelect ? ptSelect.options[ptSelect.selectedIndex] : null;
+      const ptName = (selectedPtOption && ptSelect.value) ? selectedPtOption.text : '';
+
       return {
         status: $('#newWorkStatus').value,
         categoryId: $('#newWorkCategory').value,
-        presentationTypeId: $('#newWorkPresentationType').value
+        categoryName: categoryName,
+        presentationTypeId: $('#newWorkPresentationType').value,
+        presentationTypeName: ptName
       };
     }
   });
@@ -2814,7 +2840,7 @@ async function openUpdateWorkStatus(wid, currentStatus) {
   if (x.isConfirmed && x.value) {
     show('กำลังบันทึกข้อมูลผลงาน...');
     try {
-      await rpc('adminUpdateWorkStatus', TOKEN, CID, wid, x.value.status, x.value.categoryId, x.value.presentationTypeId);
+      await rpc('adminUpdateWorkStatus', TOKEN, CID, wid, x.value);
       hide();
       toast('อัปเดตข้อมูลและสถานะผลงานสำเร็จ');
       await loadWorks();
