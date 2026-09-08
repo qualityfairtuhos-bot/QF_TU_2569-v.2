@@ -3590,7 +3590,7 @@ function submitWork(conferenceId,regId,emailOrPhone,payload,files){
 
     if(!files.original)throw new Error('กรุณาแนบไฟล์แบบฟอร์มการนำเสนอผลงาน');
     if(!files.presenterBio)throw new Error('กรุณาแนบไฟล์ประวัติของผู้นำเสนอผลงานเพื่อรับคะแนน CNEU');
-    const ethicsRequired=bool_(payload.EthicsRequired);if(ethicsRequired&&!files.ethics)throw new Error('ผลงานที่เกี่ยวข้องกับมนุษย์ต้องแนบหลักฐานการรับรองจริยธรรมการวิจัยในคน');
+    const ethicsRequired=bool_(payload.EthicsRequired);
     const region4Affiliation=upper_(payload.Region4Affiliation);if(['YES','NO'].indexOf(region4Affiliation)<0)throw new Error('กรุณาระบุว่าผู้ส่งผลงานสังกัดหน่วยงานในเขตสุขภาพที่ 4 หรือไม่');
     let region4AwardIntent=false;if(region4Affiliation==='YES'){const choice=upper_(payload.Region4AwardIntentChoice);if(['YES','NO'].indexOf(choice)<0)throw new Error('กรุณาเลือกว่ามีหรือไม่มีความประสงค์ส่งผลงานเข้าคัดเลือกในนามเขตสุขภาพที่ 4');region4AwardIntent=choice==='YES';}
     const max=num_(getSetting_(cid,'MAX_WORKS_PER_REGISTRATION','0')),current=findMany_('Works',{ConferenceID:cid,RegID:regId}).filter(function(x){return upper_(x.Status)!=='CANCELLED';}).length;if(max>0&&current>=max)throw new Error('ส่งผลงานได้สูงสุด '+max+' เรื่อง');
