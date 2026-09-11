@@ -1142,25 +1142,31 @@ function updateRecord_(name,rowNumber,patch){
   return true;
 }
 function deleteRowsWhere_(name, criteria) {
-  var sh = getSheet_(name);
-  if (!sh) return 0;
-  var records = findMany_(name, criteria);
-  if (!records || !records.length) return 0;
-  records.sort(function(a, b) { return Number(b.__row) - Number(a.__row); });
-  var count = 0;
-  records.forEach(function(r) {
-    if (r.__row && r.__row >= 2 && r.__row <= sh.getLastRow()) {
-      try {
-        sh.deleteRow(r.__row);
-        count++;
-      } catch(e) {
-        console.error('Error deleting row in ' + name + ' at ' + r.__row, e);
+  try {
+    var ss = getSpreadsheet_();
+    var sh = ss.getSheetByName(name);
+    if (!sh) return 0;
+    var records = findMany_(name, criteria);
+    if (!records || !records.length) return 0;
+    records.sort(function(a, b) { return Number(b.__row) - Number(a.__row); });
+    var count = 0;
+    records.forEach(function(r) {
+      if (r.__row && r.__row >= 2 && r.__row <= sh.getLastRow()) {
+        try {
+          sh.deleteRow(r.__row);
+          count++;
+        } catch(e) {
+          console.error('Error deleting row in ' + name + ' at ' + r.__row, e);
+        }
       }
-    }
-  });
-  clearRequestCache_();
-  clearTableCache_(name);
-  return count;
+    });
+    clearRequestCache_();
+    clearTableCache_(name);
+    return count;
+  } catch(err) {
+    console.warn('deleteRowsWhere_ error on sheet ' + name, err);
+    return 0;
+  }
 }
 function applyPlainTextToRow_(sh,hm,row,obj){ PLAIN_TEXT_FIELDS.forEach(function(k){ if(hm.map[k]!==undefined && obj[k]!==undefined){ const c=sh.getRange(row,hm.map[k]+1); c.setNumberFormat('@'); c.setValue(String(obj[k])); }}); }
 const _seqCache = {};
@@ -5735,16 +5741,24 @@ function adminDeleteWork(token, conferenceId, workId) {
   return runSafely_('adminDeleteWork', function() {
     var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
     var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
-    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || findOne_('Works', { WorkID: workId });
-    if (!w) throw new Error('ไม่พบข้อมูลผลงานที่ต้องการลบ');
+    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || 
+            findOne_('Works', { WorkID: workId }) || 
+            findOne_('Works', { WorkCode: workId });
+    if (!w) throw new Error('ไม่พบข้อมูลผลงานที่ต้องการลบ (WorkID: ' + workId + ')');
 
+    var actualWorkId = w.WorkID || workId;
     var actualCid = w.ConferenceID || cid;
 
     // 1. Delete associated files from Google Drive
-    var files = findMany_('WorkFiles', { WorkID: workId });
+    var files = [];
+    try {
+      files = findMany_('WorkFiles', { WorkID: actualWorkId });
+    } catch(err) {
+      console.warn('Could not query WorkFiles for WorkID ' + actualWorkId, err);
+    }
     var deletedFilesCount = 0;
-    files.forEach(function(f) {
-      var fileId = f.FileId || f.DriveFileID;
+    (files || []).forEach(function(f) {
+      var fileId = f.FileId || f.DriveFileID || f.FileID;
       if (fileId) {
         try {
           DriveApp.getFileById(fileId).setTrashed(true);
@@ -5756,26 +5770,29 @@ function adminDeleteWork(token, conferenceId, workId) {
     });
 
     // 2. Delete related records across all relational tables
-    deleteRowsWhere_('WorkFiles', { WorkID: workId });
-    deleteRowsWhere_('WorkAuthors', { WorkID: workId });
-    deleteRowsWhere_('ReviewAssignments', { WorkID: workId });
-    deleteRowsWhere_('ReviewScores', { WorkID: workId });
-    deleteRowsWhere_('ReviewSummary', { WorkID: workId });
-    deleteRowsWhere_('FinalDecisions', { WorkID: workId });
-    deleteRowsWhere_('ReviewerConflicts', { WorkID: workId });
-    deleteRowsWhere_('PresentationSlots', { WorkID: workId });
-    deleteRowsWhere_('Works', { WorkID: workId });
+    deleteRowsWhere_('WorkFiles', { WorkID: actualWorkId });
+    deleteRowsWhere_('WorkAuthors', { WorkID: actualWorkId });
+    deleteRowsWhere_('ReviewAssignments', { WorkID: actualWorkId });
+    deleteRowsWhere_('ReviewScores', { WorkID: actualWorkId });
+    deleteRowsWhere_('ReviewSummary', { WorkID: actualWorkId });
+    deleteRowsWhere_('FinalDecisions', { WorkID: actualWorkId });
+    deleteRowsWhere_('ReviewerConflicts', { WorkID: actualWorkId });
+    deleteRowsWhere_('Works', { WorkID: actualWorkId });
 
-    logAudit_(actualCid, ctx.user, ctx.role, 'DELETE_WORK', 'Works', workId, {
-      workCode: w.WorkCode,
-      title: w.TitleTH || w.TitleEN,
-      deletedFilesCount: deletedFilesCount
-    });
+    try {
+      logAudit_(actualCid, ctx.user, ctx.role, 'DELETE_WORK', 'Works', actualWorkId, {
+        workCode: w.WorkCode || actualWorkId,
+        title: w.TitleTH || w.TitleEN || '',
+        deletedFilesCount: deletedFilesCount
+      });
+    } catch(auditErr) {
+      console.warn('Could not write audit log for DELETE_WORK', auditErr);
+    }
 
     return {
       success: true,
-      workId: workId,
-      workCode: w.WorkCode || workId,
+      workId: actualWorkId,
+      workCode: w.WorkCode || actualWorkId,
       deletedFilesCount: deletedFilesCount
     };
   });
