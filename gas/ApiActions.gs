@@ -5,6 +5,8 @@ const API_ACTIONS = Object.freeze({
   adminAssignReviewersBulk: adminAssignReviewersBulk,
   adminBootstrap: adminBootstrap,
   adminDashboard: adminDashboard,
+  adminDeleteFinanceDocument: adminDeleteFinanceDocument,
+  adminDeleteWork: adminDeleteWork,
   adminDeleteWorkFile: adminDeleteWorkFile,
   adminGetRegistration: adminGetRegistration,
   adminGetRegistrationSignSheet: adminGetRegistrationSignSheet,
@@ -63,7 +65,7 @@ const API_ACTIONS = Object.freeze({
 });
 
 const API_WRITE_ACTIONS = Object.freeze({
-  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminDeleteWorkFile:1,
+  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminDeleteFinanceDocument:1, adminDeleteWork:1, adminDeleteWorkFile:1,
   adminResendReviewerCreds:1, adminSaveRegistration:1, adminSendDirectEmail:1,
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,

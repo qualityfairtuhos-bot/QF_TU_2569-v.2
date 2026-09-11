@@ -1141,6 +1141,27 @@ function updateRecord_(name,rowNumber,patch){
   clearTableCache_(name);
   return true;
 }
+function deleteRowsWhere_(name, criteria) {
+  var sh = getSheet_(name);
+  if (!sh) return 0;
+  var records = findMany_(name, criteria);
+  if (!records || !records.length) return 0;
+  records.sort(function(a, b) { return Number(b.__row) - Number(a.__row); });
+  var count = 0;
+  records.forEach(function(r) {
+    if (r.__row && r.__row >= 2 && r.__row <= sh.getLastRow()) {
+      try {
+        sh.deleteRow(r.__row);
+        count++;
+      } catch(e) {
+        console.error('Error deleting row in ' + name + ' at ' + r.__row, e);
+      }
+    }
+  });
+  clearRequestCache_();
+  clearTableCache_(name);
+  return count;
+}
 function applyPlainTextToRow_(sh,hm,row,obj){ PLAIN_TEXT_FIELDS.forEach(function(k){ if(hm.map[k]!==undefined && obj[k]!==undefined){ const c=sh.getRange(row,hm.map[k]+1); c.setNumberFormat('@'); c.setValue(String(obj[k])); }}); }
 const _seqCache = {};
 function nextId_(prefix){
@@ -5222,11 +5243,24 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     });
 
     var categories = {};
-    var chartWorksByCategory = {};
+    var chartWorksByCategory = {
+      'ผลงานวิจัยด้านคุณภาพและความปลอดภัย': 0,
+      'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย': 0,
+      'Service Excellence': 0,
+      'CQI/ Best Practice': 0,
+      'Primary Care & Community Network Development': 0
+    };
     findMany_('WorkCategories', { ConferenceID: cid }).forEach(function(c) {
-      categories[c.CategoryID] = c;
-      var catName = c.CategoryNameTH || c.CategoryNameEN || c.CategoryID;
-      chartWorksByCategory[catName] = 0;
+      if (c.CategoryID) categories[c.CategoryID] = c;
+      if (c.CategoryCode) {
+        categories[c.CategoryCode] = c;
+        categories[c.CategoryCode.toUpperCase()] = c;
+        categories[c.CategoryCode.replace(/^CAT-/, '')] = c;
+      }
+      var catName = resolveCategoryName_(c.CategoryNameTH || c.CategoryNameEN || c.CategoryID);
+      if (catName && chartWorksByCategory[catName] === undefined) {
+        chartWorksByCategory[catName] = 0;
+      }
     });
 
     // Chart 3: Works by INTERNAL / EXTERNAL
@@ -5238,7 +5272,8 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       chartWorksByStatus[s]++;
       
       // Works by Category
-      var cat = w.CategoryID ? (categories[w.CategoryID] ? categories[w.CategoryID].CategoryNameTH : w.CategoryID) : 'ไม่ระบุ';
+      var rawCat = w.CategoryName || w.CategoryNameTH || (w.CategoryID ? (categories[w.CategoryID] ? (categories[w.CategoryID].CategoryNameTH || categories[w.CategoryID].CategoryNameEN) : w.CategoryID) : 'ไม่ระบุ');
+      var cat = resolveCategoryName_(rawCat) || 'ไม่ระบุ';
       if (chartWorksByCategory[cat] === undefined) chartWorksByCategory[cat] = 0;
       chartWorksByCategory[cat]++;
       
@@ -5696,6 +5731,56 @@ function adminUpdateWorkStatus(token, conferenceId, workId, newStatus, categoryI
   });
 }
 
+function adminDeleteWork(token, conferenceId, workId) {
+  return runSafely_('adminDeleteWork', function() {
+    var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || findOne_('Works', { WorkID: workId });
+    if (!w) throw new Error('ไม่พบข้อมูลผลงานที่ต้องการลบ');
+
+    var actualCid = w.ConferenceID || cid;
+
+    // 1. Delete associated files from Google Drive
+    var files = findMany_('WorkFiles', { WorkID: workId });
+    var deletedFilesCount = 0;
+    files.forEach(function(f) {
+      var fileId = f.FileId || f.DriveFileID;
+      if (fileId) {
+        try {
+          DriveApp.getFileById(fileId).setTrashed(true);
+          deletedFilesCount++;
+        } catch(err) {
+          console.warn('Could not trash Drive file: ' + fileId, err);
+        }
+      }
+    });
+
+    // 2. Delete related records across all relational tables
+    deleteRowsWhere_('WorkFiles', { WorkID: workId });
+    deleteRowsWhere_('WorkAuthors', { WorkID: workId });
+    deleteRowsWhere_('ReviewAssignments', { WorkID: workId });
+    deleteRowsWhere_('ReviewScores', { WorkID: workId });
+    deleteRowsWhere_('ReviewSummary', { WorkID: workId });
+    deleteRowsWhere_('FinalDecisions', { WorkID: workId });
+    deleteRowsWhere_('ReviewerConflicts', { WorkID: workId });
+    deleteRowsWhere_('PresentationSlots', { WorkID: workId });
+    deleteRowsWhere_('Works', { WorkID: workId });
+
+    logAudit_(actualCid, ctx.user, ctx.role, 'DELETE_WORK', 'Works', workId, {
+      workCode: w.WorkCode,
+      title: w.TitleTH || w.TitleEN,
+      deletedFilesCount: deletedFilesCount
+    });
+
+    return {
+      success: true,
+      workId: workId,
+      workCode: w.WorkCode || workId,
+      deletedFilesCount: deletedFilesCount
+    };
+  });
+}
+
 function requestPasswordReset(email, conferenceId) {
   return runSafely_('requestPasswordReset', function() {
     const e = normalizeEmail_(email);
@@ -5948,6 +6033,7 @@ const API_ACTIONS = Object.freeze({
   adminUploadBanner: adminUploadBanner,
   adminListFinanceDocuments: adminListFinanceDocuments,
   adminDeleteFinanceDocument: adminDeleteFinanceDocument,
+  adminDeleteWork: adminDeleteWork,
   getPublicFinanceDocuments: getPublicFinanceDocuments,
   adminImportFromGoogleSheet: adminImportFromGoogleSheet,
   adminSendIncompleteProfileEmails: adminSendIncompleteProfileEmails,
@@ -5991,7 +6077,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1,
-  adminUploadFinanceDocument:1, adminUploadBanner:1, adminDeleteFinanceDocument:1,
+  adminUploadFinanceDocument:1, adminUploadBanner:1, adminDeleteFinanceDocument:1, adminDeleteWork:1,
   adminImportFromGoogleSheet:1, adminSendIncompleteProfileEmails:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
   emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,
