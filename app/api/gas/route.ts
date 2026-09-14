@@ -15,10 +15,88 @@ const lastKnownGood=new Map<string,ApiResponse<unknown>>();
 const CACHE_TTLS:Record<string,number>={
   getPublicBootstrap: 300_000,
   getPublicAnnouncement: 300_000,
+  getPublicFinanceDocuments: 300_000,
   adminBootstrap: 180_000,
   adminDashboard: 45_000,
-  getAdminSettings: 120_000
+  getAdminSettings: 120_000,
+  adminListRegistrations: 45_000,
+  adminListPayments: 45_000,
+  adminListWorks: 45_000,
+  adminListReviewers: 60_000,
+  adminListUsers: 60_000,
+  adminListMealPasses: 45_000,
+  adminListFinanceDocuments: 120_000,
+  adminGetReviewConfig: 120_000,
+  reviewerBootstrap: 60_000,
+  getEventScannerBootstrap: 60_000,
+  listImportBatches: 60_000
 };
+
+const DEFAULT_CONFERENCE_BOOT = {
+  conference: {
+    ConferenceID: "CONF-TUH-QF-2569",
+    ConferenceNameTH: "งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569",
+    ShortName: "มหกรรมคุณภาพ 2569",
+    DescriptionTH: "ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ",
+    Venue: "อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต",
+    StartDate: "2026-11-18",
+    EndDate: "2026-11-20",
+    RegistrationCloseAt: "2026-11-10T23:59:59",
+    PaymentCloseAt: "2026-11-12T23:59:59",
+    SubmissionCloseAt: "2026-10-15T23:59:59",
+    ResultAnnouncementAt: "2026-11-01T23:59:59",
+    LogoUrl: "/images/tuh-logo.png",
+    PrimaryColor: "#0C385B",
+    SecondaryColor: "#006D70"
+  },
+  registrationTypes: [
+    { TypeCode: "INTERNAL", TypeNameTH: "บุคลากรโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ", FeeAmount: 0 },
+    { TypeCode: "EXTERNAL_EARLY", TypeNameTH: "บุคคลภายนอก (Early Bird)", FeeAmount: 1800 },
+    { TypeCode: "EXTERNAL_REGULAR", TypeNameTH: "บุคคลภายนอก (ทั่วไป)", FeeAmount: 2200 }
+  ],
+  workCategories: [
+    { CategoryID: "CAT-1", CategoryCode: "RESEARCH", CategoryNameTH: "ผลงานวิจัยด้านคุณภาพและความปลอดภัย" },
+    { CategoryID: "CAT-2", CategoryCode: "INNOVATION", CategoryNameTH: "ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย" },
+    { CategoryID: "CAT-3", CategoryCode: "SERVICE", CategoryNameTH: "Service Excellence" },
+    { CategoryID: "CAT-4", CategoryCode: "CQI", CategoryNameTH: "CQI/ Best Practice" },
+    { CategoryID: "CAT-5", CategoryCode: "PRIMARY_CARE", CategoryNameTH: "Primary Care & Community Network Development" }
+  ],
+  presentationTypes: [
+    { PresentationTypeID: "PRES-ORAL", TypeCode: "ORAL", TypeNameTH: "แบบบรรยาย (Oral presentation)", PresentationMinutes: 10, QAMinutes: 2 },
+    { PresentationTypeID: "PRES-POSTER", TypeCode: "POSTER", TypeNameTH: "แบบโปสเตอร์ (e-poster)", PresentationMinutes: 4, QAMinutes: 1 }
+  ],
+  eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
+  settings: {
+    EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
+    BANNER_SLIDES_JSON: '[{"title":"งานมหกรรมคุณภาพ ครั้งที่ 19","imageUrl":"/images/tuh-banner-main.jpg","link":"","active":true},{"title":"CQI & Best Practice","imageUrl":"/images/tuh-banner-cqi.jpg","link":"","active":true},{"title":"VAR for Sustainability Healthcare","imageUrl":"/images/tuh-banner-var.jpg","link":"","active":true}]'
+  },
+  organizationUnits: [
+    { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
+    { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านพัฒนาระบบบริการและสนับสนุนบริการสุขภาพ" },
+    { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านบริการทางการแพทย์" },
+    { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านอำนวยการ" },
+    { UnitLevel: "GROUP", UnitNameTH: "ฝ่ายการพยาบาล" },
+    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลผู้ป่วยนอก" },
+    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลผู้ป่วยใน" },
+    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลอุบัติเหตุและฉุกเฉิน" },
+    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลผู้ป่วยหนัก" },
+    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลห้องผ่าตัด" }
+  ],
+  dailyQuota: {
+    internal: { max: 400, day1: 0, day2: 0, day3: 0 },
+    external: { max: 200, day1: 0, day2: 0, day3: 0 }
+  }
+};
+
+const preseededBoot: ApiResponse<unknown> = {
+  success: true,
+  data: DEFAULT_CONFERENCE_BOOT
+};
+lastKnownGood.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', preseededBoot);
+lastKnownGood.set('getPublicBootstrap:[]', preseededBoot);
+lastKnownGood.set('getPublicBootstrap:[""]', preseededBoot);
+memoryCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
+memoryCache.set('getPublicBootstrap:[]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
 
 function getCachedResponse(action:string,args:unknown[]){
   const ttl=CACHE_TTLS[action];
