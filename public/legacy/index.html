@@ -507,7 +507,7 @@ function done(){$('#loading').classList.remove('show')}
 function alertErr(e){done();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('#page-'+p).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));scrollTo({top:0,behavior:'smooth'})}
 function formObj(f){const o={};new FormData(f).forEach((v,k)=>o[k]=v);f.querySelectorAll('input[type=checkbox]').forEach(x=>o[x.name]=x.checked);if(o.ReceiptTaxID&&!o.ReceiptTaxId)o.ReceiptTaxId=o.ReceiptTaxID;if(o.ReceiptTaxId&&!o.ReceiptTaxID)o.ReceiptTaxID=o.ReceiptTaxId;return o}
-function fileObj(el){return new Promise((res,rej)=>{if(!el||!el.files||!el.files[0])return res(null);const f=el.files[0];const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type||'application/octet-stream',base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
+function fileObj(el){return new Promise((res,rej)=>{const f=el.files[0];if(!f)return res(null);const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 
 function normalizeBannerImageUrl(url){
