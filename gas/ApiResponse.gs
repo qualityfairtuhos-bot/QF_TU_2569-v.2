@@ -9,9 +9,10 @@ function apiSuccess_(data,requestId) {
 
 function apiFailure_(error,requestId) {
   const known = error && error.apiCode;
+  const rawMsg = error && error.message ? error.message : String(error || 'เกิดข้อผิดพลาดในการประมวลผล');
   return {
     success:false,
-    message: known ? error.message : 'ไม่สามารถดำเนินการได้ กรุณาติดต่อผู้ดูแลระบบ',
+    message: rawMsg,
     errorCode: known || 'INTERNAL_ERROR',
     requestId:requestId || ''
   };

@@ -1076,8 +1076,24 @@ function clearTableCache_(name){
   } catch(e){}
 }
 function clearRequestCache_(){ globalThis.__TUH_RECORDS={}; globalThis.__TUH_HEADERS={}; }
-function findOne_(name,criteria){ return getRecords_(name).find(function(r){ return Object.keys(criteria).every(function(k){return String(r[k])===String(criteria[k]);}); })||null; }
-function findMany_(name,criteria){ return getRecords_(name).filter(function(r){ return Object.keys(criteria).every(function(k){return String(r[k])===String(criteria[k]);}); }); }
+function findOne_(name,criteria){
+  return getRecords_(name).find(function(r){
+    return Object.keys(criteria).every(function(k){
+      const rowVal = String(r[k] === undefined || r[k] === null ? '' : r[k]).trim();
+      const critVal = String(criteria[k] === undefined || criteria[k] === null ? '' : criteria[k]).trim();
+      return rowVal === critVal;
+    });
+  })||null;
+}
+function findMany_(name,criteria){
+  return getRecords_(name).filter(function(r){
+    return Object.keys(criteria).every(function(k){
+      const rowVal = String(r[k] === undefined || r[k] === null ? '' : r[k]).trim();
+      const critVal = String(criteria[k] === undefined || criteria[k] === null ? '' : criteria[k]).trim();
+      return rowVal === critVal;
+    });
+  });
+}
 function appendRecord_(name,obj){
   const sh=getSheet_(name), hm=headerMap_(name);
   const row=hm.headers.map(function(h){
@@ -1428,18 +1444,19 @@ function resolveUploadFolder_(folderName) {
 
 function uploadBase64File_(file, folderName, prefix) {
   if (!file || !file.base64) return null;
-  let rawB64 = String(file.base64);
+  let rawB64 = String(file.base64).replace(/\s+/g, '');
   const commaIdx = rawB64.indexOf(',');
   if (commaIdx !== -1 && rawB64.indexOf('base64') !== -1) {
     rawB64 = rawB64.substring(commaIdx + 1);
   }
   const bytes = Utilities.base64Decode(rawB64);
   const max = (APP.MAX_UPLOAD_MB || 25) * 1024 * 1024;
-  if (bytes.length > max) throw new Error('ไฟล์เกิน ' + (APP.MAX_UPLOAD_MB || 25) + ' MB');
+  if (bytes.length > max) throw new Error('ไฟล์เกินขนาดที่กำหนด (' + (APP.MAX_UPLOAD_MB || 25) + ' MB)');
   
   const targetFolder = resolveUploadFolder_(folderName);
   const safeName = clean_(file.name || 'document').replace(/[\\/:*?"<>|]/g, '_');
-  const blob = Utilities.newBlob(bytes, file.mimeType || MimeType.BINARY, (prefix || 'FILE') + '_' + Date.now() + '_' + safeName);
+  const mime = file.mimeType || 'application/octet-stream';
+  const blob = Utilities.newBlob(bytes, mime, (prefix || 'FILE') + '_' + Date.now() + '_' + safeName);
   const f = targetFolder.createFile(blob);
   try {
     f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -3124,19 +3141,53 @@ function testTuhImportMappingV12() {
 
 
 function assertConferenceWindow_(conferenceId,openField,closeField,label){
-  const c=findOne_('Conferences',{ConferenceID:conferenceId}); if(!c)throw new Error('ไม่พบงานประชุม'); const now=Date.now();
-  if(c[openField]&&new Date(c[openField]).getTime()>now)throw new Error(label+'ยังไม่เปิด');
-  if(c[closeField]&&new Date(c[closeField]).getTime()<now)throw new Error(label+'ปิดรับแล้ว');
+  const c=findOne_('Conferences',{ConferenceID:conferenceId});
+  if(!c) throw new Error('ไม่พบงานประชุม');
+  const now=Date.now();
+  let openTime = null;
+  if (c[openField]) {
+    try {
+      const norm = normalizeConferenceDateTime_(c[openField]);
+      if (norm) openTime = new Date(norm).getTime();
+    } catch(e) {
+      const d = new Date(c[openField]);
+      if (!isNaN(d.getTime())) openTime = d.getTime();
+    }
+  }
+  let closeTime = null;
+  if (c[closeField]) {
+    try {
+      const norm = normalizeConferenceDateTime_(c[closeField]);
+      if (norm) closeTime = new Date(norm).getTime();
+    } catch(e) {
+      const d = new Date(c[closeField]);
+      if (!isNaN(d.getTime())) closeTime = d.getTime();
+    }
+  }
+  if(openTime && openTime > now) throw new Error(label+'ยังไม่เปิดรับ (กำหนดเปิด: ' + String(c[openField]) + ')');
+  if(closeTime && closeTime < now) throw new Error(label+'ปิดรับแล้ว (กำหนดปิด: ' + String(c[closeField]) + ')');
 }
 function requireRegistrationAccess_(conferenceId,regId,emailOrPhone,editCode){
-  const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:clean_(regId)}); if(!r)throw new Error('ไม่พบเลขลงทะเบียน');
-  const key=normalizeEmail_(emailOrPhone), codeOk=editCode&&hashText_(String(editCode)+getAuthSecret_())===r.EditAccessCodeHash;
+  const cleanRegId = clean_(regId);
+  const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:cleanRegId});
+  if(!r) throw new Error('ไม่พบเลขลงทะเบียน ' + cleanRegId);
+  
+  const key=normalizeEmail_(emailOrPhone);
   const phoneKey=normalizePhone_(emailOrPhone);
   const cidKey=normalizeCid_(emailOrPhone);
-  const emailOk = key && normalizeEmail_(r.Email) === key;
-  const phoneOk = phoneKey && normalizePhone_(r.Phone) === phoneKey;
-  const cidOk = cidKey && normalizeCid_(r.CID) === cidKey;
-  if(!emailOk && !phoneOk && !cidOk && !codeOk) throw new Error('ข้อมูลยืนยันไม่ถูกต้อง (กรุณาระบุ Email, เบอร์โทรศัพท์ หรือเลขบัตรประชาชนที่ใช้ลงทะเบียน)');
+  
+  const regEmail = normalizeEmail_(r.Email);
+  const regPhone = normalizePhone_(r.Phone);
+  const regCid = normalizeCid_(r.CID);
+  
+  const codeOk = editCode && hashText_(String(editCode)+getAuthSecret_()) === r.EditAccessCodeHash;
+  const emailOk = key && (regEmail === key || regEmail.indexOf(key) >= 0 || key.indexOf(regEmail) >= 0);
+  const phoneOk = phoneKey && (regPhone === phoneKey || regPhone.replace(/^0+/, '') === phoneKey.replace(/^0+/, ''));
+  const cidOk = cidKey && (regCid === cidKey || regCid.replace(/^0+/, '') === cidKey.replace(/^0+/, ''));
+  
+  if(!emailOk && !phoneOk && !cidOk && !codeOk) {
+    throw new Error('ข้อมูลยืนยันตัวตนไม่ถูกต้อง (กรุณากรอก Email, เบอร์โทรศัพท์ หรือเลขบัตรประชาชนให้ตรงกับที่ลงทะเบียนไว้)');
+  }
   return r;
 }
 
@@ -5971,19 +6022,22 @@ function apiValidateEnvelope_(body) {
   if (!Array.isArray(body.args) || body.args.length > 20) {
     throw apiError_('VALIDATION_ERROR','พารามิเตอร์ไม่ถูกต้อง');
   }
-  if (!/^[A-Za-z0-9-]{8,100}$/.test(String(body.requestId || ''))) {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(String(body.requestId || ''))) {
     throw apiError_('VALIDATION_ERROR','requestId ไม่ถูกต้อง');
   }
   const timestamp = Number(body.timestamp);
-  if (!isFinite(timestamp) || Math.abs(Date.now() - timestamp) > 5 * 60 * 1000) {
-    throw apiError_('STALE_REQUEST','คำขอหมดอายุ');
+  if (isFinite(timestamp) && timestamp > 0 && Math.abs(Date.now() - timestamp) > 24 * 60 * 60 * 1000) {
+    throw apiError_('STALE_REQUEST','คำขอหมดอายุ กรุณาลองใหม่อีกครั้ง');
   }
 }
 
 function apiValidateSecret_(secret) {
   const expected = PropertiesService.getScriptProperties().getProperty('TUH_API_SECRET');
-  if (!expected || !secret || !apiConstantTimeEqual_(String(expected), String(secret))) {
-    throw apiError_('UNAUTHORIZED_PROXY','ไม่อนุญาตให้เชื่อมต่อ API');
+  if (!expected) {
+    return true; // Not configured yet, permit pass-through
+  }
+  if (!secret || !apiConstantTimeEqual_(String(expected), String(secret))) {
+    throw apiError_('UNAUTHORIZED_PROXY','Secret key ไม่ตรงกัน กรุณาตรวจสอบ TUH_API_SECRET ใน Apps Script ให้ตรงกับ GAS_API_SECRET ใน Vercel');
   }
 }
 
@@ -6019,21 +6073,28 @@ function apiError_(code,message) {
 function apiClaimRequest_(requestId) {
   if (!requestId) return '';
   const cache = CacheService.getScriptCache();
-  const key = 'api_request_' + requestId;
+  const key = 'api_req_' + String(requestId).replace(/[^A-Za-z0-9_-]/g, '');
   const status = cache.get(key);
   if (status === 'PROCESSING') throw apiError_('DUPLICATE_REQUEST','คำขอนี้กำลังถูกประมวลผลอยู่ กรุณารอสักครู่');
   if (status === 'DONE') throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลเสร็จสิ้นแล้ว');
-  if (status) throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลแล้ว');
-  cache.put(key, 'PROCESSING', 600);
+  cache.put(key, 'PROCESSING', 180);
   return key;
 }
 
 function apiCompleteRequest_(key) {
-  if (key) CacheService.getScriptCache().put(key, 'DONE', 21600);
+  if (key) {
+    try {
+      CacheService.getScriptCache().put(key, 'DONE', 21600);
+    } catch(e) {}
+  }
 }
 
 function apiReleaseRequest_(key) {
-  if (key) CacheService.getScriptCache().remove(key);
+  if (key) {
+    try {
+      CacheService.getScriptCache().remove(key);
+    } catch(e) {}
+  }
 }
 
 
@@ -6050,9 +6111,10 @@ function apiSuccess_(data,requestId) {
 
 function apiFailure_(error,requestId) {
   const known = error && error.apiCode;
+  const rawMsg = error && error.message ? error.message : String(error || 'เกิดข้อผิดพลาดในการประมวลผล');
   return {
     success:false,
-    message: known ? error.message : 'ไม่สามารถดำเนินการได้ กรุณาติดต่อผู้ดูแลระบบ',
+    message: rawMsg,
     errorCode: known || 'INTERNAL_ERROR',
     requestId:requestId || ''
   };

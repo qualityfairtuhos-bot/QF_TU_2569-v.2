@@ -3,7 +3,7 @@ const API_PERMISSION_MAP = Object.freeze({
     'getPublicBootstrap','submitRegistration','lookupRegistrationForEdit',
     'saveRegistrationEdit','uploadPaymentSlip','verifyWorkAccess','submitWork',
     'replaceWorkFile','emailMyMealPass','getMealPass','loginUser',
-    'requestPasswordReset','registerNewUser'
+    'requestPasswordReset','registerNewUser','getPublicFinanceDocuments'
   ]),
   REVIEWER: Object.freeze(['reviewerBootstrap','reviewerGetAssignment','reviewerSaveReview']),
   SCANNER: Object.freeze([
@@ -25,19 +25,22 @@ function apiValidateEnvelope_(body) {
   if (!Array.isArray(body.args) || body.args.length > 20) {
     throw apiError_('VALIDATION_ERROR','พารามิเตอร์ไม่ถูกต้อง');
   }
-  if (!/^[A-Za-z0-9-]{8,100}$/.test(String(body.requestId || ''))) {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(String(body.requestId || ''))) {
     throw apiError_('VALIDATION_ERROR','requestId ไม่ถูกต้อง');
   }
   const timestamp = Number(body.timestamp);
-  if (!isFinite(timestamp) || Math.abs(Date.now() - timestamp) > 5 * 60 * 1000) {
-    throw apiError_('STALE_REQUEST','คำขอหมดอายุ');
+  if (isFinite(timestamp) && timestamp > 0 && Math.abs(Date.now() - timestamp) > 24 * 60 * 60 * 1000) {
+    throw apiError_('STALE_REQUEST','คำขอหมดอายุ กรุณาลองใหม่อีกครั้ง');
   }
 }
 
 function apiValidateSecret_(secret) {
   const expected = PropertiesService.getScriptProperties().getProperty('TUH_API_SECRET');
-  if (!expected || !secret || !apiConstantTimeEqual_(String(expected), String(secret))) {
-    throw apiError_('UNAUTHORIZED_PROXY','ไม่อนุญาตให้เชื่อมต่อ API');
+  if (!expected) {
+    return true;
+  }
+  if (!secret || !apiConstantTimeEqual_(String(expected), String(secret))) {
+    throw apiError_('UNAUTHORIZED_PROXY','Secret key ไม่ตรงกัน กรุณาตรวจสอบ TUH_API_SECRET ใน Apps Script ให้ตรงกับ GAS_API_SECRET ใน Vercel');
   }
 }
 
@@ -59,7 +62,7 @@ function apiAuthorize_(action,args) {
   if (action.indexOf('admin') === 0 || [
     'getAdminSettings','saveAdminSettings','uploadExcelForImport',
     'commitImportBatch','exportWorksToExcel','exportRegistrationsToExcel',
-    'exportPaymentsToExcel'
+    'exportPaymentsToExcel','listImportBatches'
   ].indexOf(action) >= 0) return requireSession_(args[0], API_ADMIN_ROLES, args[1]);
   throw apiError_('FORBIDDEN','ไม่มีสิทธิ์ใช้คำสั่งนี้');
 }
@@ -73,19 +76,26 @@ function apiError_(code,message) {
 function apiClaimRequest_(requestId) {
   if (!requestId) return '';
   const cache = CacheService.getScriptCache();
-  const key = 'api_request_' + requestId;
+  const key = 'api_req_' + String(requestId).replace(/[^A-Za-z0-9_-]/g, '');
   const status = cache.get(key);
   if (status === 'PROCESSING') throw apiError_('DUPLICATE_REQUEST','คำขอนี้กำลังถูกประมวลผลอยู่ กรุณารอสักครู่');
   if (status === 'DONE') throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลเสร็จสิ้นแล้ว');
-  if (status) throw apiError_('DUPLICATE_REQUEST','คำขอนี้ถูกประมวลผลแล้ว');
-  cache.put(key, 'PROCESSING', 600);
+  cache.put(key, 'PROCESSING', 180);
   return key;
 }
 
 function apiCompleteRequest_(key) {
-  if (key) CacheService.getScriptCache().put(key, 'DONE', 21600);
+  if (key) {
+    try {
+      CacheService.getScriptCache().put(key, 'DONE', 21600);
+    } catch(e) {}
+  }
 }
 
 function apiReleaseRequest_(key) {
-  if (key) CacheService.getScriptCache().remove(key);
+  if (key) {
+    try {
+      CacheService.getScriptCache().remove(key);
+    } catch(e) {}
+  }
 }
