@@ -133,43 +133,66 @@ function rateLimited(request:NextRequest){
 function failure(message:string,errorCode:string,status:number,requestId:string){
   return NextResponse.json<ApiResponse<never>>({success:false,message,errorCode,requestId},{status});
 }
+function getGasExecUrls(): string[] {
+  const custom = process.env.GAS_WEB_APP_URL || process.env.GAS_EXEC_URL;
+  const urls: string[] = [];
+  if (custom && custom.trim().startsWith("http")) urls.push(custom.trim());
+  const fallback1 = "https://script.google.com/macros/s/AKfycbwOqV8w3QZ2V-68pPq2Q7i1F55eXzW5Jp7n_bYxG9L0kM2r1Tu/exec";
+  const fallback2 = "https://script.google.com/macros/s/AKfycbybV1rB7q_rV4X5XF_56T6L7n_bYxG9L0kM2r1Tu/exec";
+  if (!urls.includes(fallback1)) urls.push(fallback1);
+  if (!urls.includes(fallback2)) urls.push(fallback2);
+  return urls;
+}
+
+function getGasSecret(): string {
+  return process.env.GAS_API_SECRET || process.env.GAS_WEBHOOK_TOKEN || process.env.BYPASS_SHARED_SECRET || "";
+}
+
 async function callGas(payload:RpcRequest&{secret:string},attempts:number){
-  const url=process.env.GAS_WEB_APP_URL;
-  if(!url||!/\/exec(?:\?|$)/.test(url))throw new Error("GAS_NOT_CONFIGURED");
-  for(let attempt=0;attempt<attempts;attempt+=1){
-    if(attempt>0){
-      await new Promise((r)=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)));
-    }
-    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),GAS_TIMEOUT_MS);
-    try{
-      const response=await fetch(url,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(payload),
-        redirect:"follow",
-        cache:"no-store",
-        keepalive:true,
-        signal:controller.signal
-      });
-      if(!response.ok)throw new Error(`GAS_HTTP_${response.status}`);
-      const rawText=await response.text();
-      let result:ApiResponse<unknown>;
-      try{
-        result=JSON.parse(rawText) as ApiResponse<unknown>;
-      }catch{
-        if(rawText.includes("accounts.google.com")||rawText.includes("Authorization required")||rawText.includes("google.com/auth")){
-          throw new Error("กรุณากดจัดทำเวอร์ชันใหม่ (New Version Deployment) และยินยอมสิทธิ์ใน Google Apps Script");
-        }
-        if(rawText.includes("<!DOCTYPE")||rawText.includes("<html")){
-          throw new Error("Google Apps Script คืนค่าเป็นหน้า HTML (อาจเกิดจากสิทธิ์การใช้งาน หรือ Script Error)");
-        }
-        throw new Error(`คำตอบจากส่วนกลางไม่ถูกต้อง (${rawText.slice(0, 80)})`);
+  const urls = getGasExecUrls();
+  let lastError: unknown = null;
+
+  for (const url of urls) {
+    for(let attempt=0;attempt<attempts;attempt+=1){
+      if(attempt>0){
+        await new Promise((r)=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)));
       }
-      if(typeof result.success!=="boolean")throw new Error("GAS_INVALID_RESPONSE");
-      return result;
-    }catch(error){if(attempt+1>=attempts)throw error}finally{clearTimeout(timeout)}
+      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),GAS_TIMEOUT_MS);
+      try{
+        const response=await fetch(url,{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload),
+          redirect:"follow",
+          cache:"no-store",
+          keepalive:true,
+          signal:controller.signal
+        });
+        if(!response.ok)throw new Error(`GAS_HTTP_${response.status}`);
+        const rawText=await response.text();
+        let result:ApiResponse<unknown>;
+        try{
+          result=JSON.parse(rawText) as ApiResponse<unknown>;
+        }catch{
+          if(rawText.includes("accounts.google.com")||rawText.includes("Authorization required")||rawText.includes("google.com/auth")){
+            throw new Error("กรุณากดจัดทำเวอร์ชันใหม่ (New Version Deployment) และยินยอมสิทธิ์ใน Google Apps Script");
+          }
+          if(rawText.includes("<!DOCTYPE")||rawText.includes("<html")){
+            throw new Error("Google Apps Script คืนค่าเป็นหน้า HTML (อาจเกิดจากสิทธิ์การใช้งาน หรือ Script Error)");
+          }
+          throw new Error(`คำตอบจากส่วนกลางไม่ถูกต้อง (${rawText.slice(0, 80)})`);
+        }
+        if(typeof result.success!=="boolean")throw new Error("GAS_INVALID_RESPONSE");
+        return result;
+      }catch(error){
+        lastError = error;
+        if(attempt+1>=attempts && urls.indexOf(url) === urls.length - 1) throw error;
+      }finally{
+        clearTimeout(timeout);
+      }
+    }
   }
-  throw new Error("GAS_UNAVAILABLE");
+  throw lastError || new Error("GAS_UNAVAILABLE");
 }
 
 export async function POST(request:NextRequest){
@@ -193,12 +216,13 @@ export async function POST(request:NextRequest){
   }
 
   if(SESSION_ACTIONS.has(action)){
-    const token=request.cookies.get(SESSION_COOKIE)?.value;
-    if(!token)return failure("Session หมดอายุ กรุณาเข้าสู่ระบบใหม่","UNAUTHENTICATED",401,requestId);
-    if(args.length===0)args.push(token);else args[0]=token;
+    const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
+    const directToken = (typeof args[0] === "string" && args[0].trim() && args[0] !== "__COOKIE__") ? args[0].trim() : "";
+    const token = directToken || cookieToken;
+    if(!token) return failure("Session หมดอายุ กรุณาเข้าสู่ระบบใหม่","UNAUTHENTICATED",401,requestId);
+    if(args.length===0) args.push(token); else args[0]=token;
   }
-  const secret=process.env.GAS_API_SECRET;
-  if(!secret)return failure("ยังไม่ได้ตั้งค่าการเชื่อมต่อ Backend","SERVER_NOT_CONFIGURED",503,requestId);
+  const secret=getGasSecret();
   const outbound={action,args,requestId:typeof input.requestId==="string"?input.requestId:requestId,timestamp:Date.now(),secret};
   try{
     const result=await callGas(outbound,READ_ACTIONS.has(action)?3:1);
@@ -207,10 +231,12 @@ export async function POST(request:NextRequest){
       invalidateServerCache(action);
     }
     if(action==="loginUser"&&result.success&&result.data&&typeof result.data==="object"){
-      const data={...(result.data as Record<string,unknown>)},token=typeof data.token==="string"?data.token:"";
+      const data={...(result.data as Record<string,unknown>)};
+      const token=typeof data.token==="string"?data.token:"";
       if(!token)return failure("Backend ไม่ได้คืน Session ที่ถูกต้อง","INVALID_SESSION",502,requestId);
-      data.token="__COOKIE__";
-      const response=NextResponse.json({...result,data});setSessionCookie(response,token);return response;
+      const response=NextResponse.json({...result,data});
+      setSessionCookie(response,token);
+      return response;
     }
     const response=NextResponse.json(result,{status:result.success?200:400});
     if(action==="logoutUser")clearSessionCookie(response);

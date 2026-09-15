@@ -355,8 +355,16 @@ const ADMIN_CRED_KEY='tuhAdminRememberedCredentials';
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
 function loadRememberedLogin(){try{const username=localStorage.getItem(ADMIN_CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
 function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(ADMIN_CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(ADMIN_CRED_KEY)}
-function currentAdminToken(){return '__COOKIE__'}
-function storeAdminToken(){}
+function currentAdminToken(){
+  try{return localStorage.getItem('tuhAdminToken')||sessionStorage.getItem('tuhAdminToken')||''}catch(e){return ''}
+}
+function storeAdminToken(token){
+  try{
+    if(token && token !== '__COOKIE__'){
+      localStorage.setItem('tuhAdminToken', token);
+    }
+  }catch(e){}
+}
 function renderAppShell(bootData){
   BOOT=bootData;
   $('#login').style.display='none';
@@ -3541,8 +3549,27 @@ async function viewUserScanHistory(id){
     err(e);
   }
 }
-async function initAdminApp(){loadRememberedLogin();TOKEN=currentAdminToken();if(TOKEN){show('กำลังตรวจสอบ Session');try{await boot();hide()}catch(e){TOKEN='';localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');$('#login').style.display='';$('#app').style.display='none';hide()}}}
-if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initAdminApp)}else{initAdminApp()}
+window.addEventListener('load',async()=>{
+  loadRememberedLogin();
+  TOKEN=currentAdminToken();
+  if(TOKEN){
+    show('กำลังตรวจสอบ Session');
+    try{
+      await boot();
+      hide();
+    }catch(e){
+      TOKEN='';
+      try{localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken')}catch(err){}
+      $('#login').style.display='';
+      $('#app').style.display='none';
+      hide();
+    }
+  }else{
+    $('#login').style.display='';
+    $('#app').style.display='none';
+    hide();
+  }
+});
 </script>
 <footer style="text-align:center; padding: 20px; font-size: 0.85rem; color: #667a88; margin-top: 40px;">
   © 2026 สงวนลิขสิทธิ์ • แพลตฟอร์มนี้เป็นนวัตกรรมที่พัฒนาขึ้นเพื่อสนับสนุนงานวิชาการ<br>
