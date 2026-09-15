@@ -17,19 +17,19 @@ const CACHE_TTLS:Record<string,number>={
   getPublicAnnouncement: 300_000,
   getPublicFinanceDocuments: 300_000,
   adminBootstrap: 180_000,
-  adminDashboard: 45_000,
-  getAdminSettings: 120_000,
-  adminListRegistrations: 45_000,
-  adminListPayments: 45_000,
-  adminListWorks: 45_000,
-  adminListReviewers: 60_000,
-  adminListUsers: 60_000,
-  adminListMealPasses: 45_000,
-  adminListFinanceDocuments: 120_000,
-  adminGetReviewConfig: 120_000,
-  reviewerBootstrap: 60_000,
-  getEventScannerBootstrap: 60_000,
-  listImportBatches: 60_000
+  adminDashboard: 120_000,
+  getAdminSettings: 180_000,
+  adminListRegistrations: 120_000,
+  adminListPayments: 120_000,
+  adminListWorks: 120_000,
+  adminListReviewers: 180_000,
+  adminListUsers: 180_000,
+  adminListMealPasses: 120_000,
+  adminListFinanceDocuments: 180_000,
+  adminGetReviewConfig: 180_000,
+  reviewerBootstrap: 120_000,
+  getEventScannerBootstrap: 120_000,
+  listImportBatches: 120_000
 };
 
 const DEFAULT_CONFERENCE_BOOT = {
@@ -98,10 +98,18 @@ lastKnownGood.set('getPublicBootstrap:[""]', preseededBoot);
 memoryCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
 memoryCache.set('getPublicBootstrap:[]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
 
+function getCacheKey(action:string,args:unknown[]){
+  if(SESSION_ACTIONS.has(action)&&args.length>0){
+    const sessionlessArgs=["__SESSION__",...args.slice(1)];
+    return `${action}:${JSON.stringify(sessionlessArgs)}`;
+  }
+  return `${action}:${JSON.stringify(args)}`;
+}
+
 function getCachedResponse(action:string,args:unknown[]){
   const ttl=CACHE_TTLS[action];
   if(!ttl)return null;
-  const key=`${action}:${JSON.stringify(args)}`;
+  const key=getCacheKey(action,args);
   const item=memoryCache.get(key);
   if(item&&item.expiresAt>Date.now()){
     return item.data;
@@ -113,14 +121,14 @@ function getCachedResponse(action:string,args:unknown[]){
 function setCachedResponse(action:string,args:unknown[],data:ApiResponse<unknown>){
   const ttl=CACHE_TTLS[action];
   if(!ttl||!data.success)return;
-  const key=`${action}:${JSON.stringify(args)}`;
+  const key=getCacheKey(action,args);
   memoryCache.set(key,{data,expiresAt:Date.now()+ttl});
   lastKnownGood.set(key,data);
 }
 
 function invalidateServerCache(action:string){
   // If a write occurs, clear memory cache
-  if(/save|submit|update|import|seed|init|add|revoke|delete|upload|replace|send/i.test(action)){
+  if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset/i.test(action)){
     memoryCache.clear();
   }
 }
@@ -135,13 +143,12 @@ function failure(message:string,errorCode:string,status:number,requestId:string)
 }
 function getGasExecUrls(): string[] {
   const custom = process.env.GAS_WEB_APP_URL || process.env.GAS_EXEC_URL;
-  const urls: string[] = [];
-  if (custom && custom.trim().startsWith("http")) urls.push(custom.trim());
-  const fallback1 = "https://script.google.com/macros/s/AKfycbwOqV8w3QZ2V-68pPq2Q7i1F55eXzW5Jp7n_bYxG9L0kM2r1Tu/exec";
-  const fallback2 = "https://script.google.com/macros/s/AKfycbybV1rB7q_rV4X5XF_56T6L7n_bYxG9L0kM2r1Tu/exec";
-  if (!urls.includes(fallback1)) urls.push(fallback1);
-  if (!urls.includes(fallback2)) urls.push(fallback2);
-  return urls;
+  if (custom && custom.trim().startsWith("http")) {
+    return [custom.trim()];
+  }
+  return [
+    "https://script.google.com/macros/s/AKfycbwOqV8w3QZ2V-68pPq2Q7i1F55eXzW5Jp7n_bYxG9L0kM2r1Tu/exec"
+  ];
 }
 
 function getGasSecret(): string {
@@ -155,9 +162,10 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
   for (const url of urls) {
     for(let attempt=0;attempt<attempts;attempt+=1){
       if(attempt>0){
-        await new Promise((r)=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)));
+        await new Promise((r)=>setTimeout(r,attempt*500));
       }
-      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),GAS_TIMEOUT_MS);
+      const timeoutMs = Math.min(GAS_TIMEOUT_MS, 45_000);
+      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
       try{
         const response=await fetch(url,{
           method:"POST",
@@ -207,14 +215,6 @@ export async function POST(request:NextRequest){
   const args=Array.isArray(input.args)?[...input.args]:[];
   if(args.length>20)return failure("จำนวนพารามิเตอร์ไม่ถูกต้อง","VALIDATION_ERROR",400,requestId);
 
-  const cacheKey=`${action}:${JSON.stringify(args)}`;
-
-  // Check in-memory cache for fast read actions
-  const cached=getCachedResponse(action,args);
-  if(cached){
-    return NextResponse.json(cached,{status:200,headers:{"X-Cache":"HIT"}});
-  }
-
   if(SESSION_ACTIONS.has(action)){
     const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
     const directToken = (typeof args[0] === "string" && args[0].trim() && args[0] !== "__COOKIE__") ? args[0].trim() : "";
@@ -222,10 +222,19 @@ export async function POST(request:NextRequest){
     if(!token) return failure("Session หมดอายุ กรุณาเข้าสู่ระบบใหม่","UNAUTHENTICATED",401,requestId);
     if(args.length===0) args.push(token); else args[0]=token;
   }
+
+  const cacheKey=getCacheKey(action,args);
+
+  // Check in-memory cache for fast read actions
+  const cached=getCachedResponse(action,args);
+  if(cached){
+    return NextResponse.json(cached,{status:200,headers:{"X-Cache":"HIT"}});
+  }
+
   const secret=getGasSecret();
   const outbound={action,args,requestId:typeof input.requestId==="string"?input.requestId:requestId,timestamp:Date.now(),secret};
   try{
-    const result=await callGas(outbound,READ_ACTIONS.has(action)?3:1);
+    const result=await callGas(outbound,READ_ACTIONS.has(action)?2:1);
     if(result.success){
       setCachedResponse(action,args,result);
       invalidateServerCache(action);

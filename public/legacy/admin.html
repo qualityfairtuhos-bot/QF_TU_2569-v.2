@@ -355,16 +355,8 @@ const ADMIN_CRED_KEY='tuhAdminRememberedCredentials';
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
 function loadRememberedLogin(){try{const username=localStorage.getItem(ADMIN_CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
 function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(ADMIN_CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(ADMIN_CRED_KEY)}
-function currentAdminToken(){
-  try{return localStorage.getItem('tuhAdminToken')||sessionStorage.getItem('tuhAdminToken')||''}catch(e){return ''}
-}
-function storeAdminToken(token){
-  try{
-    if(token && token !== '__COOKIE__'){
-      localStorage.setItem('tuhAdminToken', token);
-    }
-  }catch(e){}
-}
+function currentAdminToken(){return '__COOKIE__'}
+function storeAdminToken(){}
 function renderAppShell(bootData){
   BOOT=bootData;
   $('#login').style.display='none';
@@ -414,11 +406,39 @@ async function boot(){
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
 }
-async function nav(p){const page=$('#page-'+p);if(!page)return;CURRENT=p;$$('.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');$$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));const b=$(`.menu button[data-page="${p}"]`);$('#topTitle').textContent=b?b.childNodes[0].textContent:p;const sidebar=$('#sidebar');if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();try{if(p==='dashboard')await loadDashboard();if(p==='settings')await loadSettings();if(p==='import')await loadImportBatches();if(p==='registrations')await loadRegistrations();if(p==='payments')await loadPayments();if(p==='works')await loadWorks();if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}if(p==='food')await loadFood();if(p==='users')await loadUsers()}catch(e){err(e)}}
+const LOADED_PAGES = new Set();
+async function nav(p, force = false){
+  const page=$('#page-'+p);
+  if(!page)return;
+  CURRENT=p;
+  $$('.page').forEach(x=>x.classList.remove('active'));
+  page.classList.add('active');
+  $$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));
+  const b=$(`.menu button[data-page="${p}"]`);
+  $('#topTitle').textContent=b?b.childNodes[0].textContent:p;
+  const sidebar=$('#sidebar');
+  if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();
+  
+  if(!force && LOADED_PAGES.has(p)){
+    return;
+  }
+  try{
+    if(p==='dashboard')await loadDashboard();
+    else if(p==='settings')await loadSettings();
+    else if(p==='import')await loadImportBatches();
+    else if(p==='registrations')await loadRegistrations();
+    else if(p==='payments')await loadPayments();
+    else if(p==='works')await loadWorks();
+    else if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}
+    else if(p==='food')await loadFood();
+    else if(p==='users')await loadUsers();
+    LOADED_PAGES.add(p);
+  }catch(e){err(e)}
+}
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
 async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
-async function refreshPage(){return nav(CURRENT)}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
+async function refreshPage(){LOADED_PAGES.delete(CURRENT);return nav(CURRENT,true)}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';LOADED_PAGES.clear();$('#app').style.display='none';$('#login').style.display='flex';hide();}
 let chartRegByType, chartWorksIntent, chartWorksByStatus, chartWorksByCategory, chartDailyQuota;
 if (window.ChartDataLabels) Chart.register(ChartDataLabels);
 function renderDashboardUi(d, filterType){
@@ -3549,27 +3569,7 @@ async function viewUserScanHistory(id){
     err(e);
   }
 }
-window.addEventListener('load',async()=>{
-  loadRememberedLogin();
-  TOKEN=currentAdminToken();
-  if(TOKEN){
-    show('กำลังตรวจสอบ Session');
-    try{
-      await boot();
-      hide();
-    }catch(e){
-      TOKEN='';
-      try{localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken')}catch(err){}
-      $('#login').style.display='';
-      $('#app').style.display='none';
-      hide();
-    }
-  }else{
-    $('#login').style.display='';
-    $('#app').style.display='none';
-    hide();
-  }
-});
+window.addEventListener('load',async()=>{loadRememberedLogin();TOKEN=currentAdminToken();if(TOKEN){show('กำลังตรวจสอบ Session');try{await boot();hide()}catch(e){TOKEN='';localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');$('#login').style.display='';$('#app').style.display='none';hide()}}});
 </script>
 <footer style="text-align:center; padding: 20px; font-size: 0.85rem; color: #667a88; margin-top: 40px;">
   © 2026 สงวนลิขสิทธิ์ • แพลตฟอร์มนี้เป็นนวัตกรรมที่พัฒนาขึ้นเพื่อสนับสนุนงานวิชาการ<br>
