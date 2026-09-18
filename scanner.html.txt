@@ -65,6 +65,13 @@
 
         <div class="scanner-console">
           <div class="console-head"><span id="consoleState">STATUS: READY TO SCAN</span><span>HARDWARE V1.8</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.08);padding:9px 12px;border-radius:10px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.12)">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;font-size:0.86rem;font-weight:600;color:#fff;">
+              <input type="checkbox" id="fastScanMode" checked style="width:18px;height:18px;accent-color:#1b8f5a;cursor:pointer;">
+              <span>⚡ โหมดสแกนด่วนอัตโนมัติ (Fast Scan / Auto Confirm)</span>
+            </label>
+            <span style="font-size:0.72rem;color:#8dd9b1;font-weight:500">กล้องเปิดค้าง • สแกนปุ๊บบันทึกปั๊บ</span>
+          </div>
           <div class="scan-actions"><button class="btn btn-red" id="openCameraBtn" onclick="openCamera()">เปิดกล้องสแกน</button><button class="btn btn-outline" id="scanFileBtn" onclick="document.getElementById('qrFileInput').click()">📸 ถ่ายรูปสแกน</button><input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileScan(this)"><button class="btn btn-outline" id="closeCameraBtn" onclick="closeCamera()" disabled>ปิดกล้อง</button><button class="btn btn-soft" onclick="clearScan()">ล้างค่า</button></div>
           <div class="reader-wrap hidden" id="readerWrap"><div id="reader"></div></div>
           <div class="manual-row"><input id="identifier" placeholder="ยิง QR Code หรือกรอก REG-2026-000001" autocomplete="off"><button class="btn btn-red" id="inspectBtn" onclick="inspectRegistration()">ตรวจสอบสิทธิ์</button></div>
@@ -191,7 +198,117 @@ async function openCamera(){
   }
 }
 async function closeCamera(){if(QR){try{if(CAMERA_ON)await QR.stop();await QR.clear()}catch(e){}}QR=null;CAMERA_ON=false;$('#readerWrap').classList.add('hidden');$('#openCameraBtn').disabled=false;$('#closeCameraBtn').disabled=true;$('#consoleState').textContent='STATUS: READY TO SCAN'}
-async function onQrDecoded(decoded){if(SCAN_LOCK)return;SCAN_LOCK=true;$('#identifier').value=decoded;navigator.vibrate&&navigator.vibrate(120);await closeCamera();Swal.fire({toast:true,position:'top-end',icon:'success',title:'อ่าน QR Code แล้ว กรุณากดตรวจสอบสิทธิ์',showConfirmButton:false,timer:2200});setTimeout(()=>SCAN_LOCK=false,800)}
+
+let audioCtx=null;
+function playBeep(type){
+  try{
+    if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    const now=audioCtx.currentTime,osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    if(type==='success'){
+      osc.type='sine';
+      osc.frequency.setValueAtTime(880,now);
+      osc.frequency.exponentialRampToValueAtTime(1320,now+0.08);
+      gain.gain.setValueAtTime(0.3,now);
+      gain.gain.exponentialRampToValueAtTime(0.01,now+0.25);
+      osc.start(now);
+      osc.stop(now+0.25);
+    }else{
+      osc.type='sawtooth';
+      osc.frequency.setValueAtTime(220,now);
+      osc.frequency.setValueAtTime(180,now+0.15);
+      gain.gain.setValueAtTime(0.35,now);
+      gain.gain.exponentialRampToValueAtTime(0.01,now+0.35);
+      osc.start(now);
+      osc.stop(now+0.35);
+    }
+  }catch(e){}
+}
+
+function normalizeRegInput(id){
+  let s=String(id||'').trim();
+  if(/^\d{1,6}$/.test(s))return 'REG-2026-'+s.padStart(6,'0');
+  if(/^REG-\d{4}-\d{1,5}$/i.test(s)){
+    const p=s.split('-');
+    return p[0].toUpperCase()+'-'+p[1]+'-'+p[2].padStart(6,'0');
+  }
+  return s;
+}
+
+function addOptimisticRecent(r){
+  const list=$('#recentList');if(!list)return;
+  const empty=list.querySelector('.empty-state');if(empty)list.innerHTML='';
+  const item=document.createElement('div');
+  item.className='recent-item';
+  item.style.borderLeft='4px solid #1b8f5a';
+  item.innerHTML=`<div class="top"><div><b>${esc(r.FullName||r.RegID)}</b><small>${esc(r.RegID)}</small><small>${esc(r.Organization||'')}</small></div><div class="recent-time">${esc(timeText(r.ConfirmedAt||new Date()))}</div></div><span class="recent-tag">${esc(r.ServiceNameTH)}</span>`;
+  list.prepend(item);
+  const countEl=$('#recentCount');
+  if(countEl){
+    const cur=parseInt(countEl.textContent,10)||0;
+    countEl.textContent=`${cur+1} รายการ`;
+  }
+}
+
+async function executeFastScan(rawInput){
+  if(!SELECTED_SERVICE){
+    playBeep('error');
+    Swal.fire({icon:'warning',title:'กรุณาเลือกบริการด้านบนก่อน'});
+    SCAN_LOCK=false;
+    return;
+  }
+  const id=normalizeRegInput(rawInput);
+  if(!id){SCAN_LOCK=false;return;}
+  $('#identifier').value=id;
+  const sys=$('#systemStatus'),con=$('#consoleState');
+  if(sys){sys.textContent='STATUS: SAVING...';sys.style.background='#e0f2fe';sys.style.color='#0369a1';}
+  if(con)con.textContent='STATUS: SAVING...';
+  $('#checkResult').innerHTML=`<div class="message" style="text-align:center;background:#e0f2fe;color:#0369a1;"><span class="spin"></span> กำลังบันทึกสิทธิ์อัตโนมัติสำหรับ <b>${esc(id)}</b>...</div>`;
+  try{
+    const r=await rpc('confirmEventScanner',TOKEN,CID,id,$('#eventDate').value,SELECTED_SERVICE,$('#scannerPoint').value);
+    playBeep('success');
+    navigator.vibrate&&navigator.vibrate([100,60,100]);
+    if(sys){sys.textContent='STATUS: PASS ✓';sys.style.background='#ecf8f4';sys.style.color='#147548';}
+    if(con)con.textContent='STATUS: PASS ✓';
+    $('#checkResult').classList.add('success-flash');
+    $('#checkResult').innerHTML=`<div class="message ok" style="text-align:center;padding:14px;border:2px solid #1b8f5a;"><div style="font-size:1.6rem;line-height:1;margin-bottom:4px">✅</div><h2 style="margin:0 0 4px;color:#146c43;font-size:1.25rem;">บันทึกสำเร็จ</h2><b style="font-size:1.1rem">${esc(r.FullName||r.RegID)}</b><div class="regid" style="margin:2px 0 4px">${esc(r.RegID)}</div><div style="color:#2c5282;font-weight:600">${esc(r.ServiceNameTH)}</div><small style="color:#64748b">${esc(thDate(r.EventDate))} เวลา ${esc(timeText(r.ConfirmedAt))}</small></div>`;
+    addOptimisticRecent(r);
+    PENDING=null;$('#identifier').value='';
+    setTimeout(()=>{
+      $('#checkResult').classList.remove('success-flash');
+      if(sys){sys.textContent='STATUS: READY TO SCAN';sys.style.background='#ecf8f4';sys.style.color='#147548';}
+      if(con)con.textContent=CAMERA_ON?'STATUS: CAMERA ACTIVE':'STATUS: READY TO SCAN';
+      SCAN_LOCK=false;
+    },1500);
+  }catch(e){
+    playBeep('error');
+    navigator.vibrate&&navigator.vibrate([200,100,200]);
+    if(sys){sys.textContent='STATUS: ERROR ✕';sys.style.background='#feeceb';sys.style.color='#b42318';}
+    if(con)con.textContent='STATUS: ERROR ✕';
+    const errMsg=e.message||String(e),isDup=/แล้ว/.test(errMsg);
+    $('#checkResult').innerHTML=`<div class="message bad" style="text-align:center;padding:14px;border:2px solid #d71920;"><div style="font-size:1.6rem;line-height:1;margin-bottom:4px">${isDup?'⚠️':'❌'}</div><h2 style="margin:0 0 4px;color:#a3261c;font-size:1.2rem;">${isDup?'ใช้สิทธิ์ไปแล้ว':'ไม่สามารถบันทึกได้'}</h2><b>${esc(id)}</b><div style="margin-top:6px;font-weight:600;font-size:0.95rem;color:#7f1d1d;">${esc(errMsg)}</div></div>`;
+    setTimeout(()=>{
+      if(sys){sys.textContent='STATUS: READY TO SCAN';sys.style.background='#ecf8f4';sys.style.color='#147548';}
+      if(con)con.textContent=CAMERA_ON?'STATUS: CAMERA ACTIVE':'STATUS: READY TO SCAN';
+      SCAN_LOCK=false;
+    },2200);
+  }
+}
+async function onQrDecoded(decoded){
+  if(SCAN_LOCK)return;
+  SCAN_LOCK=true;
+  $('#identifier').value=decoded;
+  const isFast=$('#fastScanMode')?$('#fastScanMode').checked:true;
+  if(!isFast){
+    navigator.vibrate&&navigator.vibrate(120);
+    await closeCamera();
+    Swal.fire({toast:true,position:'top-end',icon:'success',title:'อ่าน QR Code แล้ว กรุณากดตรวจสอบสิทธิ์',showConfirmButton:false,timer:2200});
+    setTimeout(()=>SCAN_LOCK=false,800);
+    return;
+  }
+  await executeFastScan(decoded);
+}
 function clearScan(){$('#identifier').value='';PENDING=null;renderEmpty();$('#identifier').focus()}
 function renderEmpty(){$('#checkResult').innerHTML='<div class="empty-state">ยังไม่มีข้อมูลสำหรับตรวจสอบ</div>'}
 function checkBadge(ok,text){return `<span class="badge ${ok?'ok':'bad'}">${ok?'✓':'✕'} ${esc(text)}</span>`}
@@ -212,7 +329,17 @@ async function inspectRegistration(){
 function renderInspection(r){const c=r.Checks||{};$('#checkResult').innerHTML=`<div class="person-head"><div><h3>${esc(r.FullName)}</h3><div class="regid">${esc(r.RegID)}</div><div style="margin-top:4px;color:#647987">${esc(r.Organization||'-')}</div></div><div style="text-align:right"><b>${esc(r.ServiceNameTH)}</b><br><small>${esc(thDate(r.EventDate))}</small></div></div><div class="badges">${checkBadge(c.dataComplete,'ข้อมูลครบ')}${checkBadge(c.registrationApproved,'ทะเบียนตรวจผ่าน')}${checkBadge(c.daySelected,'เลือกเข้าร่วมวันนี้')}${checkBadge(c.paymentOkay,'การเงินผ่าน/ไม่ต้องชำระ')}${checkBadge(!r.Duplicate,'ยังไม่ใช้สิทธิ์')}</div><div class="message ${r.CanConfirm?'ok':'bad'}">${esc(r.Message)}</div><div class="confirm-row"><button class="btn btn-soft" onclick="clearScan()">ยกเลิก</button><button class="btn btn-success" ${r.CanConfirm?'':'disabled'} onclick="confirmRecord()">ยืนยันบันทึก</button></div>`}
 async function confirmRecord(){if(!PENDING||!PENDING.CanConfirm)return;const x=await Swal.fire({icon:'question',title:'ยืนยันบันทึก?',html:`<b>${esc(PENDING.FullName)}</b><br>${esc(PENDING.ServiceNameTH)}<br>${esc(thDate(PENDING.EventDate))}`,showCancelButton:true,confirmButtonText:'ยืนยันบันทึก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#1b8f5a'});if(!x.isConfirmed)return;setBusy(true,'กำลังบันทึก');try{const r=await rpc('confirmEventScanner',TOKEN,CID,PENDING.RegID,PENDING.EventDate,PENDING.ServiceCode,$('#scannerPoint').value);$('#checkResult').classList.add('success-flash');$('#checkResult').innerHTML=`<div class="message ok" style="text-align:center"><h2 style="margin:0 0 6px">บันทึกสำเร็จ</h2><b>${esc(r.FullName)}</b><br>${esc(r.ServiceNameTH)}<br>${esc(thDate(r.EventDate))} เวลา ${esc(timeText(r.ConfirmedAt))}</div>`;navigator.vibrate&&navigator.vibrate([120,80,120]);PENDING=null;$('#identifier').value='';await loadRecent()}catch(e){if(!sessionError(e))Swal.fire({icon:'error',title:'บันทึกไม่สำเร็จ',text:e.message})}finally{setBusy(false);setTimeout(()=>$('#checkResult').classList.remove('success-flash'),800)}}
 async function loadRecent(){if(!TOKEN||!SELECTED_SERVICE||!$('#eventDate').value)return;try{setBusy(true, 'กำลังโหลดข้อมูล...');const d=await rpc('getEventScannerRecent',TOKEN,CID,$('#eventDate').value,SELECTED_SERVICE,80);$('#recentCount').textContent=`${d.count||0} รายการ`;$('#recentList').innerHTML=(d.rows||[]).length?(d.rows||[]).map(r=>`<div class="recent-item"><div class="top"><div><b>${esc(r.FullName||r.RegID)}</b><small>${esc(r.RegID)}</small><small>${esc(r.Organization||'')}</small></div><div class="recent-time">${esc(timeText(r.RecordedAt))}</div></div><span class="recent-tag">${esc(r.ServiceNameTH)}</span></div>`).join(''):'<div class="empty-state">ยังไม่มีรายการสำหรับวันและบริการที่เลือก</div>'}catch(e){if(!sessionError(e))$('#recentList').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`}finally{setBusy(false)}}
-$('#identifier').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();inspectRegistration()}});
+$('#identifier').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const isFast=$('#fastScanMode')?$('#fastScanMode').checked:true;
+    if(isFast){
+      executeFastScan($('#identifier').value);
+    }else{
+      inspectRegistration();
+    }
+  }
+});
 autoBoot();
 </script>
 <div class="loading" id="loading"><div class="loading-box"><span class="spin"></span><b id="loadText">กำลังประมวลผล</b></div></div>

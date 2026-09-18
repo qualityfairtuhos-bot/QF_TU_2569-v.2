@@ -4447,6 +4447,12 @@ function scannerResolveRegId_(identifier,conferenceId){
   let raw=clean_(identifier);if(!raw)throw new Error('กรุณาสแกน QR Code หรือกรอก RegID');
   try{raw=decodeURIComponent(raw);}catch(ignore){}
   const urlToken=raw.match(/[?&#](?:token|qr)=([^&#]+)/i);if(urlToken){try{raw=decodeURIComponent(urlToken[1]);}catch(ignore){raw=urlToken[1];}}
+  if(/^\d{1,6}$/.test(raw)){
+    raw='REG-2026-'+raw.padStart(6,'0');
+  }else if(/^REG-\d{4}-\d{1,6}$/i.test(raw)){
+    const p=raw.split('-');
+    raw=p[0].toUpperCase()+'-'+p[1]+'-'+p[2].padStart(6,'0');
+  }
   const direct=raw.match(/REG-[A-Z0-9-]+/i);
   if(/^REG-[A-Z0-9-]+$/i.test(raw))return upper_(raw);
   try{
@@ -4518,7 +4524,7 @@ function scannerInspectInternal_(ctx,conferenceId,identifier,eventDate,serviceCo
     ParticipantType:r.ParticipantType,ParticipantTypeName:type.TypeNameTH||r.ParticipantType,Organization:r.Institution||r.OrganizationUnit||r.OrganizationGroup||'',
     Email:r.Email,Phone:r.Phone,FoodType:r.FoodType,RegistrationStatus:r.RegistrationStatus,DataCompletenessStatus:r.DataCompletenessStatus,PaymentStatus:r.PaymentStatus,
     EventDate:date,ServiceCode:def.code,ServiceType:def.type,ServiceNameTH:def.nameTH,ServiceNameEN:def.nameEN,Checks:checks,
-    Duplicate:duplicate,UsedAt:usedAt,UsedBy:usedBy,CanConfirm:canConfirm,Message:canConfirm?'ตรวจสอบผ่าน สามารถกดยืนยันได้':reasons.join(' â€¢ ')
+    Duplicate:duplicate,UsedAt:usedAt,UsedBy:usedBy,CanConfirm:canConfirm,Message:canConfirm?'ตรวจสอบผ่าน สามารถกดยืนยันได้':reasons.join(' • ')
   };
 }
 function getEventScannerBootstrap(token,conferenceId){
@@ -4539,13 +4545,17 @@ function confirmEventScanner(token,conferenceId,identifier,eventDate,serviceCode
       if(checked.ServiceType==='CHECKIN'){
         appendRecord_('AttendanceCheckIns',{CheckInID:nextId_('CHK'),ConferenceID:conferenceId,RegID:checked.RegID,EventDate:checked.EventDate,CheckInSession:checked.ServiceCode,CheckInSessionName:checked.ServiceNameTH,CheckInAt:now,CheckInPoint:point,CheckedBy:ctx.user.Email,Status:'SUCCESS',Note:checked.ServiceCode});
       }else{
-        ensureMealEntitlements_(conferenceId,checked.RegID);
-        const e=scannerMealEntitlement_(conferenceId,checked.RegID,checked.EventDate,checked.ServiceCode);if(!e||!bool_(e.Eligible)||upper_(e.Status)==='CANCELLED')throw new Error('ไม่พบสิทธิ์อาหารสำหรับมื้อนี้');
+        let e=scannerMealEntitlement_(conferenceId,checked.RegID,checked.EventDate,checked.ServiceCode);
+        if(!e){
+          ensureMealEntitlements_(conferenceId,checked.RegID);
+          e=scannerMealEntitlement_(conferenceId,checked.RegID,checked.EventDate,checked.ServiceCode);
+        }
+        if(!e||!bool_(e.Eligible)||upper_(e.Status)==='CANCELLED')throw new Error('ไม่พบสิทธิ์อาหารสำหรับมื้อนี้');
         if(upper_(e.Status)==='REDEEMED')throw new Error('รับอาหารมื้อนี้แล้วเมื่อ '+formatDateTime_(e.RedeemedAt));
         updateRecord_('MealEntitlements',e.__row,{RedeemedAt:now,RedeemedBy:ctx.user.Email,ScannerPoint:point,Status:'REDEEMED'});
         appendRecord_('MealScans',{ScanID:nextId_('SCAN'),ConferenceID:conferenceId,RegID:checked.RegID,EntitlementID:e.EntitlementID,EventDate:checked.EventDate,MealCode:checked.ServiceCode,ScanAt:now,ScannerUserID:ctx.user.UserID,ScannerPoint:point,Result:'SUCCESS',Note:checked.ServiceNameTH});
       }
-      invalidateCache_(conferenceId);logAudit_(conferenceId,ctx.user,ctx.role,'EVENT_SCANNER_CONFIRM',checked.ServiceType,checked.RegID,{eventDate:checked.EventDate,serviceCode:checked.ServiceCode,scannerPoint:point});
+      logAudit_(conferenceId,ctx.user,ctx.role,'EVENT_SCANNER_CONFIRM',checked.ServiceType,checked.RegID,{eventDate:checked.EventDate,serviceCode:checked.ServiceCode,scannerPoint:point});
       return serialize_({success:true,RegID:checked.RegID,FullName:checked.FullName,Organization:checked.Organization,EventDate:checked.EventDate,ServiceCode:checked.ServiceCode,ServiceType:checked.ServiceType,ServiceNameTH:checked.ServiceNameTH,ConfirmedAt:now,ConfirmedBy:ctx.user.FullName||ctx.user.Email,ScannerPoint:point});
     });
   });
