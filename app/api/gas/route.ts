@@ -128,7 +128,7 @@ function setCachedResponse(action:string,args:unknown[],data:ApiResponse<unknown
 
 function invalidateServerCache(action:string){
   // If a write occurs, clear memory cache
-  if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset/i.test(action)){
+  if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(action)){
     memoryCache.clear();
   }
 }
@@ -224,12 +224,17 @@ export async function POST(request:NextRequest){
     if(args.length===0) args.push(token); else args[0]=token;
   }
 
+  const bypassCache = Boolean((input as {bypassCache?: boolean}).bypassCache) || request.headers.get("x-bypass-cache") === "1";
   const cacheKey=getCacheKey(action,args);
 
-  // Check in-memory cache for fast read actions
-  const cached=getCachedResponse(action,args);
-  if(cached){
-    return NextResponse.json(cached,{status:200,headers:{"X-Cache":"HIT"}});
+  // Check in-memory cache for fast read actions unless explicitly bypassed
+  if(!bypassCache){
+    const cached=getCachedResponse(action,args);
+    if(cached){
+      return NextResponse.json(cached,{status:200,headers:{"X-Cache":"HIT"}});
+    }
+  } else {
+    memoryCache.delete(cacheKey);
   }
 
   const secret=getGasSecret();

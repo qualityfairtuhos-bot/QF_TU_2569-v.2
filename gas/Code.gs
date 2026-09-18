@@ -3688,7 +3688,32 @@ function adminAddReviewer(token,conferenceId,payload){
     if(bool_(payload.SendCredentials))sendReviewerCredentials_(conferenceId,email,temporaryPassword,reviewerId);return {ReviewerID:reviewerId,TemporaryPassword:payload.SendCredentials?temporaryPassword:''};});
 }
 function sendReviewerCredentials_(cid,email,password,reviewerId){const url=buildWebAppRouteUrl_('reviewer',cid);sendEmailLogged_(cid,email,'ข้อมูลเข้าสู่ระบบ Reviewer','<p>Username: <b>'+email+'</b></p><p>Temporary password: <b>'+password+'</b></p><p><a href="'+url+'">เข้าสู่ระบบ Reviewer</a></p>','REVIEWER',reviewerId,null);}
-function adminListReviewers(token,conferenceId){return runSafely_('adminListReviewers',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);const map={};getRecords_('Reviewers').forEach(function(r){map[r.ReviewerID]=r;});const asns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});const counts={};asns.forEach(function(a){if(String(a.Status).toUpperCase()!=='CANCELLED'&&String(a.Status).toUpperCase()!=='DECLINED'){counts[a.ReviewerID]=(counts[a.ReviewerID]||0)+1;}});return serialize_(findMany_('ReviewerPool',{ConferenceID:conferenceId}).map(function(p){p.CurrentAssignedCount=counts[p.ReviewerID]||0;return Object.assign({},p,{reviewer:map[p.ReviewerID]||{}});}));});}
+function adminListReviewers(token,conferenceId){
+  return runSafely_('adminListReviewers',function(){
+    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
+    const map={};
+    getRecords_('Reviewers').forEach(function(r){
+      if(r && (r.ReviewerID||'').toString().trim()){
+        map[r.ReviewerID]=r;
+      }
+    });
+    const asns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});
+    const counts={};
+    asns.forEach(function(a){
+      if(String(a.Status).toUpperCase()!=='CANCELLED'&&String(a.Status).toUpperCase()!=='DECLINED'){
+        counts[a.ReviewerID]=(counts[a.ReviewerID]||0)+1;
+      }
+    });
+    const pools = findMany_('ReviewerPool',{ConferenceID:conferenceId}).filter(function(p){
+      const rid = (p && p.ReviewerID ? String(p.ReviewerID) : '').trim();
+      return rid && map[rid] && (map[rid].ReviewerID ? String(map[rid].ReviewerID) : '').trim();
+    });
+    return serialize_(pools.map(function(p){
+      p.CurrentAssignedCount=counts[p.ReviewerID]||0;
+      return Object.assign({},p,{reviewer:map[p.ReviewerID]||{}});
+    }));
+  });
+}
 function adminAssignReviewers(token,conferenceId,workId,reviewRoundId,reviewerIds){
   return runSafely_('adminAssignReviewers',function(){const ctx=requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId),w=findOne_('Works',{ConferenceID:conferenceId,WorkID:workId}),round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:reviewRoundId});if(!w||!round)throw new Error('ไม่พบผลงานหรือรอบประเมิน');if(['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว');let created=0,skipped=[];(reviewerIds||[]).forEach(function(rid){const rev=findOne_('Reviewers',{ReviewerID:rid}),pool=findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});if(!rev||!pool||upper_(pool.Status)!=='ACTIVE'){skipped.push({ReviewerID:rid,reason:'Reviewer inactive'});return;}if(findOne_('ReviewAssignments',{ConferenceID:conferenceId,ReviewRoundID:reviewRoundId,WorkID:workId,ReviewerID:rid})){skipped.push({ReviewerID:rid,reason:'Already assigned'});return;}if(num_(pool.CurrentAssignedCount)>=num_(pool.MaxWorkload,10)){skipped.push({ReviewerID:rid,reason:'Workload full'});return;}const aid=nextId_('ASN');appendRecord_('ReviewAssignments',{AssignmentID:aid,ConferenceID:conferenceId,ReviewRoundID:reviewRoundId,WorkID:workId,WorkCode:w.WorkCode,ReviewerID:rid,ReviewerName:rev.FullName,ReviewerEmail:rev.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',Locked:false,UpdatedAt:new Date()});updateRecord_('ReviewerPool',pool.__row,{CurrentAssignedCount:num_(pool.CurrentAssignedCount)+1});sendReviewAssignmentEmail_(conferenceId,w,rev,aid);created++;});if(created)updateRecord_('Works',w.__row,{Status:'UNDER_REVIEW',UpdatedAt:new Date()});return {created:created,skipped:skipped};});
 }
@@ -4454,6 +4479,47 @@ function adminUpdateReviewer(token,conferenceId,reviewerId,data){
     }
     invalidateCache_(conferenceId);
     return {success:true};
+  });
+}
+function adminDeleteReviewer(token,conferenceId,reviewerId){
+  return runSafely_('adminDeleteReviewer',function(){
+    const ctx = requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const rid = String(reviewerId || '').trim();
+    if(!rid) throw new Error('ไม่พบรหัส Reviewer');
+    
+    // Check if assignments exist
+    const asns = findMany_('ReviewAssignments',{ConferenceID:cid,ReviewerID:rid}).filter(function(a){
+      return String(a.Status).toUpperCase() !== 'CANCELLED';
+    });
+    if(asns.length > 0){
+      throw new Error('ไม่สามารถลบ Reviewer ได้เนื่องจากมีประวัติรับมอบหมายงานแล้ว ' + asns.length + ' งาน กรุณาเปลี่ยนสถานะเป็น INACTIVE แทน');
+    }
+    
+    // Delete Reviewer assignments (e.g. cancelled ones)
+    deleteRowsWhere_('ReviewAssignments', {ConferenceID: cid, ReviewerID: rid});
+    // Delete from ReviewerPool
+    deleteRowsWhere_('ReviewerPool', {ConferenceID: cid, ReviewerID: rid});
+    
+    // Check if reviewer is in any other conference pool
+    const otherPools = findMany_('ReviewerPool', {ReviewerID: rid});
+    if(!otherPools || otherPools.length === 0){
+      const r = findOne_('Reviewers', {ReviewerID: rid});
+      if(r){
+        const email = normalizeEmail_(r.Email);
+        if(email){
+          const u = getRecords_('Users').find(function(x){ return normalizeEmail_(x.Email) === email; });
+          if(u){
+            deleteRowsWhere_('UserConferenceRoles', {ConferenceID: cid, UserID: u.UserID, Role: 'REVIEWER'});
+          }
+        }
+        deleteRowsWhere_('Reviewers', {ReviewerID: rid});
+      }
+    }
+    
+    invalidateCache_(cid);
+    logAudit_(cid, ctx.user, ctx.role, 'DELETE_REVIEWER', 'Reviewers', rid, {deleted: true});
+    return {success: true, deleted: true};
   });
 }
 function adminResendReviewerCreds(token,conferenceId,reviewerId){
@@ -5939,6 +6005,7 @@ const API_ACTIONS = Object.freeze({
   adminUploadBanner: adminUploadBanner,
   adminListFinanceDocuments: adminListFinanceDocuments,
   adminDeleteFinanceDocument: adminDeleteFinanceDocument,
+  adminDeleteReviewer: adminDeleteReviewer,
   adminDeleteWork: adminDeleteWork,
   getPublicFinanceDocuments: getPublicFinanceDocuments,
   adminImportFromGoogleSheet: adminImportFromGoogleSheet,
@@ -5983,7 +6050,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1,
-  adminUploadFinanceDocument:1, adminUploadBanner:1, adminDeleteFinanceDocument:1, adminDeleteWork:1,
+  adminUploadFinanceDocument:1, adminUploadBanner:1, adminDeleteFinanceDocument:1, adminDeleteReviewer:1, adminDeleteWork:1,
   adminImportFromGoogleSheet:1, adminSendIncompleteProfileEmails:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
   emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,
