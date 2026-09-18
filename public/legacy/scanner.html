@@ -98,7 +98,48 @@ window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 let TOKEN='',TOKEN_SOURCE='',BOOT=null,SELECTED_SERVICE='',PENDING=null,QR=null,CAMERA_ON=false,SCAN_LOCK=false;
-async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});if(response.status===413){throw new Error('ไฟล์ที่แนบมีขนาดใหญ่เกินกำหนด (HTTP 413 Payload Too Large) กรุณาลดขนาดหรือบีบอัดไฟล์ก่อนส่ง')}let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){if(!response.ok){throw new Error(`การเชื่อมต่อขัดข้อง (HTTP ${response.status}) กรุณาลองใหม่อีกครั้ง`)}throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
+async function rpc(n,...a){
+  const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet|loginUser|adminBootstrap|reviewerBootstrap|getEventScannerBootstrap|getPublicBootstrap)/.test(n)?3:1;
+  let lastErr=null;
+  for(let attempt=0;attempt<maxRetries;attempt++){
+    if(attempt>0){
+      if(typeof show==='function') show(`กำลังเชื่อมต่อระบบส่วนกลาง (พยายามใหม่ครั้งที่ ${attempt+1})...`);
+      await new Promise(r=>setTimeout(r,attempt*800+Math.floor(Math.random()*300)));
+    }
+    try{
+      const response=await fetch('/api/gas',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})
+      });
+      let result;
+      try{
+        const text=await response.text();
+        result=JSON.parse(text);
+      }catch(e){
+        throw new Error('การตอบกลับจากระบบไม่ถูกต้อง');
+      }
+      if(response.status===401){
+        localStorage.removeItem('tuhScannerToken');
+        sessionStorage.removeItem('tuhScannerToken');
+        TOKEN='';
+        TOKEN_SOURCE='';
+        $('#appView').classList.add('hidden');
+        $('#loginView').classList.remove('hidden');
+        throw new Error(result.message||'Session หมดอายุ กรุณาเข้าสู่ระบบใหม่');
+      }
+      if(!response.ok||!result.success){
+        throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
+      }
+      return result.data;
+    }catch(err){
+      lastErr=err;
+      if(attempt+1>=maxRetries)throw err;
+    }
+  }
+  throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
+}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 function parseDate(v){const s=String(v||''),m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3],12);const d=new Date(s);return isNaN(d)?null:d}
 function thDate(v){const d=parseDate(v);return d?new Intl.DateTimeFormat('th-TH-u-ca-buddhist',{day:'numeric',month:'long',year:'numeric'}).format(d):String(v||'')}
@@ -109,9 +150,9 @@ const SCANNER_CRED_KEY='tuhScannerRememberedCredentials';
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
 function loadRememberedLogin(){try{const username=localStorage.getItem(SCANNER_CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
 function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(SCANNER_CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(SCANNER_CRED_KEY)}
-function scannerStoredToken(){return '__COOKIE__'}
-function adminStoredToken(){return ''}
-function storeScannerToken(){}
+function scannerStoredToken(){try{const t=localStorage.getItem('tuhScannerToken')||sessionStorage.getItem('tuhScannerToken')||'';return(t&&t!=='__COOKIE__')?t:'';}catch(e){return '';}}
+function adminStoredToken(){try{const t=localStorage.getItem('tuhAdminToken')||sessionStorage.getItem('tuhAdminToken')||'';return(t&&t!=='__COOKIE__')?t:'';}catch(e){return '';}}
+function storeScannerToken(t){try{if(t&&t!=='__COOKIE__'){localStorage.setItem('tuhScannerToken',t);sessionStorage.setItem('tuhScannerToken',t);}}catch(e){}}
 function sessionError(e){if(/Session|เข้าสู่ระบบใหม่|หมดอายุ/.test(e.message||'')){if(TOKEN_SOURCE==='scanner'){localStorage.removeItem('tuhScannerToken');sessionStorage.removeItem('tuhScannerToken')}if(TOKEN_SOURCE==='admin'){localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken')};TOKEN='';TOKEN_SOURCE='';$('#appView').classList.add('hidden');$('#loginView').classList.remove('hidden');Swal.fire({icon:'warning',title:'Session หมดอายุ',text:'กรุณาเข้าสู่ระบบใหม่'});return true}return false}
 
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();try{setBusy(true,'กำลังเข้าสู่ระบบ');const r=await rpc('loginUser',$('#loginUser').value,$('#loginPass').value,CID,navigator.userAgent);if(!['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FOOD_STAFF'].includes(r.role))throw new Error('บัญชีนี้ไม่มีสิทธิ์ใช้งานหน้าสแกน');TOKEN=r.token;TOKEN_SOURCE='scanner';saveRememberedLogin();storeScannerToken(TOKEN);await bootScanner()}catch(e){Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message})}finally{setBusy(false)}});

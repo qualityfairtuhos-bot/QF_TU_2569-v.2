@@ -162,9 +162,10 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
   for (const url of urls) {
     for(let attempt=0;attempt<attempts;attempt+=1){
       if(attempt>0){
-        await new Promise((r)=>setTimeout(r,attempt*500));
+        await new Promise((r)=>setTimeout(r,attempt*600));
       }
-      const timeoutMs = Math.min(GAS_TIMEOUT_MS, 50_000);
+      const isAuthOrBoot = /login|Bootstrap|Dashboard|getPublic|verify/i.test(payload.action);
+      const timeoutMs = isAuthOrBoot ? 35_000 : Math.min(GAS_TIMEOUT_MS, 50_000);
       const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
       try{
         const response=await fetch(url,{
@@ -233,8 +234,9 @@ export async function POST(request:NextRequest){
 
   const secret=getGasSecret();
   const outbound={action,args,requestId:typeof input.requestId==="string"?input.requestId:requestId,timestamp:Date.now(),secret};
+  const isRetryableAction = READ_ACTIONS.has(action) || action === "loginUser" || action === "requestPasswordReset" || action === "verifyWorkAccess" || action === "lookupRegistrationForEdit";
   try{
-    const result=await callGas(outbound,READ_ACTIONS.has(action)?2:1);
+    const result=await callGas(outbound,isRetryableAction?2:1);
     if(result.success){
       setCachedResponse(action,args,result);
       invalidateServerCache(action);
@@ -253,7 +255,7 @@ export async function POST(request:NextRequest){
   }catch(err:unknown){
     let errorMsg=err instanceof Error?err.message:String(err);
     if(/aborted|AbortError|timeout|ECONNRESET/i.test(errorMsg)){
-      errorMsg="การเชื่อมต่อระบบส่วนกลางใช้เวลานานเกินกำหนด กรุณาตรวจสอบสถานะการลงทะเบียนในเมนู 'ตรวจสอบสถานะ' หรือลองใหม่อีกครั้ง";
+      errorMsg="การเชื่อมต่อระบบส่วนกลางใช้เวลานานเกินกำหนด กรุณาลองใหม่อีกครั้ง";
     }
     // If upstream call fails, check if we have a last known good cached response for read actions
     if(lastKnownGood.has(cacheKey)){

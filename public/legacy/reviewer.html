@@ -196,11 +196,12 @@ window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
 const $=s=>document.querySelector(s);
 async function rpc(n,...a){
-  const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;
+  const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet|loginUser|reviewerBootstrap|adminBootstrap|getEventScannerBootstrap|getPublicBootstrap)/.test(n)?3:1;
   let lastErr=null;
   for(let attempt=0;attempt<maxRetries;attempt++){
     if(attempt>0){
-      await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)));
+      if(typeof show==='function') show(`กำลังเชื่อมต่อระบบส่วนกลาง (พยายามใหม่ครั้งที่ ${attempt+1})...`);
+      await new Promise(r=>setTimeout(r,attempt*800+Math.floor(Math.random()*300)));
     }
     try{
       const response=await fetch('/api/gas',{
@@ -214,15 +215,15 @@ async function rpc(n,...a){
         const text=await response.text();
         result=JSON.parse(text);
       }catch(e){
-        throw new Error('การตอบกลับจากระบบไม่ถูกต้อง (' + response.status + ')');
+        throw new Error('การตอบกลับจากระบบไม่ถูกต้อง');
       }
-      if(response.status === 401){
+      if(response.status===401){
         localStorage.removeItem('tuhReviewerToken');
         sessionStorage.removeItem('tuhReviewerToken');
         TOKEN='';
         $('#appView').classList.add('hidden');
         $('#loginView').classList.remove('hidden');
-        throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
+        throw new Error(result.message||'Session หมดอายุ กรุณาเข้าสู่ระบบใหม่');
       }
       if(!response.ok||!result.success){
         throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
@@ -241,10 +242,38 @@ function hide(){$('#loading').classList.remove('show')}
 function togglePassword(){const e=$('#loginPassword'),showing=e.type==='text';e.type=showing?'password':'text';document.querySelector('.eye').textContent=showing?'👁':'🙈'}
 function loadCreds(){try{const username=localStorage.getItem(CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
 function saveCreds(){if($('#rememberLogin').checked)localStorage.setItem(CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(CRED_KEY)}
-function storedToken(){try{return localStorage.getItem('tuhReviewerToken')||sessionStorage.getItem('tuhReviewerToken')||'__COOKIE__';}catch(e){return '__COOKIE__';}}
-function storeToken(t){try{if(t){localStorage.setItem('tuhReviewerToken',t);sessionStorage.setItem('tuhReviewerToken',t);}}catch(e){}}
-$('#loginForm').onsubmit=async e=>{e.preventDefault();show('กำลังเข้าสู่ระบบ');try{const r=await rpc('loginUser',$('#loginUser').value,$('#loginPassword').value,CID,navigator.userAgent);if(r.role!=='REVIEWER')throw new Error('บัญชีนี้ไม่มีสิทธิ์ Reviewer');TOKEN=r.token;saveCreds();storeToken(TOKEN);await boot()}catch(e){hide();Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message})}};
-async function boot(){BOOT=await rpc('reviewerBootstrap',TOKEN,CID);$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#confName').textContent='TUH 19 & HA-Regional 1';$('#reviewerName').textContent=BOOT.reviewer.FullName||BOOT.reviewer.Email;renderAll();hide()}
+function storedToken(){try{const t=localStorage.getItem('tuhReviewerToken')||sessionStorage.getItem('tuhReviewerToken')||'';return(t&&t!=='__COOKIE__')?t:'';}catch(e){return '';}}
+function storeToken(t){try{if(t&&t!=='__COOKIE__'){localStorage.setItem('tuhReviewerToken',t);sessionStorage.setItem('tuhReviewerToken',t);}}catch(e){}}
+$('#loginForm').onsubmit=async e=>{
+  e.preventDefault();
+  const username=$('#loginUser').value.trim();
+  const password=$('#loginPassword').value;
+  if(!username||!password){
+    Swal.fire({icon:'warning',title:'กรุณากรอก Username/Email และรหัสผ่าน',confirmButtonColor:'#006D70'});
+    return;
+  }
+  show('กำลังเข้าสู่ระบบ...');
+  try{
+    const r=await rpc('loginUser',username,password,CID,navigator.userAgent);
+    if(r.role!=='REVIEWER')throw new Error('บัญชีนี้ไม่มีสิทธิ์ Reviewer (สิทธิ์ปัจจุบัน: '+(r.role||'ไม่มี')+')');
+    TOKEN=r.token;
+    saveCreds();
+    storeToken(TOKEN);
+    await boot();
+  }catch(e){
+    hide();
+    Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message||'ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง',confirmButtonColor:'#006D70'});
+  }
+};
+async function boot(){
+  BOOT=await rpc('reviewerBootstrap',TOKEN,CID);
+  $('#loginView').classList.add('hidden');
+  $('#appView').classList.remove('hidden');
+  $('#confName').textContent=BOOT.conference?.ConferenceNameTH||'งานประชุมวิชาการ TUH';
+  $('#reviewerName').textContent=BOOT.reviewer?.FullName||BOOT.reviewer?.Email||'Reviewer';
+  renderAll();
+  hide();
+}
 function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); }
 function statusBadge(s){const c=s==='COMPLETE'?'ok':(s==='PASS'?'ok':'warn');return `<span class="badge ${c}">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
 let currentFilter = 'all';
