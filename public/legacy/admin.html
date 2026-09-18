@@ -253,11 +253,11 @@
           <h3 style="margin:0">รายชื่อ Reviewer</h3>
           <div style="display:flex; gap:10px">
             <button class="btn btn-primary" onclick="openReviewerForm()">+ เพิ่ม Reviewer</button>
-            <button class="btn btn-soft" id="btnRefreshReviewers" onclick="loadReviewers(true)"><i class="fa-solid fa-arrows-rotate"></i> โหลดข้อมูลล่าสุดจาก Google Sheets</button>
+            <button class="btn btn-soft" onclick="loadReviewers()">รีเฟรช</button>
           </div>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px">
-          <input id="revSearch" class="field" placeholder="ค้นหาชื่อ, อีเมล หรือหน่วยงาน Reviewer..." style="flex:1; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="filterReviewersLocally()">
+          <input id="revSearch" class="field" placeholder="ค้นหาชื่อ, อีเมล หรือหน่วยงาน Reviewer..." style="flex:1; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadReviewers()">
         </div>
         <div class="table-wrap">
           <table class="table" style="font-size:0.85rem">
@@ -335,7 +335,6 @@ const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPT
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
 async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
-async function rpcFresh(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*500))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json','x-bypass-cache':'1'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now(),bypassCache:true})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
@@ -407,29 +406,7 @@ async function boot(){
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
 }
-async function nav(p){
-  const page=$('#page-'+p);
-  if(!page)return;
-  CURRENT=p;
-  $$('.page').forEach(x=>x.classList.remove('active'));
-  page.classList.add('active');
-  $$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));
-  const b=$(`.menu button[data-page="${p}"]`);
-  $('#topTitle').textContent=b?b.childNodes[0].textContent:p;
-  const sidebar=$('#sidebar');
-  if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();
-  try{
-    if(p==='dashboard') loadDashboard();
-    else if(p==='settings') loadSettings();
-    else if(p==='import') loadImportBatches();
-    else if(p==='registrations') loadRegistrations();
-    else if(p==='payments') loadPayments();
-    else if(p==='works') loadWorks();
-    else if(p==='reviewers') Promise.all([loadReviewers(), loadReviewConfig()]);
-    else if(p==='food') loadFood();
-    else if(p==='users') loadUsers();
-  }catch(e){err(e)}
-}
+async function nav(p){const page=$('#page-'+p);if(!page)return;CURRENT=p;$$('.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');$$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));const b=$(`.menu button[data-page="${p}"]`);$('#topTitle').textContent=b?b.childNodes[0].textContent:p;const sidebar=$('#sidebar');if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();try{if(p==='dashboard')await loadDashboard();if(p==='settings')await loadSettings();if(p==='import')await loadImportBatches();if(p==='registrations')await loadRegistrations();if(p==='payments')await loadPayments();if(p==='works')await loadWorks();if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}if(p==='food')await loadFood();if(p==='users')await loadUsers()}catch(e){err(e)}}
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
 async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
@@ -1249,48 +1226,23 @@ async function sendBatchEmails(batchId, emailTarget){
     viewImportBatchDetail(batchId);
   } catch(e) { err(e); }
 }
-function renderRegistrationsUi(rows){
-  if(!rows || !Array.isArray(rows)) rows = [];
-  window.REGISTRATION_ROWS = rows;
-  if ($('#regCountBadge')) {
-    $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
-  }
-  $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
-  initRegScrollSync();
-  setTimeout(updateRegTopScrollbar, 50);
-}
-
-async function loadRegistrations(forceRefresh=false){
-  const q = ($('#regSearch')?.value || '').trim();
-  const status = ($('#regStatus')?.value || '').trim();
-  const participantGroup = ($('#regParticipantType')?.value || '').trim();
-  const attendanceDay = ($('#regAttendanceDay')?.value || '').trim();
-  const isDefaultQuery = !q && !status && !participantGroup && !attendanceDay;
-  const cacheKey = `tuhRegs_${CID}`;
-  let hasRenderedCache = false;
-
-  if(isDefaultQuery && !forceRefresh){
-    try{
-      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
-      if(cached && Array.isArray(cached)){
-        renderRegistrationsUi(cached);
-        hasRenderedCache = true;
-      }
-    }catch(e){}
-  }
-
-  if(!hasRenderedCache) show('กำลังโหลดผู้ลงทะเบียน');
+async function loadRegistrations(){
+  show('กำลังโหลดผู้ลงทะเบียน');
   try{
-    const filterObj = { q, status, participantGroup, attendanceDay };
-    const rows = forceRefresh ? await rpcFresh('adminListRegistrations',TOKEN,CID,filterObj) : await rpc('adminListRegistrations',TOKEN,CID,filterObj);
-    const validRows = Array.isArray(rows) ? rows : [];
-    if(isDefaultQuery){
-      try{ sessionStorage.setItem(cacheKey, JSON.stringify(validRows)); }catch(e){}
+    const rows=await rpc('adminListRegistrations',TOKEN,CID,{
+      q:$('#regSearch')?$('#regSearch').value:'',
+      status:$('#regStatus')?$('#regStatus').value:'',
+      participantGroup:$('#regParticipantType')?$('#regParticipantType').value:'',
+      attendanceDay:$('#regAttendanceDay')?$('#regAttendanceDay').value:''
+    });
+    if ($('#regCountBadge')) {
+      $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
     }
-    renderRegistrationsUi(validRows);
-  }finally{
-    if(!hasRenderedCache) hide();
-  }
+    window.REGISTRATION_ROWS = rows;
+    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    initRegScrollSync();
+    setTimeout(updateRegTopScrollbar, 50);
+  }finally{hide()}
 }
 async function setRegStatus(id,status){const returning=status==='REGISTRATION_RETURNED';const x=await Swal.fire({icon:returning?'warning':'question',title:returning?'ส่งคืนข้อมูลให้ผู้สมัคร':'ยืนยันตรวจผ่าน',input:'textarea',inputLabel:returning?'ระบุเหตุผลที่ต้องแก้ไข':'หมายเหตุ (ถ้ามี)',inputPlaceholder:returning?'กรุณาระบุให้ชัดเจนเพื่อส่งไปทาง Email':'',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืนและแจ้ง Email':'ตรวจผ่าน',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังอัปเดตสถานะ');try{const r=await rpc('adminUpdateRegistrationStatus',TOKEN,CID,id,status,x.value||'');hide();await Swal.fire({icon:'success',title:'ดำเนินการเรียบร้อย',html:`สถานะใหม่: <b>${esc(r.newStatus)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});loadRegistrations()}catch(e){err(e)}}
 async function openRegistrationView(id){
@@ -3146,124 +3098,32 @@ async function deleteWorkFileAction(workFileId, fileName, wid, regId) {
     }
   }
 }
-function renderReviewersUi(rows){
-  if(!rows || !Array.isArray(rows)) rows = [];
-  window.REVIEWERS_LIST_CACHE = rows;
-  const q = ($('#revSearch')?.value || '').toLowerCase().trim();
-  const filtered = rows.filter(x=>{
-    const rev = x.reviewer || x;
-    const s = [
-      rev.ReviewerID,
-      rev.FullName,
-      rev.FirstName,
-      rev.LastName,
-      rev.Email,
-      rev.Institution,
-      rev.Department,
-      x.ExpertiseCategories,
-      rev.ExpertiseCategories
-    ].filter(Boolean).join(' ').toLowerCase();
-    return !q || s.includes(q);
-  });
-  $('#reviewerRows').innerHTML = filtered.length ? filtered.map(x=>{
-    const rev = x.reviewer || x;
-    const rid = esc(rev.ReviewerID || x.ReviewerID || '-');
-    const name = esc(rev.FullName || [rev.Prefix, rev.FirstName, rev.LastName].filter(Boolean).join(' ') || rid);
-    const pos = esc(rev.Position || '');
-    const email = esc(rev.Email || '-');
-    const inst = esc(rev.Institution || '-');
-    const dept = esc(rev.Department || '');
-    const phone = esc(rev.Phone || '-');
-    const exp = esc(x.ExpertiseCategories || rev.ExpertiseCategories || '-');
-    const workload = `${num(x.CurrentAssignedCount)}/${num(x.MaxWorkload || rev.MaxWorkload || 10)}`;
-    const status = statusBadge(x.Status || rev.Status || 'ACTIVE');
-
-    return `<tr>
-      <td><b>${rid}</b></td>
-      <td><b>${name}</b>${pos ? `<br><span class="muted">${pos}</span>` : ''}</td>
-      <td>${email}</td>
-      <td>${inst}${dept ? `<br><span class="muted">${dept}</span>` : ''}</td>
-      <td>${phone}</td>
-      <td>${exp}</td>
-      <td>${workload}</td>
-      <td>${status}</td>
+async function loadReviewers(){
+  show('กำลังโหลด Reviewer');
+  try{
+    const rows=await rpc('adminListReviewers',TOKEN,CID);
+    const q = ($('#revSearch').value||'').toLowerCase();
+    const filtered = rows.filter(x=>{
+      const s = [x.reviewer.ReviewerID, x.reviewer.FullName, x.reviewer.Email, x.reviewer.Institution, x.reviewer.Department].join(' ').toLowerCase();
+      return !q || s.includes(q);
+    });
+    $('#reviewerRows').innerHTML=filtered.map(x=>`<tr>
+      <td>${esc(x.reviewer.ReviewerID)}</td>
+      <td><b>${esc(x.reviewer.Prefix||'')}${esc(x.reviewer.FirstName||'')} ${esc(x.reviewer.LastName||'')}</b><br><span class="muted">${esc(x.reviewer.Position||'')}</span></td>
+      <td>${esc(x.reviewer.Email)}</td>
+      <td>${esc(x.reviewer.Institution)}<br><span class="muted">${esc(x.reviewer.Department||'')}</span></td>
+      <td>${esc(x.reviewer.Phone||'-')}</td>
+      <td>${esc(x.ExpertiseCategories||x.reviewer.ExpertiseCategories)}</td>
+      <td>${x.CurrentAssignedCount}/${x.MaxWorkload}</td>
+      <td>${statusBadge(x.Status)}</td>
       <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-        <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${rid}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${rid}')"><i class="fa-solid fa-key"></i></button>
-        <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${email}','','เรียน ${name}', '')"><i class="fa-solid fa-envelope"></i></button>
+        <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-key"></i></button>
+        <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(x.reviewer.Email)}','','เรียน ${esc(x.reviewer.FullName||'')}', '')"><i class="fa-solid fa-envelope"></i></button>
       </td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="9" class="muted">ไม่พบข้อมูล Reviewer</td></tr>';
-}
-
-function filterReviewersLocally(){
-  renderReviewersUi(window.REVIEWERS_LIST_CACHE || []);
-}
-
-async function loadReviewers(forceRefresh=false){
-  const cacheKey = `tuhRev_${CID}`;
-  let hasRenderedCache = false;
-  if(!forceRefresh){
-    try{
-      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
-      if(cached && Array.isArray(cached)){
-        renderReviewersUi(cached);
-        hasRenderedCache = true;
-      }
-    }catch(e){}
-  }
-
-  const btn = $('#btnRefreshReviewers');
-  if(btn && forceRefresh){
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...';
-    btn.disabled = true;
-  }
-  if(!hasRenderedCache) show('กำลังโหลด Reviewer');
-  try{
-    const rows = forceRefresh ? await rpcFresh('adminListReviewers',TOKEN,CID) : await rpc('adminListReviewers',TOKEN,CID);
-    const validRows = Array.isArray(rows) ? rows : [];
-    try{ sessionStorage.setItem(cacheKey, JSON.stringify(validRows)); }catch(e){}
-    renderReviewersUi(validRows);
-    if(forceRefresh) toast(`โหลดข้อมูลล่าสุดแล้ว (พบ ${validRows.length} ท่าน)`);
-  } catch(e) {
-    if(!hasRenderedCache) err(e);
-  } finally {
-    if(btn && forceRefresh){
-      btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> โหลดข้อมูลล่าสุดจาก Google Sheets';
-      btn.disabled = false;
-    }
-    if(!hasRenderedCache) hide();
-  }
-}
-
-function renderReviewConfigUi(d){
-  if(!d) return;
-  const rounds = d.rounds || [];
-  const criteria = d.criteria || [];
-  $('#reviewConfig').innerHTML = '<h4>รอบประเมิน</h4>' +
-    rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers}-${r.MaxReviewers}</div>`).join('') +
-    '<h4>เกณฑ์คะแนน</h4>' +
-    criteria.map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('');
-}
-
-async function loadReviewConfig(forceRefresh=false){
-  const cacheKey = `tuhRevCfg_${CID}`;
-  let hasRenderedCache = false;
-  if(!forceRefresh){
-    try{
-      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
-      if(cached){
-        renderReviewConfigUi(cached);
-        hasRenderedCache = true;
-      }
-    }catch(e){}
-  }
-  try{
-    const d = forceRefresh ? await rpcFresh('adminGetReviewConfig',TOKEN,CID) : await rpc('adminGetReviewConfig',TOKEN,CID);
-    try{ sessionStorage.setItem(cacheKey, JSON.stringify(d)); }catch(e){}
-    renderReviewConfigUi(d);
-  }catch(e){
-    if(!hasRenderedCache) console.warn(e);
+    </tr>`).join('');
+  }finally{
+    hide();
   }
 }
 async function resendReviewerCreds(id){
@@ -3449,42 +3309,24 @@ async function promptReplaceWorkFile(workId, regId, existingFilesHtml) {
   Swal.fire({title:'อัปโหลดไฟล์ผลงาน', html:h, width:600, showConfirmButton:false, showCloseButton:true});
 }
 // Users Management
-function renderUsersUi(rows){
-  if(!rows || !Array.isArray(rows)) rows = [];
-  window.USERS_LIST_CACHE = rows;
-  $('#userRows').innerHTML=rows.length ? rows.map(x=>`<tr>
-    <td><b>${esc(x.UserID)}</b></td>
-    <td><b>${esc(x.FullName)}</b><br><span class="muted">${esc(x.Email)}</span></td>
-    <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:600">${esc(x.Role)}</span></td>
-    <td>${statusBadge(x.Status)}</td>
-    <td class="actions" style="display:flex;gap:4px;flex-wrap:wrap">
-      <button class="btn btn-soft btn-sm" onclick="openUserEditModal('${esc(x.UserID)}')" title="แก้ไขสิทธิ์และบทบาท"><i class="fa-solid fa-pen-to-square"></i> แก้ไขสิทธิ์</button>
-      ${x.Status !== 'ACTIVE' ? `<button class="btn btn-blue btn-sm" onclick="adminApproveUser('${esc(x.UserID)}')"><i class="fa-solid fa-check"></i> อนุมัติ</button>` : ''}
-      ${x.Status === 'ACTIVE' && x.Role !== 'SUPERADMIN' ? `<button class="btn btn-gold btn-sm" onclick="adminRevokeUser('${esc(x.UserID)}')"><i class="fa-solid fa-ban"></i> พักสิทธิ์</button>` : ''}
-    </td>
-  </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
-}
-
-async function loadUsers(forceRefresh=false){
-  const cacheKey = `tuhUser_${CID}`;
-  let hasRenderedCache = false;
-  if(!forceRefresh){
-    try{
-      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
-      if(cached && Array.isArray(cached)){
-        renderUsersUi(cached);
-        hasRenderedCache = true;
-      }
-    }catch(e){}
-  }
-  if(!hasRenderedCache) show('กำลังโหลดผู้ใช้งาน');
+async function loadUsers(){
+  show('กำลังโหลดผู้ใช้งาน');
   try{
-    const rows = forceRefresh ? await rpcFresh('adminListUsers',TOKEN,CID) : await rpc('adminListUsers',TOKEN,CID);
-    const validRows = Array.isArray(rows) ? rows : [];
-    try{ sessionStorage.setItem(cacheKey, JSON.stringify(validRows)); }catch(e){}
-    renderUsersUi(validRows);
+    const rows=await rpc('adminListUsers',TOKEN,CID);
+    window.USERS_LIST_CACHE = rows || [];
+    $('#userRows').innerHTML=rows.length ? rows.map(x=>`<tr>
+      <td><b>${esc(x.UserID)}</b></td>
+      <td><b>${esc(x.FullName)}</b><br><span class="muted">${esc(x.Email)}</span></td>
+      <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:600">${esc(x.Role)}</span></td>
+      <td>${statusBadge(x.Status)}</td>
+      <td class="actions" style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-soft btn-sm" onclick="openUserEditModal('${esc(x.UserID)}')" title="แก้ไขสิทธิ์และบทบาท"><i class="fa-solid fa-pen-to-square"></i> แก้ไขสิทธิ์</button>
+        ${x.Status !== 'ACTIVE' ? `<button class="btn btn-blue btn-sm" onclick="adminApproveUser('${esc(x.UserID)}')"><i class="fa-solid fa-check"></i> อนุมัติ</button>` : ''}
+        ${x.Status === 'ACTIVE' && x.Role !== 'SUPERADMIN' ? `<button class="btn btn-gold btn-sm" onclick="adminRevokeUser('${esc(x.UserID)}')"><i class="fa-solid fa-ban"></i> พักสิทธิ์</button>` : ''}
+      </td>
+    </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
   }finally{
-    if(!hasRenderedCache) hide();
+    hide();
   }
 }
 
