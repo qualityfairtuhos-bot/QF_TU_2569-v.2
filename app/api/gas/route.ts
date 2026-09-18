@@ -164,7 +164,7 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
       if(attempt>0){
         await new Promise((r)=>setTimeout(r,attempt*500));
       }
-      const timeoutMs = Math.min(GAS_TIMEOUT_MS, 45_000);
+      const timeoutMs = Math.min(GAS_TIMEOUT_MS, 50_000);
       const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
       try{
         const response=await fetch(url,{
