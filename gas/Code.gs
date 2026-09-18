@@ -3691,29 +3691,122 @@ function sendReviewerCredentials_(cid,email,password,reviewerId){const url=build
 function adminListReviewers(token,conferenceId){
   return runSafely_('adminListReviewers',function(){
     requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
-    const map={};
-    getRecords_('Reviewers').forEach(function(r){
-      if(r && (r.ReviewerID||'').toString().trim() && ((r.FirstName||'').toString().trim() || (r.FullName||'').toString().trim() || (r.Email||'').toString().trim())){
-        map[String(r.ReviewerID).trim()]=r;
+    clearRequestCache_();
+    const rawRevs = getRecords_('Reviewers') || [];
+    const revs = [];
+    const seenRevIds = {};
+
+    rawRevs.forEach(function(r, idx){
+      if(!r) return;
+      // Extract possible ReviewerID or fallback if user added directly in sheet without ID
+      let rid = String(r.ReviewerID || r.reviewerid || r.ReviewerId || r.ID || r.id || r['รหัส'] || r['รหัสผู้ทรงคุณวุฒิ'] || r['รหัสผู้ประเมิน'] || '').trim();
+      
+      const prefix = String(r.Prefix || r.prefix || r['คำนำหน้า'] || r['คำนำหน้านาม'] || '').trim();
+      const firstName = String(r.FirstName || r.firstname || r['ชื่อ'] || '').trim();
+      const lastName = String(r.LastName || r.lastname || r['นามสกุล'] || '').trim();
+      let fullName = String(r.FullName || r.fullname || r['ชื่อ-นามสกุล'] || r['ชื่อ-สกุล'] || r['ชื่อสกุล'] || r['ชื่อ นามสกุล'] || '').trim();
+      if(!fullName && (firstName || lastName)){
+        fullName = [prefix, firstName, lastName].filter(Boolean).join(' ');
+      }
+      const email = String(r.Email || r.email || r['อีเมล'] || r['อีเมล์'] || r['E-mail'] || '').trim();
+      const institution = String(r.Institution || r.institution || r['หน่วยงาน'] || r['สถาบัน'] || r['โรงพยาบาล'] || r['สังกัด'] || '').trim();
+      const department = String(r.Department || r.department || r['แผนก'] || r['ฝ่าย'] || r['กลุ่มงาน'] || r['ภาควิชา'] || '').trim();
+      const position = String(r.Position || r.position || r['ตำแหน่ง'] || '').trim();
+      const phone = String(r.Phone || r.phone || r['เบอร์โทร'] || r['เบอร์โทรศัพท์'] || r['โทรศัพท์'] || '').trim();
+      const expertise = String(r.ExpertiseCategories || r.expertisecategories || r['สาขาความเชี่ยวชาญ'] || r['ความเชี่ยวชาญ'] || r['สาขา'] || '').trim();
+      const status = String(r.Status || r.status || r['สถานะ'] || 'ACTIVE').trim().toUpperCase() || 'ACTIVE';
+      const maxWorkload = num_(r.MaxWorkload || r.maxworkload || r['ภาระงานสูงสุด'] || 10, 10);
+
+      // If completely empty row in sheet, skip
+      if(!rid && !fullName && !firstName && !email) return;
+
+      // If user added row in Google Sheet but didn't assign an ID, assign an ID
+      if(!rid){
+        rid = 'REV-' + String(r.__row || (idx + 2)).padStart(4, '0');
+        try {
+          if (r.__row) {
+            updateRecord_('Reviewers', r.__row, { ReviewerID: rid });
+          }
+        } catch(ignore) {}
+      }
+
+      r.ReviewerID = rid;
+      r.Prefix = prefix;
+      r.FirstName = firstName || fullName;
+      r.LastName = lastName;
+      r.FullName = fullName || [prefix, firstName, lastName].filter(Boolean).join(' ') || email || rid;
+      r.Email = email;
+      r.Institution = institution;
+      r.Department = department;
+      r.Position = position;
+      r.Phone = phone;
+      r.ExpertiseCategories = expertise;
+      r.Status = status;
+      r.MaxWorkload = maxWorkload;
+
+      seenRevIds[rid] = true;
+      revs.push(r);
+    });
+
+    // Also check ReviewerPool sheet in case user added them directly to ReviewerPool!
+    const poolList = findMany_('ReviewerPool',{ConferenceID:conferenceId}) || [];
+    const poolMap = {};
+    poolList.forEach(function(p){
+      if(p && p.ReviewerID) {
+        const prid = String(p.ReviewerID).trim();
+        poolMap[prid] = p;
+        if(!seenRevIds[prid] && (p.FullName || p.Email || prid)){
+          const synRev = {
+            ReviewerID: prid,
+            Prefix: p.Prefix || '',
+            FirstName: p.FirstName || p.FullName || prid,
+            LastName: p.LastName || '',
+            FullName: p.FullName || prid,
+            Email: p.Email || '',
+            Institution: p.Institution || '',
+            Department: p.Department || '',
+            Phone: p.Phone || '',
+            Position: p.Position || '',
+            ExpertiseCategories: p.ExpertiseCategories || '',
+            Status: p.Status || 'ACTIVE',
+            MaxWorkload: num_(p.MaxWorkload, 10)
+          };
+          seenRevIds[prid] = true;
+          revs.push(synRev);
+        }
       }
     });
-    const asns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});
-    const counts={};
+
+    const asns = findMany_('ReviewAssignments',{ConferenceID:conferenceId}) || [];
+    const counts = {};
     asns.forEach(function(a){
-      if(String(a.Status).toUpperCase()!=='CANCELLED'&&String(a.Status).toUpperCase()!=='DECLINED'){
+      if(String(a.Status).toUpperCase()!=='CANCELLED' && String(a.Status).toUpperCase()!=='DECLINED'){
         const rid = String(a.ReviewerID||'').trim();
-        if(rid) counts[rid]=(counts[rid]||0)+1;
+        if(rid) counts[rid] = (counts[rid]||0) + 1;
       }
     });
-    const pools = findMany_('ReviewerPool',{ConferenceID:conferenceId}).filter(function(p){
-      const rid = (p && p.ReviewerID ? String(p.ReviewerID) : '').trim();
-      return rid && map[rid] && (map[rid].ReviewerID ? String(map[rid].ReviewerID) : '').trim();
+
+    const result = revs.map(function(r){
+      const rid = String(r.ReviewerID).trim();
+      let p = poolMap[rid];
+      if(!p){
+        p = {
+          PoolID: 'POOL-' + rid,
+          ConferenceID: conferenceId,
+          ReviewerID: rid,
+          ExpertiseCategories: r.ExpertiseCategories || '',
+          ExpertiseTypes: r.ExpertiseTypes || '',
+          MaxWorkload: num_(r.MaxWorkload, 10),
+          CurrentAssignedCount: counts[rid] || 0,
+          Status: r.Status || 'ACTIVE'
+        };
+      } else {
+        p.CurrentAssignedCount = counts[rid] || 0;
+        if(!p.Status) p.Status = r.Status || 'ACTIVE';
+      }
+      return Object.assign({}, p, { reviewer: r });
     });
-    return serialize_(pools.map(function(p){
-      const rid = String(p.ReviewerID).trim();
-      p.CurrentAssignedCount=counts[rid]||0;
-      return Object.assign({},p,{reviewer:map[rid]||{}});
-    }));
+    return serialize_(result);
   });
 }
 function adminAssignReviewers(token,conferenceId,workId,reviewRoundId,reviewerIds){
@@ -6201,6 +6294,7 @@ function doPost(e) {
   let requestId = '';
   let claimKey = '';
   try {
+    try { clearRequestCache_(); } catch (ignore) {}
     if (!e || !e.postData || !e.postData.contents) throw apiError_('INVALID_JSON','ไม่พบข้อมูลคำขอ');
     if (e.postData.contents.length > 28 * 1024 * 1024) throw apiError_('PAYLOAD_TOO_LARGE','ข้อมูลมีขนาดใหญ่เกินกำหนด');
     body = JSON.parse(e.postData.contents);

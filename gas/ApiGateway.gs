@@ -3,6 +3,7 @@ function doPost(e) {
   let requestId = '';
   let claimKey = '';
   try {
+    try { clearRequestCache_(); } catch (ignore) {}
     if (!e || !e.postData || !e.postData.contents) throw apiError_('INVALID_JSON','ไม่พบข้อมูลคำขอ');
     if (e.postData.contents.length > 28 * 1024 * 1024) throw apiError_('PAYLOAD_TOO_LARGE','ข้อมูลมีขนาดใหญ่เกินกำหนด');
     body = JSON.parse(e.postData.contents);

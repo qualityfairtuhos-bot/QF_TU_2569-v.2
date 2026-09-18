@@ -16,20 +16,20 @@ const CACHE_TTLS:Record<string,number>={
   getPublicBootstrap: 300_000,
   getPublicAnnouncement: 300_000,
   getPublicFinanceDocuments: 300_000,
-  adminBootstrap: 180_000,
-  adminDashboard: 120_000,
-  getAdminSettings: 180_000,
-  adminListRegistrations: 120_000,
-  adminListPayments: 120_000,
-  adminListWorks: 120_000,
-  adminListReviewers: 180_000,
-  adminListUsers: 180_000,
-  adminListMealPasses: 120_000,
-  adminListFinanceDocuments: 180_000,
-  adminGetReviewConfig: 180_000,
-  reviewerBootstrap: 120_000,
-  getEventScannerBootstrap: 120_000,
-  listImportBatches: 120_000
+  adminBootstrap: 120_000,
+  adminDashboard: 60_000,
+  getAdminSettings: 120_000,
+  adminListRegistrations: 60_000,
+  adminListPayments: 60_000,
+  adminListWorks: 60_000,
+  adminListReviewers: 60_000,
+  adminListUsers: 60_000,
+  adminListMealPasses: 60_000,
+  adminListFinanceDocuments: 120_000,
+  adminGetReviewConfig: 60_000,
+  reviewerBootstrap: 60_000,
+  getEventScannerBootstrap: 60_000,
+  listImportBatches: 60_000
 };
 
 const DEFAULT_CONFERENCE_BOOT = {
@@ -248,6 +248,7 @@ export async function POST(request:NextRequest){
     }
   } else {
     memoryCache.delete(cacheKey);
+    lastKnownGood.delete(cacheKey);
   }
 
   const secret=getGasSecret();
