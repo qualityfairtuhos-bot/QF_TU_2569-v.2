@@ -3693,15 +3693,16 @@ function adminListReviewers(token,conferenceId){
     requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
     const map={};
     getRecords_('Reviewers').forEach(function(r){
-      if(r && (r.ReviewerID||'').toString().trim()){
-        map[r.ReviewerID]=r;
+      if(r && (r.ReviewerID||'').toString().trim() && ((r.FirstName||'').toString().trim() || (r.FullName||'').toString().trim() || (r.Email||'').toString().trim())){
+        map[String(r.ReviewerID).trim()]=r;
       }
     });
     const asns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});
     const counts={};
     asns.forEach(function(a){
       if(String(a.Status).toUpperCase()!=='CANCELLED'&&String(a.Status).toUpperCase()!=='DECLINED'){
-        counts[a.ReviewerID]=(counts[a.ReviewerID]||0)+1;
+        const rid = String(a.ReviewerID||'').trim();
+        if(rid) counts[rid]=(counts[rid]||0)+1;
       }
     });
     const pools = findMany_('ReviewerPool',{ConferenceID:conferenceId}).filter(function(p){
@@ -3709,8 +3710,9 @@ function adminListReviewers(token,conferenceId){
       return rid && map[rid] && (map[rid].ReviewerID ? String(map[rid].ReviewerID) : '').trim();
     });
     return serialize_(pools.map(function(p){
-      p.CurrentAssignedCount=counts[p.ReviewerID]||0;
-      return Object.assign({},p,{reviewer:map[p.ReviewerID]||{}});
+      const rid = String(p.ReviewerID).trim();
+      p.CurrentAssignedCount=counts[rid]||0;
+      return Object.assign({},p,{reviewer:map[rid]||{}});
     }));
   });
 }
@@ -4427,7 +4429,9 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
         const exist = findOne_('ReviewAssignments',{ConferenceID:conferenceId,WorkID:wid,ReviewerID:rid,ReviewRoundID:roundId});
         if(exist) { skipped++; return; }
         const rvw = findOne_('Reviewers',{ReviewerID:rid});
-        if(!rvw) return;
+        if(!rvw || String(rvw.Status).toUpperCase() === 'INACTIVE') { skipped++; return; }
+        const pool = findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});
+        if(pool && String(pool.Status).toUpperCase() === 'INACTIVE') { skipped++; return; }
         appendRecord_('ReviewAssignments',{AssignmentID:nextId_('ASN'),ConferenceID:conferenceId,ReviewRoundID:roundId,WorkID:wid,WorkCode:w?w.WorkCode:wid,ReviewerID:rid,ReviewerName:rvw.FullName||(rvw.FirstName+' '+rvw.LastName),ReviewerEmail:rvw.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',CreatedAt:new Date(),UpdatedAt:new Date()});
         created++;
       });
@@ -4446,7 +4450,7 @@ function adminGetReviewer(token,conferenceId,reviewerId){
       if(pool.MaxWorkload !== undefined && pool.MaxWorkload !== '') result.MaxWorkload = pool.MaxWorkload;
       if(pool.ExpertiseCategories) result.ExpertiseCategories = pool.ExpertiseCategories;
       if(pool.ExpertiseTypes) result.ExpertiseTypes = pool.ExpertiseTypes;
-      if(pool.Status) result.PoolStatus = pool.Status;
+      if(pool.Status) result.Status = pool.Status;
     }
     return serialize_(result);
   });
@@ -4459,8 +4463,10 @@ function adminUpdateReviewer(token,conferenceId,reviewerId,data){
     data = data || {};
     if(data.Phone) data.Phone = "'"+String(data.Phone); // prevent losing 0
     const fullName = [data.Prefix, data.FirstName, data.LastName].filter(Boolean).join(' ');
+    const status = data.Status || r.Status || 'ACTIVE';
     const patch = Object.assign({}, data, {
       FullName: fullName || r.FullName,
+      Status: status,
       UpdatedAt: new Date()
     });
     delete patch.__row;
@@ -4474,7 +4480,7 @@ function adminUpdateReviewer(token,conferenceId,reviewerId,data){
         ExpertiseCategories: data.ExpertiseCategories !== undefined ? data.ExpertiseCategories : pool.ExpertiseCategories,
         ExpertiseTypes: data.ExpertiseTypes !== undefined ? data.ExpertiseTypes : pool.ExpertiseTypes,
         MaxWorkload: data.MaxWorkload !== undefined ? num_(data.MaxWorkload, 10) : pool.MaxWorkload,
-        Status: data.Status || pool.Status || 'ACTIVE'
+        Status: status
       });
     }
     invalidateCache_(conferenceId);
@@ -6053,8 +6059,8 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminUploadFinanceDocument:1, adminUploadBanner:1, adminDeleteFinanceDocument:1, adminDeleteReviewer:1, adminDeleteWork:1,
   adminImportFromGoogleSheet:1, adminSendIncompleteProfileEmails:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
-  emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,
-  replaceWorkFile:1, requestPasswordReset:1, reviewerSaveReview:1,
+  emailMyMealPass:1, registerNewUser:1,
+  replaceWorkFile:1, reviewerSaveReview:1,
   saveAdminSettings:1, saveRegistrationEdit:1, submitRegistration:1,
   submitWork:1, uploadExcelForImport:1, uploadPaymentSlip:1
 });

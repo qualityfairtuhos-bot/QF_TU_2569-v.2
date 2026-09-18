@@ -168,10 +168,11 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
       const timeoutMs = isAuthOrBoot ? 35_000 : Math.min(GAS_TIMEOUT_MS, 50_000);
       const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
       try{
+        const currentPayload = attempt > 0 ? { ...payload, requestId: `${payload.requestId || randomUUID()}_r${attempt}` } : payload;
         const response=await fetch(url,{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify(payload),
+          body:JSON.stringify(currentPayload),
           redirect:"follow",
           cache:"no-store",
           keepalive:true,

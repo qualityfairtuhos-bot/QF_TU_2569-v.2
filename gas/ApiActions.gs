@@ -82,8 +82,8 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminSendIncompleteProfileEmails:1, adminSendMealPasses:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1, adminUpdateRegistrationStatus:1,
   adminUpdateReviewer:1, adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadBanner:1, adminUploadFinanceDocument:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, commitImportBatch:1, confirmEventScanner:1,
-  emailMyMealPass:1, loginUser:1, logoutUser:1, registerNewUser:1,
-  replaceWorkFile:1, requestPasswordReset:1, reviewerSaveReview:1,
+  emailMyMealPass:1, registerNewUser:1,
+  replaceWorkFile:1, reviewerSaveReview:1,
   saveAdminSettings:1, saveRegistrationEdit:1, submitRegistration:1,
   submitWork:1, uploadExcelForImport:1, uploadPaymentSlip:1
 });
