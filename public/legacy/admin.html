@@ -210,14 +210,14 @@
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
         </div>
-        <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
-          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
-          <select id="workPresentationType" class="field" style="width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+        <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap; align-items:center">
+          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ (กด Enter หรือคลิกค้นหา)" style="flex:1; min-width:220px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onkeydown="if(event.key==='Enter')loadWorks(true)">
+          <select id="workPresentationType" class="field" style="width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorkRows()">
             <option value="">ทุกรูปแบบการนำเสนอ</option>
             <option value="แบบบรรยาย">แบบบรรยาย</option>
             <option value="แบบโปสเตอร์">แบบโปสเตอร์ (e-poster)</option>
           </select>
-          <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+          <select id="workStatus" class="field" style="width:160px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorkRows()">
             <option value="">ทุกสถานะ</option>
             <option value="RECEIVED">RECEIVED</option>
             <option value="WAITING_REVIEWER_ASSIGN">รอจ่ายงาน</option>
@@ -225,7 +225,8 @@
             <option value="ACCEPTED">ผ่านการพิจารณา (Accepted)</option>
             <option value="REJECTED">ไม่ผ่าน (Rejected)</option>
           </select>
-          <button class="btn btn-soft" onclick="loadWorks()"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
+          <button class="btn btn-primary" onclick="loadWorks(true)"><i class="fa-solid fa-magnifying-glass"></i> ค้นหา</button>
+          <button class="btn btn-soft" onclick="loadWorks(true)"><i class="fa-solid fa-rotate"></i> โหลดข้อมูลใหม่</button>
         </div>
         <div class="table-wrap">
           <table class="table" style="font-size:0.85rem">
@@ -333,6 +334,7 @@ const LOGO_HACC='/images/hacc-logo.png';
 const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','RegistrationCloseAt','PaymentCloseAt','SubmissionOpenAt','SubmissionCloseAt','ResultAnnouncementAt'];
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
+const LOADED_PAGES=new Set();
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
 async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
@@ -406,8 +408,7 @@ async function boot(){
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
 }
-const LOADED_PAGES = new Set();
-async function nav(p, force = false){
+async function nav(p, force=false){
   const page=$('#page-'+p);
   if(!page)return;
   CURRENT=p;
@@ -422,23 +423,27 @@ async function nav(p, force = false){
   if(!force && LOADED_PAGES.has(p)){
     return;
   }
+  
   try{
     if(p==='dashboard')await loadDashboard();
-    else if(p==='settings')await loadSettings();
-    else if(p==='import')await loadImportBatches();
-    else if(p==='registrations')await loadRegistrations();
-    else if(p==='payments')await loadPayments();
-    else if(p==='works')await loadWorks();
-    else if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}
-    else if(p==='food')await loadFood();
-    else if(p==='users')await loadUsers();
+    if(p==='settings')await loadSettings();
+    if(p==='import')await loadImportBatches();
+    if(p==='registrations')await loadRegistrations();
+    if(p==='payments')await loadPayments();
+    if(p==='works')await loadWorks();
+    if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}
+    if(p==='food')await loadFood();
+    if(p==='users')await loadUsers();
     LOADED_PAGES.add(p);
-  }catch(e){err(e)}
+  }catch(e){
+    err(e);
+  }
 }
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
 async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
-async function refreshPage(){LOADED_PAGES.delete(CURRENT);return nav(CURRENT,true)}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';LOADED_PAGES.clear();$('#app').style.display='none';$('#login').style.display='flex';hide();}
+async function refreshPage(){LOADED_PAGES.delete(CURRENT);return nav(CURRENT, true)}
+async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}LOADED_PAGES.clear();localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
 let chartRegByType, chartWorksIntent, chartWorksByStatus, chartWorksByCategory, chartDailyQuota;
 if (window.ChartDataLabels) Chart.register(ChartDataLabels);
 function renderDashboardUi(d, filterType){
@@ -2381,7 +2386,128 @@ function formatWorkCategory(v) {
   return s;
 }
 
-async function loadWorks(){
+function renderWorkRows(){
+  const rows = window.WORK_ROWS || [];
+  const searchVal = ($('#workSearch')?.value || '').trim().toLowerCase();
+  const statusVal = ($('#workStatus')?.value || '').trim();
+  const ptVal = ($('#workPresentationType')?.value || '').trim().toLowerCase();
+  
+  // ตรวจหาผลงานที่มีชื่อซ้ำกัน (ตัดช่องว่างทุกจุดและเทียบแบบ case-insensitive)
+  function normTitle(t){
+    return String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '').trim().toLowerCase();
+  }
+  const titleCountMap = {};
+  rows.forEach(w => {
+    const nt = normTitle(w.TitleTH || w.ThaiTitle);
+    if (nt) titleCountMap[nt] = (titleCountMap[nt] || 0) + 1;
+  });
+
+  let filteredRows = rows.filter(w => {
+    if (searchVal) {
+      const code = String(w.WorkCode || w.WorkID || '').toLowerCase();
+      const titleTh = String(w.TitleTH || w.ThaiTitle || '').toLowerCase();
+      const titleEn = String(w.TitleEN || w.EnglishTitle || '').toLowerCase();
+      const presenter = String(w.PresenterName || '').toLowerCase();
+      const presenterEmail = String(w.PresenterEmail || '').toLowerCase();
+      if (!code.includes(searchVal) && !titleTh.includes(searchVal) && !titleEn.includes(searchVal) && !presenter.includes(searchVal) && !presenterEmail.includes(searchVal)) {
+        return false;
+      }
+    }
+    if (statusVal) {
+      const st = String(w.Status || w.CurrentStatus || '').toUpperCase();
+      if (st !== statusVal.toUpperCase()) return false;
+    }
+    if (ptVal) {
+      const raw = [
+        w.PresentationTypeName,
+        w.PresentationType,
+        w.PresentationTypeFinal,
+        w.PresentationTypeRequested,
+        w['รูปแบบการนำเสนอ'],
+        w['รูปแบบ']
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      if (ptVal.includes('บรรยาย') || ptVal.includes('oral')) {
+        if (!raw.includes('บรรยาย') && !raw.includes('oral') && !raw.includes('pt-2026-000001') && !raw.includes('pt-oral')) return false;
+      } else if (ptVal.includes('โปสเตอร์') || ptVal.includes('poster') || ptVal.includes('eposter')) {
+        if (!raw.includes('โปสเตอร์') && !raw.includes('poster') && !raw.includes('eposter') && !raw.includes('pt-2026-000002') && !raw.includes('pt-eposter')) return false;
+      } else if (!raw.includes(ptVal)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
+    let rawPt = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '').trim();
+    let ptDisplay = rawPt;
+    let badgeClass = '';
+    if (/oral|บรรยาย|pt-2026-000001/i.test(rawPt)) {
+      ptDisplay = 'แบบบรรยาย';
+      badgeClass = 'ok';
+    } else if (/poster|โปสเตอร์|eposter|pt-2026-000002/i.test(rawPt)) {
+      ptDisplay = 'แบบโปสเตอร์ (e-poster)';
+      badgeClass = 'warn';
+    } else if (!ptDisplay || ptDisplay === '-') {
+      ptDisplay = '-';
+    }
+
+    const nt = normTitle(w.TitleTH || w.ThaiTitle);
+    const isDuplicate = nt && (titleCountMap[nt] > 1);
+    const dupCount = isDuplicate ? titleCountMap[nt] : 0;
+    const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
+    const catDisplay = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+
+    return `<tr>
+    <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
+    <td>
+      ${isDuplicate 
+        ? `<div style="color:#dc2626; font-weight:700; display:flex; align-items:flex-start; gap:6px;">
+            <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px; flex-shrink:0; color:#dc2626;" title="อาจมีชื่อผลงานซ้ำ (${dupCount} รายการ)"></i>
+            <div>
+              <span style="color:#dc2626;">${titleDisplay}</span>
+              <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.7rem; padding:1px 6px; margin-left:4px; font-weight:600;"><i class="fa-solid fa-clone"></i> ชื่อซ้ำ (${dupCount} เรื่อง)</span>
+            </div>
+           </div>`
+        : `<div>${titleDisplay}</div>`
+      }
+      ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
+    </td>
+    <td>${esc(catDisplay)}</td>
+    <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
+    <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
+    <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
+    <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
+    <td><div style="margin-bottom:4px">งาน: ${statusBadge(w.Status||w.CurrentStatus)}</div><div>ลงทะเบียน: ${statusBadge(w.RegistrationStatus||'ไม่พบข้อมูล')}</div></td>
+    <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
+      <button class="btn btn-primary btn-sm" title="จ่ายผู้ประเมิน" onclick="openAssignReviewerModal('${esc(w.WorkID)}')"><i class="fa-solid fa-user-plus"></i></button>
+      <button class="btn btn-blue btn-sm" title="คะแนนประเมิน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple"></i></button>
+      <button class="btn btn-gold btn-sm" title="ปรับสถานะ/ประเภท" onclick="openUpdateWorkStatus('${esc(w.WorkID)}', '${esc(w.Status||w.CurrentStatus)}')"><i class="fa-solid fa-pen-to-square"></i></button>
+      <button class="btn btn-soft btn-sm" title="ส่งอีเมล" onclick="openEmail('${esc(w.PresenterEmail||'')}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(w.PresenterName||'')}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
+      <button class="btn btn-gold btn-sm" title="แนบ/จัดการไฟล์" onclick="openUploadModal('${esc(w.WorkID)}','${esc(w.RegID||'')}')"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+      <button class="btn btn-sm" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="ลบผลงานนี้ (รวมไฟล์แนบ)" onclick="deleteWorkItem('${esc(w.WorkID)}', '${esc(w.WorkCode||w.WorkID)}', '${esc((w.TitleTH||w.TitleEN||'').replace(/['\"\\`]/g, ' '))}')"><i class="fa-solid fa-trash-can"></i></button>
+      ${(w.files||[]).sort((a,b)=>{
+        const wa = (a.FileCategory||'').includes('PRESENT') ? 2 : (a.FileCategory==='BLIND' ? 1 : 0);
+        const wb = (b.FileCategory||'').includes('PRESENT') ? 2 : (b.FileCategory==='BLIND' ? 1 : 0);
+        return wa - wb;
+      }).map(f=>{
+        let t = f.FileCategory, i = 'fa-file-pdf';
+        if(t==='BLIND'){ t='ไฟล์ปกปิดชื่อ (Blind)'; i='fa-user-secret'; }
+        else if(t==='PRESENTER_BIO'){ t='ประวัติผู้นำเสนอ (Bio)'; i='fa-address-card'; }
+        else if((t||'').includes('PRESENT')){ t='ไฟล์นำเสนอ'; i='fa-display'; }
+        else{ t='ไฟล์ต้นฉบับ ('+t+')'; if(t==='WORD') i='fa-file-word'; }
+        return `<a target="_blank" href="${esc(f.FileUrl)}" class="btn btn-soft btn-sm" title="${t}"><i class="fa-solid ${i}"></i></a>`;
+      }).join('')}
+    </td>
+  </tr>`;
+  }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+}
+
+async function loadWorks(force=false){
+  if(!force && window.WORK_ROWS && window.WORK_ROWS.length > 0){
+    renderWorkRows();
+    return;
+  }
   show('กำลังโหลดผลงาน');
   try{
     const searchVal = ($('#workSearch')?.value || '').trim();
@@ -2393,104 +2519,8 @@ async function loadWorks(){
       status: statusVal,
       presentationType: ptVal
     });
-    window.WORK_ROWS = rows;
-    
-    // ตรวจหาผลงานที่มีชื่อซ้ำกัน (ตัดช่องว่างทุกจุดและเทียบแบบ case-insensitive)
-    function normTitle(t){
-      return String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '').trim().toLowerCase();
-    }
-    const titleCountMap = {};
-    (rows || []).forEach(w => {
-      const nt = normTitle(w.TitleTH || w.ThaiTitle);
-      if (nt) titleCountMap[nt] = (titleCountMap[nt] || 0) + 1;
-    });
-
-    let filteredRows = rows || [];
-    if (ptVal) {
-      const ptf = ptVal.toLowerCase();
-      filteredRows = filteredRows.filter(w => {
-        const raw = [
-          w.PresentationTypeName,
-          w.PresentationType,
-          w.PresentationTypeFinal,
-          w.PresentationTypeRequested,
-          w['รูปแบบการนำเสนอ'],
-          w['รูปแบบ']
-        ].filter(Boolean).join(' ').toLowerCase();
-
-        if (ptf.includes('บรรยาย') || ptf.includes('oral')) {
-          return raw.includes('บรรยาย') || raw.includes('oral') || raw.includes('pt-2026-000001') || raw.includes('pt-oral');
-        }
-        if (ptf.includes('โปสเตอร์') || ptf.includes('poster') || ptf.includes('eposter')) {
-          return raw.includes('โปสเตอร์') || raw.includes('poster') || raw.includes('eposter') || raw.includes('pt-2026-000002') || raw.includes('pt-eposter');
-        }
-        return raw.includes(ptf);
-      });
-    }
-
-    $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
-      let rawPt = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '').trim();
-      let ptDisplay = rawPt;
-      let badgeClass = '';
-      if (/oral|บรรยาย|pt-2026-000001/i.test(rawPt)) {
-        ptDisplay = 'แบบบรรยาย';
-        badgeClass = 'ok';
-      } else if (/poster|โปสเตอร์|eposter|pt-2026-000002/i.test(rawPt)) {
-        ptDisplay = 'แบบโปสเตอร์ (e-poster)';
-        badgeClass = 'warn';
-      } else if (!ptDisplay || ptDisplay === '-') {
-        ptDisplay = '-';
-      }
-
-      const nt = normTitle(w.TitleTH || w.ThaiTitle);
-      const isDuplicate = nt && (titleCountMap[nt] > 1);
-      const dupCount = isDuplicate ? titleCountMap[nt] : 0;
-      const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
-      const catDisplay = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
-
-      return `<tr>
-      <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
-      <td>
-        ${isDuplicate 
-          ? `<div style="color:#dc2626; font-weight:700; display:flex; align-items:flex-start; gap:6px;">
-              <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px; flex-shrink:0; color:#dc2626;" title="อาจมีชื่อผลงานซ้ำ (${dupCount} รายการ)"></i>
-              <div>
-                <span style="color:#dc2626;">${titleDisplay}</span>
-                <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.7rem; padding:1px 6px; margin-left:4px; font-weight:600;"><i class="fa-solid fa-clone"></i> ชื่อซ้ำ (${dupCount} เรื่อง)</span>
-              </div>
-             </div>`
-          : `<div>${titleDisplay}</div>`
-        }
-        ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
-      </td>
-      <td>${esc(catDisplay)}</td>
-      <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
-      <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
-      <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
-      <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
-      <td><div style="margin-bottom:4px">งาน: ${statusBadge(w.Status||w.CurrentStatus)}</div><div>ลงทะเบียน: ${statusBadge(w.RegistrationStatus||'ไม่พบข้อมูล')}</div></td>
-      <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-        <button class="btn btn-primary btn-sm" title="จ่ายผู้ประเมิน" onclick="openAssignReviewerModal('${esc(w.WorkID)}')"><i class="fa-solid fa-user-plus"></i></button>
-        <button class="btn btn-blue btn-sm" title="คะแนนประเมิน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple"></i></button>
-        <button class="btn btn-gold btn-sm" title="ปรับสถานะ/ประเภท" onclick="openUpdateWorkStatus('${esc(w.WorkID)}', '${esc(w.Status||w.CurrentStatus)}')"><i class="fa-solid fa-pen-to-square"></i></button>
-        <button class="btn btn-soft btn-sm" title="ส่งอีเมล" onclick="openEmail('${esc(w.PresenterEmail||'')}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(w.PresenterName||'')}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
-        <button class="btn btn-gold btn-sm" title="แนบ/จัดการไฟล์" onclick="openUploadModal('${esc(w.WorkID)}','${esc(w.RegID||'')}')"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-        <button class="btn btn-sm" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="ลบผลงานนี้ (รวมไฟล์แนบ)" onclick="deleteWorkItem('${esc(w.WorkID)}', '${esc(w.WorkCode||w.WorkID)}', '${esc((w.TitleTH||w.TitleEN||'').replace(/['\"\\`]/g, ' '))}')"><i class="fa-solid fa-trash-can"></i></button>
-        ${(w.files||[]).sort((a,b)=>{
-          const wa = (a.FileCategory||'').includes('PRESENT') ? 2 : (a.FileCategory==='BLIND' ? 1 : 0);
-          const wb = (b.FileCategory||'').includes('PRESENT') ? 2 : (b.FileCategory==='BLIND' ? 1 : 0);
-          return wa - wb;
-        }).map(f=>{
-          let t = f.FileCategory, i = 'fa-file-pdf';
-          if(t==='BLIND'){ t='ไฟล์ปกปิดชื่อ (Blind)'; i='fa-user-secret'; }
-          else if(t==='PRESENTER_BIO'){ t='ประวัติผู้นำเสนอ (Bio)'; i='fa-address-card'; }
-          else if((t||'').includes('PRESENT')){ t='ไฟล์นำเสนอ'; i='fa-display'; }
-          else{ t='ไฟล์ต้นฉบับ ('+t+')'; if(t==='WORD') i='fa-file-word'; }
-          return `<a target="_blank" href="${esc(f.FileUrl)}" class="btn btn-soft btn-sm" title="${t}"><i class="fa-solid ${i}"></i></a>`;
-        }).join('')}
-      </td>
-    </tr>`;
-    }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+    window.WORK_ROWS = rows || [];
+    renderWorkRows();
   }finally{
     hide();
   }
