@@ -194,86 +194,10 @@ function installDirectAccessGuard(){
 function canonicalRoute(page){const routes={public:'/',admin:'/admin',reviewer:'/reviewer',scanner:'/scanner',launcher:'/launcher'};const target=routes[page||'public']||'/';return target+'?conferenceId='+encodeURIComponent(CID)}
 window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
-const $=s=>document.querySelector(s);
-async function rpc(n,...a){
-  const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet|loginUser|reviewerBootstrap|adminBootstrap|getEventScannerBootstrap|getPublicBootstrap)/.test(n)?3:1;
-  let lastErr=null;
-  for(let attempt=0;attempt<maxRetries;attempt++){
-    if(attempt>0){
-      if(typeof show==='function') show(`กำลังเชื่อมต่อระบบส่วนกลาง (พยายามใหม่ครั้งที่ ${attempt+1})...`);
-      await new Promise(r=>setTimeout(r,attempt*800+Math.floor(Math.random()*300)));
-    }
-    try{
-      const response=await fetch('/api/gas',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})
-      });
-      let result;
-      try{
-        const text=await response.text();
-        result=JSON.parse(text);
-      }catch(e){
-        throw new Error('การตอบกลับจากระบบไม่ถูกต้อง');
-      }
-      if(response.status===401){
-        localStorage.removeItem('tuhReviewerToken');
-        sessionStorage.removeItem('tuhReviewerToken');
-        TOKEN='';
-        $('#appView').classList.add('hidden');
-        $('#loginView').classList.remove('hidden');
-        throw new Error(result.message||'Session หมดอายุ กรุณาเข้าสู่ระบบใหม่');
-      }
-      if(!response.ok||!result.success){
-        throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
-      }
-      return result.data;
-    }catch(err){
-      lastErr=err;
-      if(attempt+1>=maxRetries)throw err;
-    }
-  }
-  throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
-}
-function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
-function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}
-function hide(){$('#loading').classList.remove('show')}
-function togglePassword(){const e=$('#loginPassword'),showing=e.type==='text';e.type=showing?'password':'text';document.querySelector('.eye').textContent=showing?'👁':'🙈'}
-function loadCreds(){try{const username=localStorage.getItem(CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
-function saveCreds(){if($('#rememberLogin').checked)localStorage.setItem(CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(CRED_KEY)}
-function storedToken(){try{const t=localStorage.getItem('tuhReviewerToken')||sessionStorage.getItem('tuhReviewerToken')||'';return(t&&t!=='__COOKIE__')?t:'';}catch(e){return '';}}
-function storeToken(t){try{if(t&&t!=='__COOKIE__'){localStorage.setItem('tuhReviewerToken',t);sessionStorage.setItem('tuhReviewerToken',t);}}catch(e){}}
-$('#loginForm').onsubmit=async e=>{
-  e.preventDefault();
-  const username=$('#loginUser').value.trim();
-  const password=$('#loginPassword').value;
-  if(!username||!password){
-    Swal.fire({icon:'warning',title:'กรุณากรอก Username/Email และรหัสผ่าน',confirmButtonColor:'#006D70'});
-    return;
-  }
-  show('กำลังเข้าสู่ระบบ...');
-  try{
-    const r=await rpc('loginUser',username,password,CID,navigator.userAgent);
-    if(r.role!=='REVIEWER')throw new Error('บัญชีนี้ไม่มีสิทธิ์ Reviewer (สิทธิ์ปัจจุบัน: '+(r.role||'ไม่มี')+')');
-    TOKEN=r.token;
-    saveCreds();
-    storeToken(TOKEN);
-    await boot();
-  }catch(e){
-    hide();
-    Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message||'ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง',confirmButtonColor:'#006D70'});
-  }
-};
-async function boot(){
-  BOOT=await rpc('reviewerBootstrap',TOKEN,CID);
-  $('#loginView').classList.add('hidden');
-  $('#appView').classList.remove('hidden');
-  $('#confName').textContent=BOOT.conference?.ConferenceNameTH||'งานประชุมวิชาการ TUH';
-  $('#reviewerName').textContent=BOOT.reviewer?.FullName||BOOT.reviewer?.Email||'Reviewer';
-  renderAll();
-  hide();
-}
+const $=s=>document.querySelector(s);async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$ ('#loading').classList.remove('show')}function togglePassword(){const e=$('#loginPassword'),showing=e.type==='text';e.type=showing?'password':'text';document.querySelector('.eye').textContent=showing?'👁':'🙈'}
+function loadCreds(){try{const username=localStorage.getItem(CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}function saveCreds(){if($('#rememberLogin').checked)localStorage.setItem(CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(CRED_KEY)}function storedToken(){return '__COOKIE__'}function storeToken(){}
+$('#loginForm').onsubmit=async e=>{e.preventDefault();show('กำลังเข้าสู่ระบบ');try{const r=await rpc('loginUser',$('#loginUser').value,$('#loginPassword').value,CID,navigator.userAgent);if(r.role!=='REVIEWER')throw new Error('บัญชีนี้ไม่มีสิทธิ์ Reviewer');TOKEN=r.token;saveCreds();storeToken(TOKEN);await boot()}catch(e){hide();Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message})}};
+async function boot(){BOOT=await rpc('reviewerBootstrap',TOKEN,CID);$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#confName').textContent='TUH 19 & HA-Regional 1';$('#reviewerName').textContent=BOOT.reviewer.FullName||BOOT.reviewer.Email;renderAll();hide()}
 function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); }
 function statusBadge(s){const c=s==='COMPLETE'?'ok':(s==='PASS'?'ok':'warn');return `<span class="badge ${c}">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
 let currentFilter = 'all';
@@ -281,56 +205,218 @@ function renderAssignments(){const a=BOOT.assignments||[],complete=a.filter(x=>x
 function renderAssignmentsGrid(){const grid=$('#assignmentGrid');if(!grid)return;const a=BOOT.assignments||[],search=($('#searchAssignment').value||'').toLowerCase();const filtered=a.filter(x=>{if(currentFilter==='pending'&&x.Status==='COMPLETE')return false;if(currentFilter==='completed'&&x.Status!=='COMPLETE')return false;if(search){const txt=`${x.WorkCode} ${x.TitleTH}`.toLowerCase();if(!txt.includes(search))return false}return true});if(filtered.length===0){grid.innerHTML=`<div class="kanban-empty">ไม่พบผลงานที่ตรงกับเงื่อนไข</div>`;return}grid.innerHTML=filtered.map(x=>`<div class="kanban-card" onclick="openAssignment('${esc(x.AssignmentID)}')"><div class="kanban-header"><div class="kanban-code"># ${esc(x.WorkCode)}</div><div class="kanban-score">${esc(x.TotalScore||'-')}</div></div><div class="kanban-title">${esc(x.TitleTH||'-')}</div><div class="kanban-meta"><span>📅 มอบหมาย: ${esc(formatDate(x.AssignedAt))}</span></div><div class="kanban-badges">${statusBadge(x.Status)}${x.Decision?statusBadge(x.Decision):''}${x.WorkStatus?statusBadge(x.WorkStatus):''}</div></div>`).join('');}
 document.addEventListener('click',e=>{const tab=e.target.closest('.filter-tab');if(tab){document.querySelectorAll('.filter-tab').forEach(el=>el.classList.remove('active'));tab.classList.add('active');currentFilter=tab.dataset.filter;renderAssignmentsGrid()}});
 async function openAssignment(id){show('กำลังเปิดผลงาน');try{CURRENT=await rpc('reviewerGetAssignment',TOKEN,CID,id);hide();renderReview()}catch(e){hide();Swal.fire({icon:'error',title:'เปิดผลงานไม่ได้',text:e.message})}}
-const MAIN_CATEGORIES_DEF = [
-  { id: 1, name: 'บทนำ/วัตถุประสงค์', maxScore: 10, items: [1, 2] },
-  { id: 2, name: 'วิธีดำเนินการ', maxScore: 30, items: [3, 4] },
-  { id: 3, name: 'ผลการศึกษา/ผลลัพธ์', maxScore: 30, items: [5] },
-  { id: 4, name: 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', maxScore: 20, items: [6, 7] },
-  { id: 5, name: 'การใช้ประโยชน์', maxScore: 10, items: [8] }
-];
-
-function getCategoryForCriterion(c) {
-  const itemNo = Number(c.ItemNo) || 0;
-  const desc = String(c.DescriptionTH || '').trim();
-  for (const cat of MAIN_CATEGORIES_DEF) {
-    if (desc && (desc.includes(cat.name) || cat.name.includes(desc))) return cat;
-    if (cat.items.includes(itemNo)) return cat;
+// --- Dynamic Scoring Criteria Definitions ---
+const CRITERIA_MODELS = {
+  RESEARCH_INNOVATION: {
+    type: 'RESEARCH_INNOVATION',
+    name: 'เกณฑ์ให้คะแนนประเภทผลงานวิจัย-นวัตกรรมด้านคุณภาพและความปลอดภัย',
+    description: 'สำหรับผลงานวิจัยและนวัตกรรมด้านคุณภาพและความปลอดภัย (7 หัวข้อ รวมเต็ม 100 คะแนน)',
+    maxScore: 100,
+    items: [
+      {
+        id: '1',
+        itemNo: 1,
+        name: 'ชื่อเรื่อง',
+        desc: 'ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
+        maxScore: 5
+      },
+      {
+        id: '2',
+        itemNo: 2,
+        name: 'บทคัดย่อ',
+        desc: 'ครอบคลุม ข้อมูลภูมิหลัง วัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
+        maxScore: 15
+      },
+      {
+        id: '3',
+        itemNo: 3,
+        name: 'บทนำ',
+        desc: 'มีข้อมูลภูมิหลังที่ชัดเจน - ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุถึงวัตถุประสงค์ของการวิจัยที่ชัดเจน',
+        maxScore: 10
+      },
+      {
+        id: '4',
+        itemNo: 4,
+        name: 'ระเบียบวิธีวิจัย / วิธีการพัฒนานวัตกรรม',
+        desc: 'ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม (กรณีสิ่งประดิษฐ์/นวัตกรรม: มีความสมเหตุสมผล สอดรับองค์ความรู้ แสดงความคิดริเริ่ม ต่อยอดได้น่าสนใจ มีการปฏิบัติจริงและรายงานผลการใช้งานเบื้องต้น)',
+        maxScore: 20
+      },
+      {
+        id: '5',
+        itemNo: 5,
+        name: 'ผลการวิจัย / ผลการศึกษา',
+        desc: 'สอดคล้องกับวัตถุประสงค์ - นำเสนอผลการวิจัย/ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้',
+        maxScore: 20
+      },
+      {
+        id: '6',
+        itemNo: 6,
+        name: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
+        desc: 'มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัยและข้อเสนอแนะ',
+        maxScore: 20
+      },
+      {
+        id: '7',
+        itemNo: 7,
+        name: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพและความปลอดภัย',
+        desc: 'แสดงการนำผลงานวิจัยหรือนวัตกรรมไปใช้ประโยชน์เพื่อพัฒนาระบบคุณภาพและความปลอดภัย',
+        maxScore: 10
+      }
+    ]
+  },
+  SERVICE_CQI_PRIMARY: {
+    type: 'SERVICE_CQI_PRIMARY',
+    name: 'เกณฑ์การให้คะแนนประเภท Service - CQI - Primary Care',
+    description: 'สำหรับ Service Excellence, CQI/Best Practice และ Primary Care (6 หัวข้อหลัก รวมเต็ม 100 คะแนน)',
+    maxScore: 100,
+    items: [
+      {
+        id: '1',
+        itemNo: 1,
+        name: 'มีการทบทวนสถานการณ์ / ปัญหา / จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
+        desc: 'ทบทวนสถานการณ์ ระบุปัญหา ผลกระทบ และกลุ่มเป้าหมาย',
+        maxScore: 10,
+        subitems: [
+          { id: '1.1', itemNo: '1.1', name: 'มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร', maxScore: 5 },
+          { id: '1.2', itemNo: '1.2', name: 'มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร', maxScore: 5 }
+        ]
+      },
+      {
+        id: '2',
+        itemNo: 2,
+        name: 'มีเป้าหมายที่ชัดเจน',
+        desc: 'เป้าหมายสอดคล้องกับปัญหาและระบุจุดเน้นผลลัพธ์',
+        maxScore: 10,
+        subitems: [
+          { id: '2.1', itemNo: '2.1', name: 'มีการระบุเป้าหมายที่สอดคล้องกับปัญหา', maxScore: 5 },
+          { id: '2.2', itemNo: '2.2', name: 'มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร', maxScore: 5 }
+        ]
+      },
+      {
+        id: '3',
+        itemNo: 3,
+        name: 'กิจกรรมการพัฒนา',
+        desc: 'แนวคิดและวิธีการสำคัญในการดำเนินกิจกรรมการพัฒนา',
+        maxScore: 30,
+        subitems: [
+          { id: '3.1', itemNo: '3.1', name: 'มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง', maxScore: 10 },
+          { id: '3.2', itemNo: '3.2', name: 'มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง', maxScore: 20 }
+        ]
+      },
+      {
+        id: '4',
+        itemNo: 4,
+        name: 'การประเมินผลการเปลี่ยนแปลง',
+        desc: 'การประเมินเชิงปริมาณ/คุณภาพ และประสิทธิผลการแก้ปัญหา',
+        maxScore: 25,
+        subitems: [
+          { id: '4.1', itemNo: '4.1', name: 'มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ', maxScore: 10 },
+          { id: '4.2', itemNo: '4.2', name: 'มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด', maxScore: 15 }
+        ]
+      },
+      {
+        id: '5',
+        itemNo: 5,
+        name: 'บทเรียนที่ได้รับ',
+        desc: 'ข้อสรุปหลักการและข้อสังเกต/ข้อเสนอแนะในการนำไปประยุกต์ใช้',
+        maxScore: 20,
+        subitems: [
+          { id: '5.1', itemNo: '5.1', name: 'มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ', maxScore: 10 },
+          { id: '5.2', itemNo: '5.2', name: 'มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น', maxScore: 10 }
+        ]
+      },
+      {
+        id: '6',
+        itemNo: 6,
+        name: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
+        desc: 'ความถูกต้องตามข้อกำหนดและการเรียงลำดับเนื้อหา',
+        maxScore: 5,
+        subitems: [
+          { id: '6.1', itemNo: '6.1', name: 'ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ', maxScore: 2.5 },
+          { id: '6.2', itemNo: '6.2', name: 'การเรียบเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด', maxScore: 2.5 }
+        ]
+      }
+    ]
   }
-  return { id: 99, name: desc || 'หมวดอื่น ๆ', maxScore: Number(c.MaxScore) || 0, items: [itemNo] };
+};
+
+function detectWorkCriteriaType(work) {
+  if (!work) return 'RESEARCH_INNOVATION';
+  const raw = [
+    work.CategoryID,
+    work.CategoryName,
+    work.Category,
+    work.WorkCategory,
+    work.PresentationCategory,
+    work.PresentationType,
+    work.TitleTH,
+    work.TitleEN
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (
+    raw.includes('service') || 
+    raw.includes('cqi') || 
+    raw.includes('primary') || 
+    raw.includes('best practice') ||
+    raw.includes('ปฐมภูมิ') ||
+    raw.includes('บริการ') ||
+    raw.includes('พัฒนาคุณภาพ')
+  ) {
+    if ((raw.includes('วิจัย') || raw.includes('นวัตกรรม') || raw.includes('research') || raw.includes('innovation')) && !raw.includes('cqi') && !raw.includes('service') && !raw.includes('primary')) {
+      return 'RESEARCH_INNOVATION';
+    }
+    return 'SERVICE_CQI_PRIMARY';
+  }
+
+  if (raw.includes('วิจัย') || raw.includes('นวัตกรรม') || raw.includes('research') || raw.includes('innovation')) {
+    return 'RESEARCH_INNOVATION';
+  }
+
+  return 'SERVICE_CQI_PRIMARY';
+}
+
+function getActiveCriteriaSchema(work) {
+  const type = detectWorkCriteriaType(work);
+  return CRITERIA_MODELS[type] || CRITERIA_MODELS.RESEARCH_INNOVATION;
 }
 
 function updateLiveReviewScores() {
   const form = $('#reviewForm');
-  if (!form || !CURRENT || !CURRENT.criteria) return;
-  const critList = CURRENT.criteria || [];
-  
-  const catSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 99: 0 };
-  let grandTotal = 0;
-  
-  critList.forEach(c => {
-    const input = form.elements['score_' + c.CriteriaID];
-    if (input) {
-      let val = parseFloat(input.value);
-      if (isNaN(val) || val < 0) val = 0;
-      const max = Number(c.MaxScore) || 0;
-      if (val > max) {
-        val = max;
-        input.value = max;
-      }
-      const cat = getCategoryForCriterion(c);
-      catSums[cat.id] = (catSums[cat.id] || 0) + val;
-      grandTotal += val;
-    }
-  });
-  
+  if (!form || !CURRENT) return;
+  const schema = getActiveCriteriaSchema(CURRENT.work);
   const fmt = n => (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
   
-  MAIN_CATEGORIES_DEF.forEach(cat => {
-    const scoreVal = fmt(catSums[cat.id] || 0);
+  let grandTotal = 0;
+  
+  schema.items.forEach(cat => {
+    let catTotal = 0;
+    if (cat.subitems && cat.subitems.length > 0) {
+      cat.subitems.forEach(sub => {
+        const inp = form.elements['score_' + sub.id];
+        if (inp) {
+          let val = parseFloat(inp.value);
+          if (isNaN(val) || val < 0) val = 0;
+          if (val > sub.maxScore) { val = sub.maxScore; inp.value = sub.maxScore; }
+          catTotal += val;
+        }
+      });
+      const subTotalBadge = $(`#cat_subtotal_${cat.id}`);
+      if (subTotalBadge) subTotalBadge.textContent = `${fmt(catTotal)} / ${cat.maxScore} คะแนน`;
+    } else {
+      const inp = form.elements['score_' + cat.id];
+      if (inp) {
+        let val = parseFloat(inp.value);
+        if (isNaN(val) || val < 0) val = 0;
+        if (val > cat.maxScore) { val = cat.maxScore; inp.value = cat.maxScore; }
+        catTotal += val;
+      }
+    }
+    
     const pill = $(`#cat_pill_${cat.id}`);
-    if (pill) pill.textContent = `${scoreVal} / ${cat.maxScore} คะแนน`;
+    if (pill) pill.textContent = `${fmt(catTotal)} / ${cat.maxScore} คะแนน`;
     const summaryVal = $(`#summary_cat_${cat.id}`);
-    if (summaryVal) summaryVal.textContent = scoreVal;
+    if (summaryVal) summaryVal.textContent = fmt(catTotal);
+    grandTotal += catTotal;
   });
   
   const totalDisplay = $('#summary_total_score');
@@ -342,80 +428,112 @@ function updateLiveReviewScores() {
 function renderReview() {
   nav('assignments');
   const d = CURRENT, w = d.work, a = d.assignment, scoreMap = {};
-  (d.scores || []).forEach(x => scoreMap[x.CriteriaID] = x);
-  
-  const criteriaList = d.criteria || [];
-  const grouped = {};
-  MAIN_CATEGORIES_DEF.forEach(cat => grouped[cat.id] = { cat: cat, items: [] });
-  grouped[99] = { cat: { id: 99, name: 'หมวดอื่น ๆ', maxScore: 0, items: [] }, items: [] };
-  
-  criteriaList.forEach(c => {
-    const cat = getCategoryForCriterion(c);
-    if (!grouped[cat.id]) {
-      grouped[cat.id] = { cat: cat, items: [] };
-    }
-    grouped[cat.id].items.push(c);
+  (d.scores || []).forEach(x => {
+    const k = String(x.CriteriaID || x.ItemNo || '');
+    scoreMap[k] = x;
   });
   
-  let initTotal = 0;
-  const initCatSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 99: 0 };
-  criteriaList.forEach(c => {
-    const old = scoreMap[c.CriteriaID] || {};
-    const sc = Number(old.Score) || 0;
-    const cat = getCategoryForCriterion(c);
-    initCatSums[cat.id] = (initCatSums[cat.id] || 0) + sc;
-    initTotal += sc;
-  });
-  
+  const schema = getActiveCriteriaSchema(w);
   const fmt = n => (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
   
+  let initGrandTotal = 0;
+  const initCatTotals = {};
+  
+  schema.items.forEach(cat => {
+    let catScore = 0;
+    if (cat.subitems && cat.subitems.length > 0) {
+      cat.subitems.forEach(sub => {
+        const old = scoreMap[sub.id] || scoreMap[String(sub.itemNo)] || {};
+        const val = Number(old.Score) || 0;
+        catScore += val;
+      });
+    } else {
+      const old = scoreMap[cat.id] || scoreMap[String(cat.itemNo)] || {};
+      catScore = Number(old.Score) || 0;
+    }
+    initCatTotals[cat.id] = catScore;
+    initGrandTotal += catScore;
+  });
+  
   let categoriesHtml = '';
-  MAIN_CATEGORIES_DEF.forEach(cat => {
-    const group = grouped[cat.id];
-    if (!group || group.items.length === 0) return;
+  schema.items.forEach(cat => {
+    let contentHtml = '';
+    const catScoreStr = fmt(initCatTotals[cat.id] || 0);
     
-    const catScoreStr = fmt(initCatSums[cat.id] || 0);
-    
-    const itemsHtml = group.items.map(c => {
-      const old = scoreMap[c.CriteriaID] || {};
-      const val = (old.Score !== undefined && old.Score !== null) ? old.Score : '';
-      return `
-        <div class="criterion-card">
-          <div class="criterion-title-row">
-            <div>
-              <b>ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH)}</b>
-              ${c.CriteriaNameEN ? `<div class="en" style="color:#758593; margin-top:2px;">${esc(c.CriteriaNameEN)}</div>` : ''}
+    if (cat.subitems && cat.subitems.length > 0) {
+      contentHtml = cat.subitems.map(sub => {
+        const old = scoreMap[sub.id] || scoreMap[String(sub.itemNo)] || {};
+        const val = (old.Score !== undefined && old.Score !== null) ? old.Score : '';
+        return `
+          <div class="criterion-card" style="margin-bottom:12px; background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+            <div class="criterion-title-row" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+              <div style="flex:1; padding-right:12px;">
+                <b style="color:var(--text)">หัวข้อย่อย ${esc(sub.itemNo)}: ${esc(sub.name)}</b>
+              </div>
+              <span class="criterion-max-badge" style="background:#e6fffa; color:#006D70; font-weight:700; padding:4px 10px; border-radius:8px; font-size:0.85rem; white-space:nowrap;">เต็ม ${esc(sub.maxScore)} คะแนน</span>
             </div>
-            <span class="criterion-max-badge">เต็ม ${esc(c.MaxScore)} คะแนน</span>
+            <div class="review-grid" style="display:grid; grid-template-columns:180px 1fr; gap:12px;">
+              <div class="field" style="margin:0">
+                <label style="font-size:0.85rem; font-weight:600">คะแนนที่ให้ (0 - ${esc(sub.maxScore)}) *</label>
+                <input type="number" min="0" max="${esc(sub.maxScore)}" step="0.5" 
+                       name="score_${esc(sub.id)}" 
+                       value="${esc(val)}" 
+                       oninput="updateLiveReviewScores()" 
+                       placeholder="0 - ${esc(sub.maxScore)}"
+                       required 
+                       style="font-weight:700; color:var(--teal); font-size:1.05rem; padding:8px 12px; border:2px solid #cbd5e1; border-radius:8px; width:100%;">
+              </div>
+              <div class="field" style="margin:0">
+                <label style="font-size:0.85rem">ข้อเสนอแนะเพิ่มเติม (ถ้ามี)</label>
+                <input type="text" name="comment_${esc(sub.id)}" value="${esc(old.Comment || '')}" placeholder="ระบุข้อเสนอแนะสำหรับข้อย่อยนี้ (ถ้ามี)" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%;">
+              </div>
+            </div>
           </div>
-          <div class="review-grid">
+        `;
+      }).join('');
+    } else {
+      const old = scoreMap[cat.id] || scoreMap[String(cat.itemNo)] || {};
+      const val = (old.Score !== undefined && old.Score !== null) ? old.Score : '';
+      contentHtml = `
+        <div class="criterion-card" style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+          <div class="criterion-title-row" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+            <div style="flex:1; padding-right:12px;">
+              <div style="color:#475569; font-size:0.9rem; line-height:1.5;">${esc(cat.desc)}</div>
+            </div>
+            <span class="criterion-max-badge" style="background:#e6fffa; color:#006D70; font-weight:700; padding:4px 10px; border-radius:8px; font-size:0.85rem; white-space:nowrap;">เต็ม ${esc(cat.maxScore)} คะแนน</span>
+          </div>
+          <div class="review-grid" style="display:grid; grid-template-columns:180px 1fr; gap:12px;">
             <div class="field" style="margin:0">
-              <label style="font-size:0.85rem">คะแนนที่ให้ (0 - ${esc(c.MaxScore)}) *</label>
-              <input type="number" min="0" max="${esc(c.MaxScore)}" step="0.5" 
-                     name="score_${esc(c.CriteriaID)}" 
+              <label style="font-size:0.85rem; font-weight:600">คะแนนที่ให้ (0 - ${esc(cat.maxScore)}) *</label>
+              <input type="number" min="0" max="${esc(cat.maxScore)}" step="0.5" 
+                     name="score_${esc(cat.id)}" 
                      value="${esc(val)}" 
                      oninput="updateLiveReviewScores()" 
-                     placeholder="ระบุคะแนน (เต็ม ${esc(c.MaxScore)})"
+                     placeholder="0 - ${esc(cat.maxScore)}"
                      required 
-                     style="font-weight:600; color:var(--teal)">
+                     style="font-weight:700; color:var(--teal); font-size:1.05rem; padding:8px 12px; border:2px solid #cbd5e1; border-radius:8px; width:100%;">
             </div>
             <div class="field" style="margin:0">
-              <label style="font-size:0.85rem">ข้อเสนอแนะเฉพาะข้อนี้ (ถ้ามี)</label>
-              <textarea name="comment_${esc(c.CriteriaID)}" placeholder="ระบุความคิดเห็น/ข้อเสนอแนะเพิ่มเติมสำหรับข้อนี้">${esc(old.Comment || '')}</textarea>
+              <label style="font-size:0.85rem">ข้อเสนอแนะเพิ่มเติม (ถ้ามี)</label>
+              <input type="text" name="comment_${esc(cat.id)}" value="${esc(old.Comment || '')}" placeholder="ระบุข้อเสนอแนะสำหรับข้อนี้ (ถ้ามี)" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; width:100%;">
             </div>
           </div>
         </div>
       `;
-    }).join('');
+    }
     
     categoriesHtml += `
-      <div class="category-section">
-        <div class="category-header">
-          <h3>หมวดที่ ${cat.id}: ${esc(cat.name)} (เต็ม ${cat.maxScore} คะแนน)</h3>
-          <span class="cat-pill" id="cat_pill_${cat.id}">${catScoreStr} / ${cat.maxScore} คะแนน</span>
+      <div class="category-section" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:16px;">
+        <div class="category-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+          <h3 style="margin:0; font-size:1.05rem; color:#1e293b;">
+            ข้อ ${cat.itemNo}. ${esc(cat.name)}
+          </h3>
+          <span class="cat-pill" id="cat_pill_${cat.id}" style="background:#006D70; color:#fff; padding:4px 10px; border-radius:8px; font-weight:700; font-size:0.85rem;">
+            ${catScoreStr} / ${cat.maxScore} คะแนน
+          </span>
         </div>
         <div class="category-body">
-          ${itemsHtml}
+          ${contentHtml}
         </div>
       </div>
     `;
@@ -424,11 +542,20 @@ function renderReview() {
   $('#reviewHost').innerHTML = `
     <div class="card" style="margin-top:14px">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-        <div>
-          <h2 style="margin:0 0 6px 0">${esc(w.WorkCode)} — ${esc(w.TitleTH)}</h2>
-          <div style="font-size:0.85rem; color:#667a88">แบบประเมินผลงานวิชาการ (เกณฑ์ 5 หัวข้อหลัก 8 หัวข้อย่อย รวมเต็ม 100 คะแนน)</div>
+        <div style="max-width:70%;">
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+            <span class="pill" style="background:#006D70; color:#fff; font-weight:bold; font-size:0.9rem;"># ${esc(w.WorkCode)}</span>
+            <span class="pill" style="background:#e0f2fe; color:#0369a1; font-weight:600; font-size:0.85rem;">${esc(w.CategoryName||w.Category||w.WorkCategory||'ผลงานวิชาการ')}</span>
+          </div>
+          <h2 style="margin:0 0 6px 0; font-size:1.35rem; line-height:1.4;">${esc(w.TitleTH || w.TitleEN)}</h2>
+          <div style="font-size:0.88rem; color:#006D70; font-weight:600;">
+            <i class="fa-solid fa-list-check"></i> ${esc(schema.name)}
+          </div>
         </div>
-        <div class="actions" style="margin:0">
+        <div class="actions" style="margin:0; display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn soft" onclick="printIndividualScoreSheet('${esc(a.AssignmentID)}')">
+            <i class="fa-solid fa-print"></i> 🖨️ พิมพ์ใบคะแนนผลงานนี้
+          </button>
           ${(() => {
             let b = 0;
             return (d.files || []).sort((x,y) => new Date(x.UploadedAt||x.CreatedAt||0) - new Date(y.UploadedAt||y.CreatedAt||0)).map(f => {
@@ -444,23 +571,23 @@ function renderReview() {
       <div class="live-summary-card">
         <div class="live-summary-top">
           <div class="live-summary-title">
-            <span>📊 สรุปคะแนนประเมินสด (Live Score)</span>
+            <span>📊 สรุปคะแนนประเมินสด (Live Score) — ${esc(schema.name)}</span>
           </div>
           <div class="live-total-score-badge">
             <span style="font-size:1rem">คะแนนรวม:</span>
-            <b id="summary_total_score">${fmt(initTotal)}</b>
+            <b id="summary_total_score">${fmt(initGrandTotal)}</b>
             <span>/ 100 คะแนน</span>
           </div>
         </div>
         <div class="score-progress-bar-bg">
-          <div class="score-progress-bar-fill" id="summary_score_bar" style="width:${Math.min(100, Math.max(0, initTotal))}%"></div>
+          <div class="score-progress-bar-fill" id="summary_score_bar" style="width:${Math.min(100, Math.max(0, initGrandTotal))}%"></div>
         </div>
         <div class="live-summary-grid">
-          ${MAIN_CATEGORIES_DEF.map(cat => `
+          ${schema.items.map(cat => `
             <div class="live-cat-box">
-              <div class="cat-label">${cat.id}. ${esc(cat.name)}</div>
+              <div class="cat-label">ข้อ ${cat.itemNo}. ${esc(cat.name)}</div>
               <div class="cat-val">
-                <span id="summary_cat_${cat.id}">${fmt(initCatSums[cat.id] || 0)}</span>
+                <span id="summary_cat_${cat.id}">${fmt(initCatTotals[cat.id] || 0)}</span>
                 <span style="font-size:0.75rem; font-weight:400; opacity:0.8">/${cat.maxScore}</span>
               </div>
             </div>
@@ -494,7 +621,10 @@ function renderReview() {
           </div>
         </div>
 
-        <div class="actions" style="justify-content:flex-end; margin-top:20px; gap:12px;">
+        <div class="actions" style="justify-content:flex-end; margin-top:20px; gap:12px; flex-wrap:wrap;">
+          <button type="button" class="btn soft" style="padding:12px 20px" onclick="printIndividualScoreSheet('${esc(a.AssignmentID)}')">
+            <i class="fa-solid fa-print"></i> พิมพ์ใบคะแนน
+          </button>
           <button type="button" class="btn soft" style="padding:12px 20px" onclick="saveReview(false)">💾 บันทึกร่าง (Draft)</button>
           <button type="button" class="btn primary" style="padding:12px 24px" onclick="saveReview(true)">🚀 ยืนยันส่งผลประเมิน (Submit)</button>
         </div>
@@ -507,52 +637,104 @@ function renderReview() {
 async function saveReview(submit) {
   const f = $('#reviewForm');
   if (!f) return;
-  const critList = CURRENT.criteria || [];
+  const schema = getActiveCriteriaSchema(CURRENT.work);
   const missing = [];
   let totalEntered = 0;
+  const scores = [];
   
-  const scores = critList.map(c => {
-    const input = f.elements['score_' + c.CriteriaID];
-    const rawVal = input ? input.value : '';
-    if (submit && (rawVal === '' || isNaN(parseFloat(rawVal)))) {
-      missing.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH}`);
+  schema.items.forEach(cat => {
+    if (cat.subitems && cat.subitems.length > 0) {
+      let catSum = 0;
+      cat.subitems.forEach(sub => {
+        const input = f.elements['score_' + sub.id];
+        const rawVal = input ? input.value : '';
+        const comment = f.elements['comment_' + sub.id] ? f.elements['comment_' + sub.id].value : '';
+        if (rawVal === '' || isNaN(parseFloat(rawVal))) {
+          if (submit) missing.push(`ข้อ ${sub.itemNo} (${sub.name})`);
+        } else {
+          const val = Math.max(0, Math.min(sub.maxScore, parseFloat(rawVal)));
+          catSum += val;
+          scores.push({
+            CriteriaID: sub.id,
+            ItemNo: sub.itemNo,
+            CriteriaNameTH: sub.name,
+            Score: val,
+            MaxScore: sub.maxScore,
+            Comment: comment
+          });
+        }
+      });
+      totalEntered += catSum;
+      scores.push({
+        CriteriaID: cat.id,
+        ItemNo: cat.itemNo,
+        CriteriaNameTH: cat.name,
+        Score: catSum,
+        MaxScore: cat.maxScore,
+        Comment: ''
+      });
+    } else {
+      const input = f.elements['score_' + cat.id];
+      const rawVal = input ? input.value : '';
+      const comment = f.elements['comment_' + cat.id] ? f.elements['comment_' + cat.id].value : '';
+      if (rawVal === '' || isNaN(parseFloat(rawVal))) {
+        if (submit) missing.push(`ข้อ ${cat.itemNo} (${cat.name})`);
+      } else {
+        const val = Math.max(0, Math.min(cat.maxScore, parseFloat(rawVal)));
+        totalEntered += val;
+        scores.push({
+          CriteriaID: cat.id,
+          ItemNo: cat.itemNo,
+          CriteriaNameTH: cat.name,
+          Score: val,
+          MaxScore: cat.maxScore,
+          Comment: comment
+        });
+      }
     }
-    const sc = parseFloat(rawVal) || 0;
-    totalEntered += sc;
-    return {
-      CriteriaID: c.CriteriaID,
-      Score: rawVal,
-      Comment: f.elements['comment_' + c.CriteriaID] ? f.elements['comment_' + c.CriteriaID].value : ''
-    };
   });
-  
-  if (submit && missing.length > 0) {
-    return Swal.fire({
-      icon: 'warning',
-      title: 'กรุณากรอกคะแนนให้ครบทุกข้อ',
-      html: `<div style="text-align:left; font-size:0.9rem;">พบหัวข้อที่ยังไม่ได้ให้คะแนน:<br><ul style="margin:5px 0 0 20px; color:#b42318">${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
-    });
+
+  const decision = (f.elements['Decision'] ? f.elements['Decision'].value : '').trim();
+  const rec = (f.elements['RecommendationToAuthor'] ? f.elements['RecommendationToAuthor'].value : '').trim();
+  const intComm = (f.elements['InternalComment'] ? f.elements['InternalComment'].value : '').trim();
+
+  if (submit) {
+    if (missing.length > 0) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'กรอกคะแนนไม่ครบถ้วน',
+        html: `<div style="text-align:left; font-size:0.9rem;">พบหัวข้อที่ยังไม่ได้ให้คะแนน:<br><ul style="margin:5px 0 0 20px; color:#b42318">${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
+      });
+    }
+    if (!decision) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'ยังไม่ได้เลือกผลการประเมิน',
+        text: 'กรุณาเลือกผลการประเมินภาพรวม (ผ่าน / ปรับปรุง / ไม่ผ่าน)'
+      });
+    }
   }
-  
+
   const payload = {
     Scores: scores,
-    Decision: f.elements.Decision.value,
-    RecommendationToAuthor: f.elements.RecommendationToAuthor.value,
-    InternalComment: f.elements.InternalComment.value
+    scores: scores,
+    criteriaType: schema.type,
+    Decision: decision,
+    RecommendationToAuthor: rec,
+    InternalComment: intComm,
+    TotalScore: totalEntered
   };
-  
-  if (submit && !payload.Decision) {
-    return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกผลการประเมิน (ผ่าน / แก้ไข / ไม่ผ่าน)' });
-  }
-  
+
   if (submit) {
     const x = await Swal.fire({
       icon: 'question',
       title: 'ยืนยันการส่งผลประเมิน?',
       html: `
         <div style="text-align:left; font-size:0.95rem;">
-          <p><b>คะแนนรวมสุทธิ: <span style="color:var(--teal); font-size:1.2rem">${totalEntered.toFixed(2).replace(/\.00$/,'')} / 100 คะแนน</span></b></p>
-          <p>ผลการประเมิน: <b>${payload.Decision === 'PASS' ? 'ผ่าน (PASS)' : payload.Decision === 'REVISION' ? 'แก้ไข (REVISION)' : 'ไม่ผ่าน (REJECT)'}</b></p>
+          <p><b>ผลงาน:</b> ${esc(CURRENT.work.WorkCode)} ${esc(CURRENT.work.TitleTH)}</p>
+          <p><b>เกณฑ์:</b> ${esc(schema.name)}</p>
+          <p><b>คะแนนรวม:</b> <span style="font-size:1.2rem; font-weight:bold; color:#006D70">${totalEntered.toFixed(2).replace(/\.00$/, '')}</span> / 100 คะแนน</p>
+          <p><b>ผลการประเมิน:</b> <b>${esc(decision)}</b></p>
           <p style="color:#b42318; font-size:0.85rem;">* หลังส่งผลแล้วข้อมูลจะถูกส่งเข้าสู่ระบบหลักทันที</p>
         </div>
       `,
@@ -580,6 +762,245 @@ async function saveReview(submit) {
     hide();
     Swal.fire({ icon: 'error', title: 'บันทึกไม่ได้', text: e.message });
   }
+}
+
+// Function to print individual score sheet for a reviewer assignment
+async function printIndividualScoreSheet(assignmentId) {
+  let data = CURRENT;
+  if (!data || !data.assignment || data.assignment.AssignmentID !== assignmentId) {
+    show('กำลังโหลดข้อมูลเพื่อพิมพ์ใบคะแนน');
+    try {
+      data = await rpc('reviewerGetAssignment', TOKEN, CID, assignmentId);
+      hide();
+    } catch(e) {
+      hide();
+      return Swal.fire({ icon:'error', title:'ไม่สามารถโหลดข้อมูลได้', text:e.message });
+    }
+  }
+
+  const w = data.work || {};
+  const a = data.assignment || {};
+  const rev = (BOOT && BOOT.reviewer) || {};
+  const schema = getActiveCriteriaSchema(w);
+  const scoreMap = {};
+  (data.scores || []).forEach(x => {
+    scoreMap[String(x.CriteriaID || x.ItemNo || '')] = x;
+  });
+
+  // Calculate live values if currently in the form
+  const form = $('#reviewForm');
+  if (form && CURRENT && CURRENT.assignment && CURRENT.assignment.AssignmentID === assignmentId) {
+    schema.items.forEach(cat => {
+      if (cat.subitems && cat.subitems.length > 0) {
+        cat.subitems.forEach(sub => {
+          const inp = form.elements['score_' + sub.id];
+          if (inp && inp.value !== '') {
+            scoreMap[sub.id] = { Score: parseFloat(inp.value), Comment: (form.elements['comment_' + sub.id] || {}).value || '' };
+          }
+        });
+      } else {
+        const inp = form.elements['score_' + cat.id];
+        if (inp && inp.value !== '') {
+          scoreMap[cat.id] = { Score: parseFloat(inp.value), Comment: (form.elements['comment_' + cat.id] || {}).value || '' };
+        }
+      }
+    });
+  }
+
+  let totalScore = 0;
+  const rowsHtml = schema.items.map(cat => {
+    if (cat.subitems && cat.subitems.length > 0) {
+      let subRows = '';
+      let catSum = 0;
+      cat.subitems.forEach(sub => {
+        const scObj = scoreMap[sub.id] || scoreMap[String(sub.itemNo)] || {};
+        const sc = (scObj.Score !== undefined && scObj.Score !== null && scObj.Score !== '') ? Number(scObj.Score) : '-';
+        if (sc !== '-') catSum += Number(sc);
+        subRows += `
+          <tr style="background:#ffffff;">
+            <td style="text-align:center; color:#64748b; font-size:11px;">${esc(sub.itemNo)}</td>
+            <td style="padding-left:18px; font-size:11px;">${esc(sub.name)}</td>
+            <td style="text-align:center; font-size:11px;">${esc(sub.maxScore)}</td>
+            <td style="text-align:center; font-weight:bold; color:#006D70; font-size:12px;">${esc(sc)}</td>
+            <td style="font-size:11px; color:#475569;">${esc(scObj.Comment || '-')}</td>
+          </tr>
+        `;
+      });
+      totalScore += catSum;
+      return `
+        <tr style="background:#f1f5f9; font-weight:bold;">
+          <td style="text-align:center;">${cat.itemNo}</td>
+          <td><b>${esc(cat.name)}</b></td>
+          <td style="text-align:center;">${cat.maxScore}</td>
+          <td style="text-align:center; color:#006D70; font-size:13px;">${catSum > 0 ? catSum : '-'}</td>
+          <td style="font-size:11px; color:#64748b;">(รวมหัวข้อย่อย)</td>
+        </tr>
+        ${subRows}
+      `;
+    } else {
+      const scObj = scoreMap[cat.id] || scoreMap[String(cat.itemNo)] || {};
+      const sc = (scObj.Score !== undefined && scObj.Score !== null && scObj.Score !== '') ? Number(scObj.Score) : '-';
+      if (sc !== '-') totalScore += Number(sc);
+      return `
+        <tr style="background:#ffffff;">
+          <td style="text-align:center; font-weight:bold;">${cat.itemNo}</td>
+          <td>
+            <b>${esc(cat.name)}</b>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">${esc(cat.desc)}</div>
+          </td>
+          <td style="text-align:center; font-weight:bold;">${cat.maxScore}</td>
+          <td style="text-align:center; font-weight:bold; color:#006D70; font-size:13px;">${esc(sc)}</td>
+          <td style="font-size:11px; color:#475569;">${esc(scObj.Comment || '-')}</td>
+        </tr>
+      `;
+    }
+  }).join('');
+
+  const decisionVal = (form && form.elements['Decision'] && form.elements['Decision'].value) || a.Decision || '-';
+  const recVal = (form && form.elements['RecommendationToAuthor'] && form.elements['RecommendationToAuthor'].value) || a.RecommendationToAuthor || '-';
+  const intCommVal = (form && form.elements['InternalComment'] && form.elements['InternalComment'].value) || a.InternalComment || '-';
+  const reviewerName = rev.FullName || rev.Email || 'ผู้ประเมินผลงานวิชาการ';
+  const printDate = new Date().toLocaleString('th-TH', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="th">
+    <head>
+      <meta charset="utf-8">
+      <title>ใบคะแนนผลงาน ${esc(w.WorkCode || '')}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+      <style>
+        body { font-family: 'Prompt', sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 25px; line-height: 1.5; }
+        .header { text-align: center; border-bottom: 2px solid #006D70; padding-bottom: 12px; margin-bottom: 16px; }
+        .header h1 { font-size: 16px; margin: 0 0 4px 0; color: #006D70; }
+        .header h2 { font-size: 13px; margin: 0 0 4px 0; color: #334155; font-weight: 600; }
+        .header .subtitle { font-size: 11px; color: #64748b; }
+        
+        .info-card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; background: #f8fafc; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+        .info-row { display: flex; font-size: 11.5px; }
+        .info-label { font-weight: bold; width: 120px; color: #475569; flex-shrink: 0; }
+        .info-val { color: #0f172a; flex: 1; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11.5px; }
+        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: middle; }
+        th { background: #e6fffa; color: #006D70; font-weight: 700; text-align: center; }
+        
+        .total-row { background: #006D70 !important; color: #ffffff !important; font-weight: bold; font-size: 13px; }
+        .total-row td { border-color: #004d4f; }
+        
+        .summary-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; background: #f8fafc; }
+        .decision-badge { display: inline-block; padding: 3px 12px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+        .decision-PASS { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .decision-REVISION { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+        .decision-REJECT { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+        .signature-box { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; }
+        .sig-block { text-align: center; font-size: 11.5px; }
+        .sig-line { border-bottom: 1px dotted #94a3b8; width: 220px; margin: 40px auto 8px auto; }
+        
+        @media print {
+          body { padding: 0; }
+          @page { margin: 1.2cm; size: A4; }
+          .no-print { display: none !important; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>The 19th TUH Quality Fair & The 1st HA Regional Forum 2026</h1>
+        <h2>แบบประเมินผลงานวิชาการ (รายผลงาน)</h2>
+        <div class="subtitle">${esc(schema.name)}</div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-grid">
+          <div class="info-row"><span class="info-label">รหัสผลงาน:</span><span class="info-val"><b># ${esc(w.WorkCode || '-')}</b></span></div>
+          <div class="info-row"><span class="info-label">ประเภทผลงาน:</span><span class="info-val">${esc(w.CategoryName || w.Category || w.WorkCategory || '-')}</span></div>
+          <div class="info-row" style="grid-column: span 2;"><span class="info-label">ชื่อผลงาน (TH):</span><span class="info-val"><b>${esc(w.TitleTH || '-')}</b></span></div>
+          ${w.TitleEN ? `<div class="info-row" style="grid-column: span 2;"><span class="info-label">ชื่อผลงาน (EN):</span><span class="info-val">${esc(w.TitleEN)}</span></div>` : ''}
+          <div class="info-row"><span class="info-label">ผู้ประเมิน:</span><span class="info-val">${esc(reviewerName)}</span></div>
+          <div class="info-row"><span class="info-label">วันที่ประเมิน/พิมพ์:</span><span class="info-val">${esc(printDate)}</span></div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 45px;">ลำดับ</th>
+            <th>เกณฑ์การพิจารณาคัดเลือก</th>
+            <th style="width: 75px;">คะแนนเต็ม</th>
+            <th style="width: 80px;">คะแนนที่ได้</th>
+            <th style="width: 220px;">ข้อเสนอแนะ / ความคิดเห็น</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+          <tr class="total-row">
+            <td colspan="2" style="text-align:right; padding-right:12px;">คะแนนรวมสุทธิ (Total Score)</td>
+            <td style="text-align:center;">100</td>
+            <td style="text-align:center; font-size:14px; color:#fff;">${totalScore > 0 ? totalScore : '-'}</td>
+            <td style="text-align:center; font-size:11px; color:#e2e8f0;">คะแนนรวมเต็ม 100 คะแนน</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="summary-box">
+        <div style="margin-bottom: 8px;">
+          <b>ผลการพิจารณาภาพรวม (Decision):</b>
+          <span class="decision-badge decision-${esc(decisionVal)}">${esc(decisionVal)}</span>
+        </div>
+        <div style="margin-bottom: 8px;">
+          <b>ข้อเสนอแนะถึงผู้ส่งผลงาน (Recommendation to Author):</b>
+          <div style="margin-top:4px; padding:6px 10px; background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; min-height:30px;">
+            ${esc(recVal)}
+          </div>
+        </div>
+        ${intCommVal && intCommVal !== '-' ? `
+          <div>
+            <b>ความเห็นภายในถึงคณะกรรมการ (Internal Comment):</b>
+            <div style="margin-top:4px; padding:6px 10px; background:#ffffff; border:1px solid #e2e8f0; border-radius:6px;">
+              ${esc(intCommVal)}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="signature-box">
+        <div class="sig-block">
+          <div class="sig-line"></div>
+          <div>ลงชื่อ ........................................................... ผู้ประเมิน</div>
+          <div style="margin-top:4px;">( ${esc(reviewerName)} )</div>
+          <div style="color:#64748b; font-size:10.5px; margin-top:2px;">วันที่ ........ / ........ / ................</div>
+        </div>
+        <div class="sig-block">
+          <div class="sig-line"></div>
+          <div>ลงชื่อ ........................................................... ประธาน/กรรมการวิชาการ</div>
+          <div style="margin-top:4px;">( ........................................................... )</div>
+          <div style="color:#64748b; font-size:10.5px; margin-top:2px;">วันที่ ........ / ........ / ................</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; margin-top:25px;" class="no-print">
+        <button onclick="window.print()" style="padding:10px 24px; background:#006D70; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">
+          🖨️ คลิกเพื่อพิมพ์ใบคะแนนนี้
+        </button>
+      </div>
+
+      <script>
+        window.onload = () => {
+          setTimeout(() => { window.print(); }, 500);
+        };
+      <\/script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+function printAssignmentScoreSheet(assignmentId) {
+  printIndividualScoreSheet(assignmentId);
 }
 async function refreshData() { show('กำลังดึงข้อมูล'); try { BOOT = await rpc('reviewerBootstrap', TOKEN, CID); renderAll(); hide(); Swal.fire({icon:'success', title:'รีเฟรชข้อมูลเรียบร้อย', timer:1500, showConfirmButton:false}); } catch(e) { hide(); Swal.fire({icon:'error', title:'ผิดพลาด', text:e.message}); } }
 function renderDashboard() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pass=a.filter(x=>x.Decision==='PASS').length, rev=a.filter(x=>x.Decision==='REVISION'||x.Decision==='REJECT').length, pct=(v)=>tot?Math.round(v*100/tot)+'%':'0%'; $('#dashboard-kpis').innerHTML=`<div class="dash-kpi-card"><div class="dash-kpi-title">ได้รับมอบหมาย</div><div class="dash-kpi-value" style="color:var(--blue)">${tot}</div><div class="dash-kpi-sub">${tot?'100%':'0%'}</div><div class="dash-icon">📋</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ประเมินแล้ว</div><div class="dash-kpi-value" style="color:var(--green)">${com}</div><div class="dash-kpi-sub">${pct(com)}</div><div class="dash-icon">✅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">รอดำเนินการ</div><div class="dash-kpi-value" style="color:#d97706">${pen}</div><div class="dash-kpi-sub">${pct(pen)}</div><div class="dash-icon">⏳</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ผ่าน</div><div class="dash-kpi-value" style="color:var(--green)">${pass}</div><div class="dash-kpi-sub">${pct(pass)}</div><div class="dash-icon">🏅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ให้ปรับปรุง/ปฏิเสธ</div><div class="dash-kpi-value" style="color:var(--red)">${rev}</div><div class="dash-kpi-sub">${pct(rev)}</div><div class="dash-icon">⚠️</div></div>`; }
