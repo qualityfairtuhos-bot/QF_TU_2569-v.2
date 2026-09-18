@@ -144,11 +144,13 @@ function failure(message:string,errorCode:string,status:number,requestId:string)
 function getGasExecUrls(): string[] {
   const custom = process.env.GAS_WEB_APP_URL || process.env.GAS_EXEC_URL;
   if (custom && custom.trim().startsWith("http")) {
-    return [custom.trim()];
+    const trimmed = custom.trim();
+    if (trimmed.includes("DEPLOYMENT_ID") || trimmed.includes("YOUR_") || trimmed.includes("REPLACE_ME")) {
+      throw new Error("ยังไม่ได้ตั้งค่า GAS_WEB_APP_URL (พบค่าเริ่มต้น placeholder DEPLOYMENT_ID) กรุณาระบุ Web App URL ของ Google Apps Script ในการตั้งค่า (Settings > Environment Variables)");
+    }
+    return [trimmed];
   }
-  return [
-    "https://script.google.com/macros/s/AKfycbwOqV8w3QZ2V-68pPq2Q7i1F55eXzW5Jp7n_bYxG9L0kM2r1Tu/exec"
-  ];
+  throw new Error("ยังไม่ได้กำหนดค่า GAS_WEB_APP_URL กรุณาระบุ Web App URL ของ Google Apps Script ที่ Deploy แล้ว (ลงท้ายด้วย /exec) ในเมนู Settings");
 }
 
 function getGasSecret(): string {
@@ -156,7 +158,12 @@ function getGasSecret(): string {
 }
 
 async function callGas(payload:RpcRequest&{secret:string},attempts:number){
-  const urls = getGasExecUrls();
+  let urls: string[];
+  try {
+    urls = getGasExecUrls();
+  } catch (err) {
+    throw err;
+  }
   let lastError: unknown = null;
 
   for (const url of urls) {
@@ -178,17 +185,22 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
           keepalive:true,
           signal:controller.signal
         });
-        if(!response.ok)throw new Error(`GAS_HTTP_${response.status}`);
+        if(response.status === 404){
+          throw new Error("ไม่พบ Google Apps Script Web App (HTTP 404) กรุณาตรวจสอบว่า URL ลงท้ายด้วย /exec และ Deploy แบบ Web App ถูกต้อง");
+        }
+        if(!response.ok){
+          throw new Error(`การเชื่อมต่อไปยัง Google Apps Script ขัดข้อง (HTTP ${response.status})`);
+        }
         const rawText=await response.text();
         let result:ApiResponse<unknown>;
         try{
           result=JSON.parse(rawText) as ApiResponse<unknown>;
         }catch{
           if(rawText.includes("accounts.google.com")||rawText.includes("Authorization required")||rawText.includes("google.com/auth")){
-            throw new Error("กรุณากดจัดทำเวอร์ชันใหม่ (New Version Deployment) และยินยอมสิทธิ์ใน Google Apps Script");
+            throw new Error("สิทธิ์การเข้าถึง Google Apps Script ไม่ถูกต้อง: กรุณา Deploy Web App โดยตั้ง 'Who has access' เป็น 'Anyone' และกดอนุมัติสิทธิ์ (Authorize)");
           }
           if(rawText.includes("<!DOCTYPE")||rawText.includes("<html")){
-            throw new Error("Google Apps Script คืนค่าเป็นหน้า HTML (อาจเกิดจากสิทธิ์การใช้งาน หรือ Script Error)");
+            throw new Error("Google Apps Script ส่งกลับเป็นหน้าเว็บ HTML (อาจเกิดจากสิทธิ์การใช้งานของ Script หรือ Web App URL ไม่ถูกต้อง)");
           }
           throw new Error(`คำตอบจากส่วนกลางไม่ถูกต้อง (${rawText.slice(0, 80)})`);
         }
@@ -202,7 +214,7 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
       }
     }
   }
-  throw lastError || new Error("GAS_UNAVAILABLE");
+  throw lastError || new Error("ไม่สามารถเชื่อมต่อ Google Apps Script ได้ในขณะนี้");
 }
 
 export async function POST(request:NextRequest){
