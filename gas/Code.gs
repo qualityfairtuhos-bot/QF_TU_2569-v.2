@@ -639,7 +639,10 @@ function seedDefaultRolesUsers_(cid) {
   });
 }
 
-function cleanDatabaseAndSetupReady(cid) {
+function cleanDatabaseAndSetupReady(confirmationCode, cid) {
+  if (confirmationCode !== 'CONFIRM_DELETE_ALL_DATA_2569') {
+    throw new Error('คำสั่งอันตรายระดับสูง: ปฏิเสธการทำงานเนื่องจากไม่ได้ระบุรหัสยืนยัน CONFIRM_DELETE_ALL_DATA_2569 (ฟังก์ชันนี้จะล้างข้อมูล 26 ตารางทั้งหมด)');
+  }
   return runSafely_('cleanDatabaseAndSetupReady', function() {
     cid = cid || APP.DEFAULT_CONFERENCE_ID;
     const tablesToClear = [
@@ -671,8 +674,8 @@ function cleanDatabaseAndSetupReady(cid) {
   });
 }
 
-function runFullSetupAndSeedSampleData() {
-  return cleanDatabaseAndSetupReady();
+function runFullSetupAndSeedSampleData(confirmationCode) {
+  return cleanDatabaseAndSetupReady(confirmationCode);
 }
 
 function seedSampleData(cid) {
@@ -880,17 +883,30 @@ function seedSampleData(cid) {
   });
 }
 
-function adminSeedSampleData(token, conferenceId) {
+/**
+ * ฟังก์ชัน Seed ข้อมูลตัวอย่าง สามารถรันได้เฉพาะจาก Script Editor โดยตรง
+ * และต้องระบุคำยืนยัน CONFIRM_SEED_SAMPLE_DATA_2569
+ */
+function adminSeedSampleData(confirmationCode, conferenceId) {
+  if (confirmationCode !== 'CONFIRM_SEED_SAMPLE_DATA_2569') {
+    throw new Error('ไม่อนุญาตให้ Seed ข้อมูลผ่าน Web API กรุณารันตรงจาก Apps Script Editor พร้อมระบุ CONFIRM_SEED_SAMPLE_DATA_2569');
+  }
   return runSafely_('adminSeedSampleData', function() {
-    requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN'], conferenceId);
     return seedSampleData(conferenceId);
   });
 }
 
-function adminResetAndInitDatabase(token, conferenceId) {
+/**
+ * คำเตือนความปลอดภัยระดับสูง:
+ * ฟังก์ชันนี้ถูกตัดออกจาก Web API (doPost) แล้ว เพื่อป้องกันการโจมตีหรือเรียกผิดพลาด
+ * สามารถรันได้เฉพาะจากตัว Apps Script Editor โดยตรงเท่านั้น และต้องส่งคำยืนยัน CONFIRM_DELETE_ALL_DATA_2569
+ */
+function adminResetAndInitDatabase(confirmationCode, conferenceId) {
+  if (confirmationCode !== 'CONFIRM_DELETE_ALL_DATA_2569') {
+    throw new Error('ไม่อนุญาตให้รีเซ็ตฐานข้อมูลผ่าน Web API กรุณารันตรงจาก Apps Script Editor เท่านั้น และต้องระบุพารามิเตอร์ยืนยัน CONFIRM_DELETE_ALL_DATA_2569');
+  }
   return runSafely_('adminResetAndInitDatabase', function() {
-    requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN'], conferenceId);
-    return cleanDatabaseAndSetupReady(conferenceId);
+    return cleanDatabaseAndSetupReady('CONFIRM_DELETE_ALL_DATA_2569', conferenceId);
   });
 }
 
@@ -1127,7 +1143,7 @@ function appendRecords_(name, objects) {
   clearTableCache_(name);
   return next;
 }
-function updateRecord_(name,rowNumber,patch){
+function updateRecord_(name,rowNumber,patch,skipCacheClear){
   const sh=getSheet_(name), hm=headerMap_(name); 
   const keys = Object.keys(patch);
   if (keys.length === 0) return true;
@@ -1153,7 +1169,55 @@ function updateRecord_(name,rowNumber,patch){
     });
     rowRange.setValues([rowValues]);
   }
-  clearRequestCache_(); 
+  if (!skipCacheClear) {
+    clearRequestCache_(); 
+    clearTableCache_(name);
+  }
+  return true;
+}
+
+/**
+ * batchUpdateRecords_(name, updates)
+ * อัปเดตข้อมูลหลายแถวพร้อมกันในครั้งเดียว เพื่อลดเวลาและ API Calls ป้องกันปัญหา Timeout 6 นาที
+ * @param {string} name - ชื่อแผ่นงาน (Sheet Name)
+ * @param {Array<{rowNumber: number, patch: Object}>} updates - รายการข้อมูลและแถวที่ต้องการอัปเดต
+ */
+function batchUpdateRecords_(name, updates) {
+  if (!updates || !updates.length) return true;
+  const sh = getSheet_(name), hm = headerMap_(name);
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return true;
+
+  const validUpdates = updates.filter(function(u) {
+    return u && u.rowNumber >= 2 && u.rowNumber <= lastRow && u.patch && Object.keys(u.patch).length > 0;
+  });
+  if (!validUpdates.length) return true;
+
+  let minRow = lastRow, maxRow = 2;
+  validUpdates.forEach(function(u) {
+    if (u.rowNumber < minRow) minRow = u.rowNumber;
+    if (u.rowNumber > maxRow) maxRow = u.rowNumber;
+  });
+
+  const numRows = maxRow - minRow + 1;
+  const range = sh.getRange(minRow, 1, numRows, hm.headers.length);
+  const values = range.getValues();
+
+  validUpdates.forEach(function(u) {
+    const offset = u.rowNumber - minRow;
+    const rowValues = values[offset];
+    const keys = Object.keys(u.patch);
+    keys.forEach(function(k) {
+      if (hm.map[k] !== undefined) {
+        rowValues[hm.map[k]] = (PLAIN_TEXT_FIELDS.indexOf(k) >= 0 && u.patch[k] !== null && u.patch[k] !== undefined)
+          ? String(u.patch[k])
+          : u.patch[k];
+      }
+    });
+  });
+
+  range.setValues(values);
+  clearRequestCache_();
   clearTableCache_(name);
   return true;
 }
@@ -6086,10 +6150,8 @@ const API_ACTIONS = Object.freeze({
   adminListWorks: adminListWorks,
   adminPreviewMealPass: adminPreviewMealPass,
   adminResendReviewerCreds: adminResendReviewerCreds,
-  adminResetAndInitDatabase: adminResetAndInitDatabase,
   adminSaveRegistration: adminSaveRegistration,
   adminSearchDriveFiles: adminSearchDriveFiles,
-  adminSeedSampleData: adminSeedSampleData,
   adminSendDirectEmail: adminSendDirectEmail,
   adminSendMealPasses: adminSendMealPasses,
   adminUpdateRegistrationStatus: adminUpdateRegistrationStatus,
