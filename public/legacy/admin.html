@@ -250,7 +250,12 @@
     <section class="page" id="page-reviewers">
       <div class="card">
         <div class="actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between">
-          <h3 style="margin:0">รายชื่อ Reviewer</h3>
+          <div>
+            <h3 style="margin:0">รายชื่อ Reviewer</h3>
+            <div class="muted" style="font-size:0.85rem; margin-top:3px;">
+              🔑 <b>รหัสผ่านเริ่มต้นสำหรับ Reviewer:</b> <code style="color:#006D70; background:#e6f4f4; padding:2px 6px; border-radius:4px; font-weight:bold;">REV-[เลข 3 ตัวท้ายของ ReviewerID]</code> (เช่น รหัส <code>REV-2026-000001</code> รหัสผ่านคือ <code>REV-001</code>)
+            </div>
+          </div>
           <div style="display:flex; gap:10px">
             <button class="btn btn-primary" onclick="openReviewerForm()">+ เพิ่ม Reviewer</button>
             <button class="btn btn-soft" onclick="loadReviewers()">รีเฟรช</button>
@@ -334,52 +339,7 @@ const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','Registratio
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-async function rpc(n,...a){
-  const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;
-  let lastErr=null;
-  for(let attempt=0;attempt<maxRetries;attempt++){
-    if(attempt>0){
-      await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)));
-    }
-    try{
-      const response=await fetch('/api/gas',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})
-      });
-      let result;
-      try{
-        const text=await response.text();
-        result=JSON.parse(text);
-      }catch(e){
-        throw new Error('การตอบกลับจากระบบไม่ถูกต้อง');
-      }
-      if(response.status===401 || (result && result.errorCode === 'UNAUTHENTICATED')){
-        TOKEN='';
-        try{
-          localStorage.removeItem('tuhAdminToken');
-          sessionStorage.removeItem('tuhAdminToken');
-          localStorage.removeItem('tuhAdminBootCache_'+CID);
-        }catch(e){}
-        BOOT=null;
-        $('#app').style.display='none';
-        $('#login').style.display='flex';
-        hide();
-        throw new Error(result?.message || 'Session หมดอายุ กรุณาเข้าสู่ระบบใหม่');
-      }
-      if(!response.ok||!result.success){
-        throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
-      }
-      return result.data;
-    }catch(err){
-      lastErr=err;
-      if(err.message && err.message.includes('Session หมดอายุ')) throw err;
-      if(attempt+1>=maxRetries)throw err;
-    }
-  }
-  throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ');
-}
+async function rpc(n,...a){const maxRetries=/^(get|lookup|inspect|adminList|adminGet|reviewerGet)/.test(n)?3:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0){await new Promise(r=>setTimeout(r,attempt*700+Math.floor(Math.random()*200)))}try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}return result.data}catch(err){lastErr=err;if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
@@ -400,21 +360,8 @@ const ADMIN_CRED_KEY='tuhAdminRememberedCredentials';
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
 function loadRememberedLogin(){try{const username=localStorage.getItem(ADMIN_CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
 function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(ADMIN_CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(ADMIN_CRED_KEY)}
-function currentAdminToken(){
-  try{
-    return sessionStorage.getItem('tuhAdminToken') || localStorage.getItem('tuhAdminToken') || '__COOKIE__';
-  }catch(e){
-    return '__COOKIE__';
-  }
-}
-function storeAdminToken(tok){
-  try{
-    if(tok && tok !== '__COOKIE__'){
-      localStorage.setItem('tuhAdminToken', tok);
-      sessionStorage.setItem('tuhAdminToken', tok);
-    }
-  }catch(e){}
-}
+function currentAdminToken(){return '__COOKIE__'}
+function storeAdminToken(){}
 function renderAppShell(bootData){
   BOOT=bootData;
   $('#login').style.display='none';
@@ -458,18 +405,11 @@ async function boot(){
       renderAppShell(cached);
     }
   }catch(e){}
-  try{
-    BOOT=await rpc('adminBootstrap',TOKEN,CID);
-    try{localStorage.setItem('tuhAdminBootCache_'+CID,JSON.stringify(BOOT))}catch(e){}
-    renderAppShell(BOOT);
-    const items=menuForRole(BOOT.role);
-    await nav(items[0]?.[0]||'dashboard');
-  }catch(e){
-    if(e.message && e.message.includes('Session หมดอายุ')){
-      return;
-    }
-    throw e;
-  }
+  BOOT=await rpc('adminBootstrap',TOKEN,CID);
+  try{localStorage.setItem('tuhAdminBootCache_'+CID,JSON.stringify(BOOT))}catch(e){}
+  renderAppShell(BOOT);
+  const items=menuForRole(BOOT.role);
+  await nav(items[0]?.[0]||'dashboard');
 }
 async function nav(p){const page=$('#page-'+p);if(!page)return;CURRENT=p;$$('.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');$$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));const b=$(`.menu button[data-page="${p}"]`);$('#topTitle').textContent=b?b.childNodes[0].textContent:p;const sidebar=$('#sidebar');if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();try{if(p==='dashboard')await loadDashboard();if(p==='settings')await loadSettings();if(p==='import')await loadImportBatches();if(p==='registrations')await loadRegistrations();if(p==='payments')await loadPayments();if(p==='works')await loadWorks();if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}if(p==='food')await loadFood();if(p==='users')await loadUsers()}catch(e){err(e)}}
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
@@ -2536,19 +2476,8 @@ function num(v){return Number(v)||0;}
 async function openAssignReviewerModal(wid){
   show('กำลังเปิดหน้าต่างจ่ายงาน');
   try{
-    let d = { rounds: [{ ReviewRoundID: 'ROUND-1', RoundNameTH: 'รอบที่ 1: ประเมินข้อเสนอผลงาน', Status: 'ACTIVE' }] };
-    try {
-      const cfg = await rpc('adminGetReviewConfig',TOKEN,CID);
-      if(cfg && Array.isArray(cfg.rounds) && cfg.rounds.length) d = cfg;
-    } catch(ignore) {}
-
-    let revs = [];
-    try {
-      revs = await rpc('adminListReviewers',TOKEN,CID) || [];
-    } catch(e) {
-      console.warn('Could not fetch reviewers list', e);
-    }
-
+    const d=await rpc('adminGetReviewConfig',TOKEN,CID);
+    const revs=await rpc('adminListReviewers',TOKEN,CID);
     let assignedIds = [];
     if(wid){
       try{
@@ -2559,25 +2488,15 @@ async function openAssignReviewerModal(wid){
       }catch(e){console.warn('Could not fetch work summary',e);}
     }
     hide();
-    const roundsList = (d.rounds && d.rounds.length) ? d.rounds : [{ ReviewRoundID: 'ROUND-1', RoundNameTH: 'รอบที่ 1: ประเมินผลงาน' }];
-    const h=`<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <span style="font-weight:600; color:#334155;">เลือก Reviewer สำหรับ ${wid?'ผลงานที่เลือก':'ผลงานทั้งหมด'}:</span>
-      <button type="button" class="btn btn-soft btn-sm" onclick="Swal.close(); openReviewerForm();" style="font-size:0.8rem; padding:4px 8px;"><i class="fa-solid fa-user-plus"></i> + เพิ่ม Reviewer ใหม่</button>
+    const h=`<div style="text-align:left; margin-bottom:10px">เลือก Reviewer สำหรับ ${wid?'ผลงานที่เลือก':'ผลงานทั้งหมด'}:</div>
+    <div style="max-height:300px; overflow-y:auto; text-align:left; border:1px solid #ddd; padding:10px">
+      ${revs.map(r=>{
+        const isAssigned = assignedIds.includes(r.reviewer.ReviewerID);
+        return `<label style="display:block; margin-bottom:5px; ${isAssigned ? 'opacity:0.5' : ''}"><input type="checkbox" class="assign-rev" value="${esc(r.reviewer.ReviewerID)}" ${isAssigned ? 'disabled' : ''}> ${esc(r.reviewer.FullName)} (${esc(r.reviewer.Institution)}) - งาน: ${r.CurrentAssignedCount}/${r.MaxWorkload} ${isAssigned ? '(Assign แล้ว)' : ''}</label>`;
+      }).join('')}
     </div>
-    <div style="max-height:300px; overflow-y:auto; text-align:left; border:1px solid #ddd; padding:10px; border-radius:6px; background:#fff;">
-      ${revs.length ? revs.map(r=>{
-        const isAssigned = assignedIds.includes(r.reviewer?.ReviewerID);
-        return `<label style="display:block; margin-bottom:6px; ${isAssigned ? 'opacity:0.5' : ''}; font-size:0.88rem;">
-          <input type="checkbox" class="assign-rev" value="${esc(r.reviewer?.ReviewerID)}" ${isAssigned ? 'disabled' : ''}>
-          <b>${esc(r.reviewer?.FullName || r.reviewer?.ReviewerID)}</b> <span class="muted">(${esc(r.reviewer?.Institution || '-')})</span>
-          <span style="float:right; font-size:0.8rem; color:#64748b;">ภาระงาน: ${r.CurrentAssignedCount || 0}/${r.MaxWorkload || 10} ${isAssigned ? '<span class="badge warn" style="padding:1px 4px;font-size:0.7rem">จ่ายแล้ว</span>' : ''}</span>
-        </label>`;
-      }).join('') : '<div class="muted" style="text-align:center; padding:15px;">ยังไม่มีรายชื่อ Reviewer ในระบบ <br><button type="button" class="btn btn-blue btn-sm" style="margin-top:8px;" onclick="Swal.close(); openReviewerForm();"><i class="fa-solid fa-user-plus"></i> คลิกเพื่อเพิ่ม Reviewer</button></div>'}
-    </div>
-    <div style="text-align:left; margin-top:12px"><label style="font-weight:600; color:#334155; display:block; margin-bottom:4px;">รอบการประเมิน:</label>
-      <select id="assignRound" class="field" style="width:100%">${roundsList.map(rd=>`<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH || rd.ReviewRoundID)}</option>`).join('')}</select>
-    </div>`;
-    const x=await Swal.fire({title:'จ่ายงาน Reviewer',html:h,showCancelButton:true,confirmButtonText:'ยืนยันการจ่ายงาน',confirmButtonColor:'#006D70',preConfirm:()=>{
+    <div style="text-align:left; margin-top:10px"><label>รอบการประเมิน: <select id="assignRound" class="field" style="width:100%">${d.rounds.map(rd=>`<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH)}</option>`).join('')}</select></label></div>`;
+    const x=await Swal.fire({title:'จ่ายงาน Reviewer',html:h,showCancelButton:true,confirmButtonText:'ยืนยันการจ่ายงาน',preConfirm:()=>{
       const ids=$$('.assign-rev:checked').map(el=>el.value);
       if(!ids.length){ Swal.showValidationMessage('กรุณาเลือก Reviewer อย่างน้อย 1 คน'); return false; }
       return {reviewerIds:ids, roundId:$('#assignRound').value};
@@ -2586,7 +2505,7 @@ async function openAssignReviewerModal(wid){
       show('กำลังจ่ายงาน...');
       const res = await rpc('adminAssignReviewersBulk',TOKEN,CID, wid?[wid]:null, x.value.roundId, x.value.reviewerIds);
       hide();
-      Swal.fire({icon:'success',title:'จ่ายงานสำเร็จ',text:`สร้าง Assignment ${res.created} รายการ, ข้าม ${res.skipped} รายการ`,confirmButtonColor:'#006D70'});
+      Swal.fire({icon:'success',title:'จ่ายงานสำเร็จ',text:`สร้าง Assignment ${res.created} รายการ, ข้าม ${res.skipped} รายการ`});
       loadWorks();
     }
   }catch(e){err(e);}
@@ -3184,36 +3103,123 @@ async function deleteWorkFileAction(workFileId, fileName, wid, regId) {
     }
   }
 }
+function getDefaultReviewerPassword(revId){
+  if(!revId) return 'REV-001';
+  const nums = String(revId).replace(/\D/g, '');
+  if(nums.length >= 3){
+    return 'REV-' + nums.slice(-3);
+  } else if(nums.length > 0){
+    return 'REV-' + nums.padStart(3, '0');
+  }
+  return 'REV-001';
+}
+
 async function loadReviewers(){
   show('กำลังโหลด Reviewer');
   try{
     const rows=await rpc('adminListReviewers',TOKEN,CID);
     const q = ($('#revSearch').value||'').toLowerCase();
     const filtered = rows.filter(x=>{
-      const s = [x.reviewer.ReviewerID, x.reviewer.FullName, x.reviewer.Email, x.reviewer.Institution, x.reviewer.Department].join(' ').toLowerCase();
+      const s = [x.reviewer?.ReviewerID, x.reviewer?.FullName, x.reviewer?.Email, x.reviewer?.Institution, x.reviewer?.Department].join(' ').toLowerCase();
       return !q || s.includes(q);
     });
-    $('#reviewerRows').innerHTML=filtered.map(x=>`<tr>
-      <td>${esc(x.reviewer.ReviewerID)}</td>
-      <td><b>${esc(x.reviewer.Prefix||'')}${esc(x.reviewer.FirstName||'')} ${esc(x.reviewer.LastName||'')}</b><br><span class="muted">${esc(x.reviewer.Position||'')}</span></td>
-      <td>${esc(x.reviewer.Email)}</td>
-      <td>${esc(x.reviewer.Institution)}<br><span class="muted">${esc(x.reviewer.Department||'')}</span></td>
-      <td>${esc(x.reviewer.Phone||'-')}</td>
-      <td>${esc(x.ExpertiseCategories||x.reviewer.ExpertiseCategories)}</td>
-      <td>${x.CurrentAssignedCount}/${x.MaxWorkload}</td>
-      <td>${statusBadge(x.Status)}</td>
-      <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-        <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-key"></i></button>
-        <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(x.reviewer.Email)}','','เรียน ${esc(x.reviewer.FullName||'')}', '')"><i class="fa-solid fa-envelope"></i></button>
-      </td>
-    </tr>`).join('');
+    $('#reviewerRows').innerHTML=filtered.length ? filtered.map(x=>{
+      const rev = x.reviewer || {};
+      const defPwd = getDefaultReviewerPassword(rev.ReviewerID);
+      const fullName = rev.FullName || `${rev.Prefix||''}${rev.FirstName||''} ${rev.LastName||''}`.trim() || rev.ReviewerID;
+      return `<tr>
+        <td><b>${esc(rev.ReviewerID)}</b><br><span class="muted" style="font-size:0.75rem;">รหัสผ่าน: <code style="color:#006D70; font-weight:bold;">${esc(defPwd)}</code></span></td>
+        <td><b>${esc(fullName)}</b><br><span class="muted">${esc(rev.Position||'-')}</span></td>
+        <td><code>${esc(rev.Email||'-')}</code></td>
+        <td>${esc(rev.Institution||'-')}<br><span class="muted">${esc(rev.Department||'')}</span></td>
+        <td>${esc(rev.Phone||'-')}</td>
+        <td>${esc(x.ExpertiseCategories||rev.ExpertiseCategories||'-')}</td>
+        <td><b>${x.CurrentAssignedCount||0}</b> / ${x.MaxWorkload||10}</td>
+        <td>${statusBadge(x.Status)}</td>
+        <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
+          <button class="btn-sq" style="color:#fd7e14" title="แก้ไขข้อมูล" onclick="openReviewerForm('${esc(rev.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn-sq" style="color:#0d6efd" title="ดู/จัดการรหัสผ่านเข้าสู่ระบบ" onclick="openReviewerCredsModal('${esc(rev.ReviewerID)}', '${esc(fullName)}', '${esc(rev.Email)}')"><i class="fa-solid fa-key"></i></button>
+          <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(rev.Email)}','','เรียน ${esc(fullName)}', '')"><i class="fa-solid fa-envelope"></i></button>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="9" class="muted" style="text-align:center; padding:20px;">ไม่พบข้อมูล Reviewer</td></tr>';
   }finally{
     hide();
   }
 }
+
+async function openReviewerCredsModal(id, name, email){
+  const defaultPwd = getDefaultReviewerPassword(id);
+  const loginUrl = window.location.origin + '/reviewer?conferenceId=' + encodeURIComponent(CID);
+  const copyMsg = `เรียน ท่านคณะกรรมการผู้ทรงคุณวุฒิ (${name})\n\nข้อมูลสำหรับเข้าสู่ระบบประเมินผลงานวิชาการ\n- ลิงก์เข้าสู่ระบบ: ${loginUrl}\n- อีเมลเข้าใช้งาน: ${email}\n- รหัสผ่าน: ${defaultPwd}\n\nเมื่อเข้าสู่ระบบแล้ว ท่านสามารถเปลี่ยนรหัสผ่านได้ที่เมนูของระบบ`;
+  
+  const h = `
+    <div style="text-align:left; font-size:14px;">
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:15px;">
+        <div style="margin-bottom:6px;"><b>ผู้ทรงคุณวุฒิ:</b> ${esc(name)}</div>
+        <div style="margin-bottom:6px;"><b>Reviewer ID:</b> <span class="badge ok">${esc(id)}</span></div>
+        <div style="margin-bottom:6px;"><b>อีเมลเข้าสู่ระบบ (Username):</b> <code>${esc(email)}</code></div>
+        <div style="margin-bottom:4px; display:flex; align-items:center; justify-content:space-between;">
+          <span><b>รหัสผ่านเริ่มต้น (Default):</b> <code style="font-size:16px; font-weight:bold; color:#006D70; background:#e6f4f4; padding:2px 8px; border-radius:4px;">${esc(defaultPwd)}</code></span>
+          <button type="button" class="btn btn-soft btn-sm" onclick="navigator.clipboard.writeText('${esc(defaultPwd)}'); toast('คัดลอกรหัสผ่านแล้ว');" style="padding:2px 8px; font-size:12px;"><i class="fa-solid fa-copy"></i> คัดลอก</button>
+        </div>
+        <div class="muted" style="font-size:12px; margin-top:4px;">* คำนวณจาก REV- ตามด้วยเลข 3 ตัวท้ายของ Reviewer ID (${esc(id)})</div>
+      </div>
+
+      <div style="border-top:1px solid #e2e8f0; padding-top:12px; margin-bottom:12px;">
+        <label style="font-weight:600; display:block; margin-bottom:6px; color:#334155;">ตั้งรหัสผ่านใหม่ (กำหนดเอง):</label>
+        <div style="display:flex; gap:8px;">
+          <input id="customRevPass" placeholder="กรอกรหัสผ่านใหม่ที่ต้องการ" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;">
+          <button type="button" class="btn btn-primary btn-sm" onclick="applyCustomReviewerPassword('${esc(id)}', document.getElementById('customRevPass').value)"><i class="fa-solid fa-check"></i> บันทึก</button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" class="btn btn-blue btn-sm" style="width:100%; text-align:left; justify-content:center; padding:8px;" onclick="applyCustomReviewerPassword('${esc(id)}', '${esc(defaultPwd)}')">
+          <i class="fa-solid fa-rotate-left"></i> รีเซ็ตรหัสผ่านเป็นค่าเริ่มต้น (${esc(defaultPwd)})
+        </button>
+        <button type="button" class="btn btn-gold btn-sm" style="width:100%; text-align:left; justify-content:center; padding:8px;" onclick="resendReviewerCreds('${esc(id)}')">
+          <i class="fa-solid fa-envelope"></i> ส่งข้อมูลเข้าใช้งานไปยังอีเมล Reviewer
+        </button>
+        <button type="button" class="btn btn-soft btn-sm" style="width:100%; text-align:left; justify-content:center; padding:8px;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(copyMsg)}')); toast('คัดลอกข้อความแจ้งเข้าใช้งานแล้ว');">
+          <i class="fa-solid fa-clipboard"></i> คัดลอกข้อความแจ้งข้อมูลเข้าใช้งาน (ส่ง LINE / Chat)
+        </button>
+      </div>
+    </div>
+  `;
+
+  Swal.fire({
+    title: 'ข้อมูลเข้าสู่ระบบของผู้ทรงคุณวุฒิ',
+    html: h,
+    showConfirmButton: false,
+    showCloseButton: true,
+    width: 550
+  });
+}
+
+async function applyCustomReviewerPassword(id, newPassword){
+  if(!newPassword || !newPassword.trim()){
+    Swal.fire({icon:'warning', title:'กรุณากรอกรหัสผ่าน', confirmButtonColor:'#006D70'});
+    return;
+  }
+  show('กำลังบันทึกรหัสผ่านใหม่...');
+  try{
+    await rpc('adminUpdateReviewer', TOKEN, CID, id, { Password: newPassword.trim() });
+    hide();
+    Swal.fire({
+      icon: 'success',
+      title: 'บันทึกรหัสผ่านสำเร็จ',
+      html: `รหัสผ่านของ Reviewer <b>${esc(id)}</b> ถูกตั้งค่าเป็น: <code style="font-size:16px; font-weight:bold; color:#006D70; background:#e6f4f4; padding:2px 8px; border-radius:4px;">${esc(newPassword.trim())}</code>`,
+      confirmButtonColor: '#006D70'
+    });
+    loadReviewers();
+  }catch(e){
+    err(e);
+  }
+}
+
 async function resendReviewerCreds(id){
-  const x=await Swal.fire({title:'ยืนยันส่งรหัสผ่าน',text:'ระบบจะสร้างรหัสผ่านชั่วคราวใหม่และส่งไปยังอีเมลของ Reviewer ท่านนี้',icon:'question',showCancelButton:true,confirmButtonText:'ส่งอีเมล'});
+  const x=await Swal.fire({title:'ยืนยันส่งรหัสผ่าน',text:'ระบบจะสร้างรหัสผ่านชั่วคราวใหม่และส่งไปยังอีเมลของ Reviewer ท่านนี้',icon:'question',showCancelButton:true,confirmButtonText:'ส่งอีเมล',confirmButtonColor:'#006D70'});
   if(!x.isConfirmed)return;
   show('กำลังส่งอีเมล...');
   try{
@@ -3222,6 +3228,7 @@ async function resendReviewerCreds(id){
     toast('ส่งข้อมูลเข้าใช้งานเรียบร้อยแล้ว');
   }catch(e){err(e);}
 }
+
 async function openReviewerForm(id){
   show('กำลังโหลดข้อมูลฟอร์ม');
   try {
@@ -3244,6 +3251,8 @@ async function openReviewerForm(id){
     const orgs = o.organizations || [];
     const orgGroups = o.organizationGroups || [];
 
+    const defaultPwdHint = id ? '' : 'ค่าเริ่มต้น: REV-[เลข 3 ตัวท้ายของ ReviewerID] (เช่น REV-001)';
+
     const h=`<style>.rv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;font-size:14px;margin-bottom:15px}.rv-grid label{display:block;margin-bottom:3px;color:#334155;font-weight:600}.rv-grid input,.rv-grid select{width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="rv-grid">
       <div><label>คำนำหน้า *</label><input id="rvPrefix" list="dlPrefix" value="${esc(r.Prefix||'')}" placeholder="เช่น ดร., ผศ.">${dataList('dlPrefix',prefixes)}</div>
       <div><label>ชื่อ *</label><input id="rvFirst" value="${esc(r.FirstName||'')}" placeholder="ชื่อจริง"></div>
@@ -3261,9 +3270,10 @@ async function openReviewerForm(id){
       <div><label>การแจ้งเตือน</label><select id="rvNotif"><option value="EMAIL" ${r.NotificationPreference==='EMAIL'?'selected':''}>Email</option><option value="LINE" ${r.NotificationPreference==='LINE'?'selected':''}>Line</option><option value="TELEGRAM" ${r.NotificationPreference==='TELEGRAM'?'selected':''}>Telegram</option></select></div>
       <div><label>Line Token</label><input id="rvLine" value="${esc(r.LineToken||'')}"></div>
       <div><label>Telegram ID</label><input id="rvTel" value="${esc(r.TelegramID||'')}"></div>
-      ${id?'':`<div style="grid-column:1/-1"><label>รหัสผ่านชั่วคราว (เว้นว่างไว้เพื่อสุ่มรหัสผ่านอัตโนมัติ)</label><input id="rvPass" placeholder="สุ่มรหัสผ่านอัตโนมัติ"></div>`}
+      ${id?'':`<div style="grid-column:1/-1"><label>รหัสผ่านเข้าใช้งาน <span class="muted" style="font-weight:normal;">(เว้นว่างไว้เพื่อใช้รหัสเริ่มต้นอัตโนมัติ)</span></label><input id="rvPass" placeholder="${defaultPwdHint}"></div>`}
       <div style="grid-column:1/-1"><label>หมายเหตุ</label><input id="rvNote" value="${esc(r.Note||'')}"></div>
     </div>`;
+
     const x=await Swal.fire({
       title: id ? 'แก้ไขข้อมูล Reviewer' : 'เพิ่ม Reviewer ใหม่',
       html: h,
@@ -3303,6 +3313,7 @@ async function openReviewerForm(id){
         };
       }
     });
+
     if(!x.isConfirmed) return;
     show(id ? 'กำลังบันทึกข้อมูล...' : 'กำลังเพิ่ม Reviewer...');
     if(id){
@@ -3312,27 +3323,38 @@ async function openReviewerForm(id){
     }else{
       const res = await rpc('adminAddReviewer',TOKEN,CID,x.value);
       hide();
-      const pwd = res?.TemporaryPassword || res?.password || '';
+      const createdId = res?.ReviewerID || res?.reviewer?.ReviewerID || res?.id || '';
+      const defPwd = getDefaultReviewerPassword(createdId);
+      const finalPwd = res?.TemporaryPassword || res?.password || x.value.Password || defPwd;
+      const fullName = `${x.value.Prefix||''}${x.value.FirstName} ${x.value.LastName}`.trim();
+      const loginUrl = window.location.origin + '/reviewer?conferenceId=' + encodeURIComponent(CID);
+      const copyMsg = `เรียน ท่านคณะกรรมการผู้ทรงคุณวุฒิ (${fullName})\n\nข้อมูลสำหรับเข้าสู่ระบบประเมินผลงานวิชาการ\n- ลิงก์เข้าสู่ระบบ: ${loginUrl}\n- อีเมลเข้าใช้งาน: ${x.value.Email}\n- รหัสผ่าน: ${finalPwd}\n\nเมื่อเข้าสู่ระบบครั้งแรก ท่านสามารถเปลี่ยนรหัสผ่านได้ที่เมนูของระบบ`;
+
       Swal.fire({
         icon: 'success',
-        title: 'เพิ่ม Reviewer เรียบร้อยแล้ว',
-        html: `เพิ่ม <b>${esc(x.value.FirstName)} ${esc(x.value.LastName)}</b> เข้าสู่ระบบแล้ว<br>${pwd ? `<div style="margin-top:10px;padding:8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;color:#166534">รหัสผ่านชั่วคราว: <b>${esc(pwd)}</b></div>` : ''}`,
-        confirmButtonColor: '#006D70'
+        title: 'เพิ่ม Reviewer สำเร็จแล้ว',
+        html: `
+          <div style="text-align:left; font-size:14px; margin-top:10px;">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:12px;">
+              ${createdId ? `<div style="margin-bottom:6px;"><b>Reviewer ID:</b> <span class="badge ok">${esc(createdId)}</span></div>` : ''}
+              <div style="margin-bottom:6px;"><b>ชื่อ-นามสกุล:</b> ${esc(fullName)}</div>
+              <div style="margin-bottom:6px;"><b>Username / Email:</b> <code>${esc(x.value.Email)}</code></div>
+              <div style="margin-bottom:4px;"><b>รหัสผ่านเข้าใช้งาน (Password):</b> <code style="font-size:16px; font-weight:bold; color:#006D70; background:#e6f4f4; padding:2px 8px; border-radius:4px;">${esc(finalPwd)}</code></div>
+            </div>
+            <div style="font-size:12px; color:#64748b; margin-bottom:14px;">💡 รหัสผ่านถูกกำหนดตามรูปแบบมาตรฐาน <b>REV-[เลข 3 ตัวท้าย]</b> หรือรหัสที่ท่านตั้งไว้</div>
+            <button type="button" class="btn btn-primary btn-sm" style="width:100%; justify-content:center; padding:8px;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(copyMsg)}')); toast('คัดลอกข้อมูลเข้าสู่ระบบเรียบร้อย');">
+              <i class="fa-solid fa-clipboard"></i> คัดลอกข้อมูลเข้าสู่ระบบสำหรับส่งแจ้ง Reviewer
+            </button>
+          </div>
+        `,
+        confirmButtonColor: '#006D70',
+        confirmButtonText: 'ตกลง'
       });
     }
     loadReviewers();
   } catch(e) { err(e); }
 }
-async function loadReviewConfig(){
-  try{
-    const d=await rpc('adminGetReviewConfig',TOKEN,CID);
-    if(d && Array.isArray(d.rounds)){
-      $('#reviewConfig').innerHTML='<h4>รอบประเมิน</h4>'+d.rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH || r.RoundNameEN || r.ReviewRoundID)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers||1}-${r.MaxReviewers||3}</div>`).join('')+'<h4>เกณฑ์คะแนน</h4>'+(d.criteria||[]).map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('');
-    }
-  }catch(e){
-    console.warn('Could not load review config', e);
-  }
-}
+async function loadReviewConfig(){const d=await rpc('adminGetReviewConfig',TOKEN,CID);$('#reviewConfig').innerHTML='<h4>รอบประเมิน</h4>'+d.rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers}-${r.MaxReviewers}</div>`).join('')+'<h4>เกณฑ์คะแนน</h4>'+d.criteria.map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('')}
 
 function switchUploadTab(t){
   if(t==='local'){
@@ -3476,9 +3498,6 @@ async function loadUsers(){
         ${x.Status === 'ACTIVE' && x.Role !== 'SUPERADMIN' ? `<button class="btn btn-gold btn-sm" onclick="adminRevokeUser('${esc(x.UserID)}')"><i class="fa-solid fa-ban"></i> พักสิทธิ์</button>` : ''}
       </td>
     </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
-  }catch(e){
-    $('#userRows').innerHTML = `<tr><td colspan="5" style="color:#b91c1c; text-align:center; padding:20px;">ไม่สามารถโหลดข้อมูลผู้ใช้งานได้ (${esc(e.message)})<br><button class="btn btn-soft btn-sm" style="margin-top:10px;" onclick="loadUsers()"><i class="fa-solid fa-rotate"></i> ลองใหม่อีกครั้ง</button></td></tr>`;
-    err(e);
   }finally{
     hide();
   }
