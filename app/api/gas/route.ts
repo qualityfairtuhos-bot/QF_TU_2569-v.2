@@ -13,23 +13,23 @@ const buckets=new Map<string,{count:number;reset:number}>();
 const memoryCache=new Map<string,{data:ApiResponse<unknown>;expiresAt:number}>();
 const lastKnownGood=new Map<string,ApiResponse<unknown>>();
 const CACHE_TTLS:Record<string,number>={
-  getPublicBootstrap: 300_000,
-  getPublicAnnouncement: 300_000,
-  getPublicFinanceDocuments: 300_000,
-  adminBootstrap: 120_000,
-  adminDashboard: 60_000,
-  getAdminSettings: 120_000,
-  adminListRegistrations: 60_000,
-  adminListPayments: 60_000,
-  adminListWorks: 60_000,
-  adminListReviewers: 60_000,
-  adminListUsers: 60_000,
-  adminListMealPasses: 60_000,
-  adminListFinanceDocuments: 120_000,
-  adminGetReviewConfig: 60_000,
-  reviewerBootstrap: 60_000,
-  getEventScannerBootstrap: 60_000,
-  listImportBatches: 60_000
+  getPublicBootstrap: 30_000,
+  getPublicAnnouncement: 60_000,
+  getPublicFinanceDocuments: 60_000,
+  adminBootstrap: 60_000,
+  adminDashboard: 30_000,
+  getAdminSettings: 30_000,
+  adminListRegistrations: 30_000,
+  adminListPayments: 30_000,
+  adminListWorks: 30_000,
+  adminListReviewers: 30_000,
+  adminListUsers: 30_000,
+  adminListMealPasses: 30_000,
+  adminListFinanceDocuments: 60_000,
+  adminGetReviewConfig: 30_000,
+  reviewerBootstrap: 30_000,
+  getEventScannerBootstrap: 30_000,
+  listImportBatches: 30_000
 };
 
 const DEFAULT_CONFERENCE_BOOT = {
@@ -68,7 +68,7 @@ const DEFAULT_CONFERENCE_BOOT = {
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
-    BANNER_SLIDES_JSON: '[{"title":"งานมหกรรมคุณภาพ ครั้งที่ 19","imageUrl":"/images/tuh-banner-main.jpg","link":"","active":true},{"title":"CQI & Best Practice","imageUrl":"/images/tuh-banner-cqi.jpg","link":"","active":true},{"title":"VAR for Sustainability Healthcare","imageUrl":"/images/tuh-banner-var.jpg","link":"","active":true}]'
+    BANNER_SLIDES_JSON: '[]'
   },
   organizationUnits: [
     { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
@@ -95,8 +95,6 @@ const preseededBoot: ApiResponse<unknown> = {
 lastKnownGood.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', preseededBoot);
 lastKnownGood.set('getPublicBootstrap:[]', preseededBoot);
 lastKnownGood.set('getPublicBootstrap:[""]', preseededBoot);
-memoryCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
-memoryCache.set('getPublicBootstrap:[]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
 
 function getCacheKey(action:string,args:unknown[]){
   if(SESSION_ACTIONS.has(action)&&args.length>0){
@@ -128,11 +126,8 @@ function setCachedResponse(action:string,args:unknown[],data:ApiResponse<unknown
 
 function invalidateServerCache(action:string){
   if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(action)){
-    for(const key of memoryCache.keys()){
-      if(!key.startsWith("getPublic") && !key.startsWith("getAdminSettings")){
-        memoryCache.delete(key);
-      }
-    }
+    memoryCache.clear();
+    lastKnownGood.clear();
   }
 }
 

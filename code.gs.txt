@@ -5295,9 +5295,21 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     // Extract participant types for dropdown filter
     const participantTypes = [];
     
+    // Helper to group into 3 categories matching Chart 3
+    function toGroup_(pt) {
+      var s = String(pt || '').toUpperCase();
+      if (s.indexOf('INTERNAL') >= 0) return 'บุคลากรภายใน (INTERNAL)';
+      if (s.indexOf('EXTERNAL') >= 0) return 'บุคคลภายนอก (EXTERNAL)';
+      return 'ไม่ระบุ';
+    }
+
     // Compute charts using UNFILTERED regs so charts always show the full comparison
-    var chartRegByType = {};
-    var worksIntentByType = {};
+    var chartRegByType = { 'บุคลากรภายใน (INTERNAL)': 0, 'บุคคลภายนอก (EXTERNAL)': 0, 'ไม่ระบุ': 0 };
+    var worksIntentByType = {
+      'บุคลากรภายใน (INTERNAL)': { intent: 0, actual: 0 },
+      'บุคคลภายนอก (EXTERNAL)': { intent: 0, actual: 0 },
+      'ไม่ระบุ': { intent: 0, actual: 0 }
+    };
     var regTypeMap = {};
     
     regs.forEach(function(r) {
@@ -5305,14 +5317,15 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       if (participantTypes.indexOf(t) < 0) participantTypes.push(t);
       regTypeMap[r.RegID] = t;
       
-      // Chart 1: Reg by type
-      if (!chartRegByType[t]) chartRegByType[t] = 0;
-      chartRegByType[t]++;
+      // Chart 1: Reg by type (3 groups)
+      var grp = toGroup_(t);
+      if (!chartRegByType[grp]) chartRegByType[grp] = 0;
+      chartRegByType[grp]++;
       
-      // Chart 2: Intent by type
-      if (!worksIntentByType[t]) worksIntentByType[t] = { intent: 0, actual: 0 };
+      // Chart 2: Intent by type (3 groups)
+      if (!worksIntentByType[grp]) worksIntentByType[grp] = { intent: 0, actual: 0 };
       if (bool_(r.WantsSubmitWork)) {
-        worksIntentByType[t].intent++;
+        worksIntentByType[grp].intent++;
       }
     });
     
@@ -5344,10 +5357,10 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     });
 
     // Chart 3: Works by INTERNAL / EXTERNAL
-    var chartWorksByStatus = { 'บุคลากรภายใน (INTERNAL)': 0, 'บุคคลภายนอก (EXTERNAL)': 0 };
+    var chartWorksByStatus = { 'บุคลากรภายใน (INTERNAL)': 0, 'บุคคลภายนอก (EXTERNAL)': 0, 'ไม่ระบุ': 0 };
     worksData.forEach(function(w) {
       var pt = regTypeMap[w.RegID] || 'ไม่ระบุ';
-      var s = pt.toUpperCase().indexOf('INTERNAL') >= 0 ? 'บุคลากรภายใน (INTERNAL)' : (pt.toUpperCase().indexOf('EXTERNAL') >= 0 ? 'บุคคลภายนอก (EXTERNAL)' : pt);
+      var s = toGroup_(pt);
       if (chartWorksByStatus[s] === undefined) chartWorksByStatus[s] = 0;
       chartWorksByStatus[s]++;
       
@@ -5357,10 +5370,9 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       if (chartWorksByCategory[cat] === undefined) chartWorksByCategory[cat] = 0;
       chartWorksByCategory[cat]++;
       
-      // Actual works by type
-      var t = regTypeMap[w.RegID] || 'ไม่ระบุ';
-      if (!worksIntentByType[t]) worksIntentByType[t] = { intent: 0, actual: 0 };
-      worksIntentByType[t].actual++;
+      // Actual works by type (3 groups matching Chart 3)
+      if (!worksIntentByType[s]) worksIntentByType[s] = { intent: 0, actual: 0 };
+      worksIntentByType[s].actual++;
     });
 
     // Now apply filters to `regs` to calculate KPIs for the selected type

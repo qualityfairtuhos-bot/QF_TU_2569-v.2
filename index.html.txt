@@ -518,9 +518,9 @@ function normalizeBannerImageUrl(url){
   let str = String(url).trim();
   if(str.startsWith('data:image/')) return str;
   if(str.startsWith('/')) return str;
-  const driveFileMatch = str.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=|thumbnail\?id=)([a-zA-Z0-9_-]+)/);
-  if(driveFileMatch && driveFileMatch[1]) {
-    return 'https://lh3.googleusercontent.com/d/' + driveFileMatch[1];
+  const driveMatch = str.match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=view&)?id=|thumbnail\?id=)|lh3\.googleusercontent\.com\/d\/)([a-zA-Z0-9_-]+)/);
+  if(driveMatch && driveMatch[1]) {
+    return 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
   }
   return str;
 }
@@ -779,8 +779,13 @@ async function init(){
     if(rawCache){
       const parsed=JSON.parse(rawCache);
       if(parsed&&parsed.conference){
-        applyBootData(parsed);
-        hasCachedBoot=true;
+        const banStr = typeof parsed.settings?.BANNER_SLIDES_JSON === 'string' ? parsed.settings.BANNER_SLIDES_JSON : JSON.stringify(parsed.settings?.BANNER_SLIDES_JSON || '');
+        if(banStr.includes('tuh-banner-var.jpg') || banStr.includes('tuh-banner-main.jpg')){
+          try { localStorage.removeItem('TUH_BOOT_CACHE_'+CID); } catch(e){}
+        } else {
+          applyBootData(parsed);
+          hasCachedBoot=true;
+        }
       }
     }
   }catch(e){}

@@ -107,7 +107,10 @@
         <div class="card" style="margin:20px 0 10px; border-left:4px solid #c8b278; background:#fffdf9; padding:18px;">
           <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
             <h4 style="margin:0; color:#0c385b;"><i class="fa-solid fa-images" style="color:#c8b278;"></i> จัดการรูปภาพ Banner ส่วนหัวเว็บไซต์ (Header Banners)<span class="en">Header Banner Carousel</span></h4>
-            <button type="button" class="btn btn-gold btn-sm" onclick="openAddBannerModal()" style="font-weight:600;"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner ใหม่</button>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveBannersNow()" style="font-weight:600;"><i class="fa-solid fa-floppy-disk"></i> บันทึก Banner ทันที</button>
+              <button type="button" class="btn btn-gold btn-sm" onclick="openAddBannerModal()" style="font-weight:600;"><i class="fa-solid fa-plus"></i> เพิ่มภาพ Banner ใหม่</button>
+            </div>
           </div>
           
           <!-- Banner Specification Guide -->
@@ -334,7 +337,7 @@ const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','Registratio
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+60000})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
+window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?15000:45000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
@@ -513,33 +516,57 @@ function renderDashboardUi(d, filterType){
       });
     }
   }
+  function normalizePersonnelGroup(k){
+    const str = String(k || '').trim().toUpperCase();
+    if (str.includes('INTERNAL')) return 'บุคลากรภายใน (INTERNAL)';
+    if (str.includes('EXTERNAL')) return 'บุคคลภายนอก (EXTERNAL)';
+    return 'ไม่ระบุ';
+  }
+
   if(d.chartRegByType) {
     try {
-      const labels = Object.keys(d.chartRegByType);
-      const data = Object.values(d.chartRegByType);
+      const stdPersonnelGroups = ['บุคลากรภายใน (INTERNAL)', 'บุคคลภายนอก (EXTERNAL)', 'ไม่ระบุ'];
+      const regAgg = { 'บุคลากรภายใน (INTERNAL)': 0, 'บุคคลภายนอก (EXTERNAL)': 0, 'ไม่ระบุ': 0 };
+      Object.keys(d.chartRegByType).forEach(k => {
+        const grp = normalizePersonnelGroup(k);
+        regAgg[grp] = (regAgg[grp] || 0) + (Number(d.chartRegByType[k]) || 0);
+      });
+      const labels = stdPersonnelGroups.filter(g => regAgg[g] > 0 || g !== 'ไม่ระบุ');
+      const data = labels.map(l => regAgg[l] || 0);
       if(chartRegByType) chartRegByType.destroy();
       const canvas = $('#chartRegByTypeCanvas');
       if (canvas) {
         chartRegByType = new Chart(canvas, {
           type: 'bar',
-          data: { labels: labels, datasets: [{ label: 'จำนวนผู้สมัคร', data: data, backgroundColor: '#aecbe2' }] },
-          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'ผู้สมัครแยกรายประเภท' } } }
+          data: { labels: labels, datasets: [{ label: 'จำนวนผู้สมัคร', data: data, backgroundColor: ['#fbb4ae', '#b3cde3', '#ccebc5'] }] },
+          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'ผู้สมัครแยกตามประเภทบุคลากร (INTERNAL/EXTERNAL)' } } }
         });
       }
     } catch(e) { console.error('chartRegByType error:', e); }
   }
   if(d.chartWorksIntent) {
     try {
-      const labels = Object.keys(d.chartWorksIntent);
-      const dataIntent = labels.map(l => d.chartWorksIntent[l] ? d.chartWorksIntent[l].intent : 0);
-      const dataActual = labels.map(l => d.chartWorksIntent[l] ? d.chartWorksIntent[l].actual : 0);
+      const stdPersonnelGroups = ['บุคลากรภายใน (INTERNAL)', 'บุคคลภายนอก (EXTERNAL)', 'ไม่ระบุ'];
+      const intentAgg = {
+        'บุคลากรภายใน (INTERNAL)': { intent: 0, actual: 0 },
+        'บุคคลภายนอก (EXTERNAL)': { intent: 0, actual: 0 },
+        'ไม่ระบุ': { intent: 0, actual: 0 }
+      };
+      Object.keys(d.chartWorksIntent).forEach(k => {
+        const grp = normalizePersonnelGroup(k);
+        intentAgg[grp].intent += (Number(d.chartWorksIntent[k]?.intent) || 0);
+        intentAgg[grp].actual += (Number(d.chartWorksIntent[k]?.actual) || 0);
+      });
+      const labels = stdPersonnelGroups.filter(g => (intentAgg[g].intent > 0 || intentAgg[g].actual > 0 || g !== 'ไม่ระบุ'));
+      const dataIntent = labels.map(l => intentAgg[l].intent);
+      const dataActual = labels.map(l => intentAgg[l].actual);
       if(chartWorksIntent) chartWorksIntent.destroy();
       const canvas = $('#chartWorksIntentCanvas');
       if (canvas) {
         chartWorksIntent = new Chart(canvas, {
           type: 'bar',
           data: { labels: labels, datasets: [ { label: 'แจ้งส่งผลงาน', data: dataIntent, backgroundColor: '#fdcdac' }, { label: 'ส่งผลงานจริง', data: dataActual, backgroundColor: '#b3e2cd' } ]},
-          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'การส่งผลงานแยกรายประเภทบุคลากร' } } }
+          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'การส่งผลงานแยกรายประเภทบุคลากร (INTERNAL/EXTERNAL)' } } }
         });
       }
     } catch(e) { console.error('chartWorksIntent error:', e); }
@@ -742,13 +769,55 @@ function renderBannerList(){
   }).join('');
 }
 
-function toggleBannerActive(idx){
+async function autoSaveBannerList(){
+  try {
+    const list = window.BANNER_LIST || [];
+    if($('#BANNER_SLIDES_JSON_INPUT')) {
+      $('#BANNER_SLIDES_JSON_INPUT').value = JSON.stringify(list);
+    }
+    await rpc('saveAdminSettings', TOKEN, CID, {
+      settings: {
+        BANNER_SLIDES_JSON: JSON.stringify(list)
+      }
+    });
+    if(window._rpcCache) window._rpcCache.clear();
+    try { localStorage.removeItem('TUH_BOOT_CACHE_' + CID); } catch(e){}
+    return true;
+  } catch(e) {
+    console.error('autoSaveBannerList error:', e);
+    return false;
+  }
+}
+
+async function saveBannersNow(){
+  show('กำลังบันทึกภาพ Banner...');
+  try {
+    const ok = await autoSaveBannerList();
+    hide();
+    if(ok){
+      await Swal.fire({
+        icon: 'success',
+        title: 'บันทึกเรียบร้อย',
+        text: 'ภาพ Banner ได้รับการบันทึกและอัปเดตหน้าบ้านเรียบร้อยแล้ว',
+        confirmButtonColor: '#006D70'
+      });
+    } else {
+      throw new Error('ไม่สามารถบันทึกได้');
+    }
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
+
+async function toggleBannerActive(idx){
   if(!window.BANNER_LIST || !window.BANNER_LIST[idx]) return;
   window.BANNER_LIST[idx].active = window.BANNER_LIST[idx].active === false ? true : false;
   renderBannerList();
+  await autoSaveBannerList();
 }
 
-function moveBannerSlide(idx, dir){
+async function moveBannerSlide(idx, dir){
   if(!window.BANNER_LIST) return;
   const target = idx + dir;
   if(target < 0 || target >= window.BANNER_LIST.length) return;
@@ -756,6 +825,7 @@ function moveBannerSlide(idx, dir){
   window.BANNER_LIST[idx] = window.BANNER_LIST[target];
   window.BANNER_LIST[target] = temp;
   renderBannerList();
+  await autoSaveBannerList();
 }
 
 async function deleteBannerSlide(idx){
@@ -772,6 +842,9 @@ async function deleteBannerSlide(idx){
   if(res.isConfirmed){
     window.BANNER_LIST.splice(idx, 1);
     renderBannerList();
+    show('กำลังบันทึกการลบภาพ Banner...');
+    await autoSaveBannerList();
+    hide();
   }
 }
 
@@ -879,13 +952,27 @@ async function openAddBannerModal(editIdx = null){
       window.BANNER_LIST.push(res.value);
     }
     renderBannerList();
-    Swal.fire({
-      icon: 'success',
-      title: isEdit ? 'แก้ไขสำเร็จ' : 'เพิ่มภาพสำเร็จ',
-      text: 'กรุณากด "บันทึกการตั้งค่า" ด้านล่างเพื่อบันทึกข้อมูลถาวร',
-      timer: 2500,
-      showConfirmButton: false
-    });
+    show('กำลังบันทึกภาพ Banner...');
+    try {
+      await autoSaveBannerList();
+      hide();
+      Swal.fire({
+        icon: 'success',
+        title: isEdit ? 'แก้ไขสำเร็จ' : 'เพิ่มภาพสำเร็จ',
+        text: 'บันทึกภาพ Banner เรียบร้อยแล้ว (อัปเดตหน้าบ้านทันที)',
+        timer: 2000,
+        showConfirmButton: false
+      });
+    } catch(e) {
+      hide();
+      Swal.fire({
+        icon: 'success',
+        title: isEdit ? 'แก้ไขสำเร็จ' : 'เพิ่มภาพสำเร็จ',
+        text: 'กรุณากด "บันทึกการตั้งค่า" ด้านล่างเพื่อบันทึกข้อมูลถาวร',
+        timer: 2500,
+        showConfirmButton: false
+      });
+    }
   }
 }
 
@@ -904,6 +991,8 @@ $('#settingsForm').onsubmit=async e=>{
     settings.BANNER_SLIDES_JSON=JSON.stringify(window.BANNER_LIST || []);
     show('กำลังบันทึกการตั้งค่า');
     await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});
+    if(window._rpcCache) window._rpcCache.clear();
+    try { localStorage.removeItem('TUH_BOOT_CACHE_' + CID); } catch(e){}
     hide();
     await Swal.fire({icon:'success',title:'บันทึกเรียบร้อย',text:'การตั้งค่าและภาพ Banner ได้รับการอัปเดตเรียบร้อยแล้ว',confirmButtonColor:'#006D70'});
     await loadSettings();
