@@ -211,13 +211,13 @@
           </div>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
-          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadWorks()">
-          <select id="workPresentationType" class="field" style="width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="renderWorksTable()">
+          <select id="workPresentationType" class="field" style="width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
             <option value="">ทุกรูปแบบการนำเสนอ</option>
             <option value="แบบบรรยาย">แบบบรรยาย</option>
             <option value="แบบโปสเตอร์">แบบโปสเตอร์ (e-poster)</option>
           </select>
-          <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="loadWorks()">
+          <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
             <option value="">ทุกสถานะ</option>
             <option value="RECEIVED">RECEIVED</option>
             <option value="WAITING_REVIEWER_ASSIGN">รอจ่ายงาน</option>
@@ -225,7 +225,7 @@
             <option value="ACCEPTED">ผ่านการพิจารณา (Accepted)</option>
             <option value="REJECTED">ไม่ผ่าน (Rejected)</option>
           </select>
-          <button class="btn btn-soft" onclick="loadWorks()"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
+          <button class="btn btn-soft" onclick="loadWorks(true)"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
         </div>
         <div class="table-wrap">
           <table class="table" style="font-size:0.85rem">
@@ -253,11 +253,11 @@
           <h3 style="margin:0">รายชื่อ Reviewer</h3>
           <div style="display:flex; gap:10px">
             <button class="btn btn-primary" onclick="openReviewerForm()">+ เพิ่ม Reviewer</button>
-            <button class="btn btn-soft" onclick="loadReviewers()">รีเฟรช</button>
+            <button class="btn btn-soft" onclick="loadReviewers(true)">รีเฟรช</button>
           </div>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px">
-          <input id="revSearch" class="field" placeholder="ค้นหาชื่อ, อีเมล หรือหน่วยงาน Reviewer..." style="flex:1; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="loadReviewers()">
+          <input id="revSearch" class="field" placeholder="ค้นหาชื่อ, อีเมล หรือหน่วยงาน Reviewer..." style="flex:1; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="renderReviewersTable()">
         </div>
         <div class="table-wrap">
           <table class="table" style="font-size:0.85rem">
@@ -409,11 +409,49 @@ async function boot(){
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
 }
-async function nav(p){const page=$('#page-'+p);if(!page)return;CURRENT=p;$$('.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');$$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));const b=$(`.menu button[data-page="${p}"]`);$('#topTitle').textContent=b?b.childNodes[0].textContent:p;const sidebar=$('#sidebar');if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();try{if(p==='dashboard')await loadDashboard();if(p==='settings')await loadSettings();if(p==='import')await loadImportBatches();if(p==='registrations')await loadRegistrations();if(p==='payments')await loadPayments();if(p==='works')await loadWorks();if(p==='reviewers'){await loadReviewers();await loadReviewConfig()}if(p==='food')await loadFood();if(p==='users')await loadUsers()}catch(e){err(e)}}
+const TAB_STATE = window.TAB_STATE || { loaded: {}, inFlight: {} };
+window.TAB_STATE = TAB_STATE;
+
+async function nav(p, forceRefresh = false){
+  const page=$('#page-'+p);
+  if(!page)return;
+  CURRENT=p;
+  $$('.page').forEach(x=>x.classList.remove('active'));
+  page.classList.add('active');
+  $$('.menu button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));
+  const b=$(`.menu button[data-page="${p}"]`);
+  $('#topTitle').textContent=b?b.childNodes[0].textContent:p;
+  const sidebar=$('#sidebar');
+  if(sidebar&&sidebar.classList.contains('open'))toggleSidebar();
+
+  const isAlreadyLoaded = !!TAB_STATE.loaded[p];
+  if(isAlreadyLoaded && !forceRefresh){
+    return;
+  }
+  if(TAB_STATE.inFlight[p]) return;
+  TAB_STATE.inFlight[p] = true;
+
+  try{
+    if(p==='dashboard')await loadDashboard(forceRefresh);
+    else if(p==='settings')await loadSettings(forceRefresh);
+    else if(p==='import')await loadImportBatches(forceRefresh);
+    else if(p==='registrations')await loadRegistrations(forceRefresh);
+    else if(p==='payments')await loadPayments(forceRefresh);
+    else if(p==='works')await loadWorks(forceRefresh);
+    else if(p==='reviewers')await Promise.all([loadReviewers(forceRefresh), loadReviewConfig(forceRefresh)]);
+    else if(p==='food')await loadFood(forceRefresh);
+    else if(p==='users')await loadUsers(forceRefresh);
+    TAB_STATE.loaded[p] = Date.now();
+  }catch(e){
+    err(e);
+  }finally{
+    TAB_STATE.inFlight[p] = false;
+  }
+}
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
 async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
-async function refreshPage(){return nav(CURRENT)}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
+async function refreshPage(){if(window._rpcCache)window._rpcCache.clear();if(CURRENT&&window.TAB_STATE&&window.TAB_STATE.loaded)delete window.TAB_STATE.loaded[CURRENT];return nav(CURRENT,true)}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
 let chartRegByType, chartWorksIntent, chartWorksByStatus, chartWorksByCategory, chartDailyQuota;
 if (window.ChartDataLabels) Chart.register(ChartDataLabels);
 function renderDashboardUi(d, filterType){
@@ -616,8 +654,9 @@ async function loadDashboard(){
     if(!hasRenderedCache) hide();
   }
 }
-async function loadSettings(){
-  show('กำลังโหลดการตั้งค่า');
+async function loadSettings(forceRefresh = false){
+  const formFilled = !!($('#settingsForm')?.elements?.['ConferenceNameTH']?.value);
+  if(!formFilled && !forceRefresh) show('กำลังโหลดการตั้งค่า');
   try{
     const d=await rpc('getAdminSettings',TOKEN,CID),f=$('#settingsForm');
     ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>f.elements[k].value=d.conference[k]||'');
@@ -646,7 +685,7 @@ async function loadSettings(){
 
     $$('.date-input').forEach(el=>el.onblur=()=>warnGregorianInput(el));
   }finally{
-    hide();
+    if(!formFilled && !forceRefresh) hide();
   }
 }
 
@@ -1229,8 +1268,9 @@ async function sendBatchEmails(batchId, emailTarget){
     viewImportBatchDetail(batchId);
   } catch(e) { err(e); }
 }
-async function loadRegistrations(){
-  show('กำลังโหลดผู้ลงทะเบียน');
+async function loadRegistrations(forceRefresh = false){
+  const hasRows = !!(window.REGISTRATION_ROWS && window.REGISTRATION_ROWS.length);
+  if(!hasRows && !forceRefresh) show('กำลังโหลดผู้ลงทะเบียน');
   try{
     const rows=await rpc('adminListRegistrations',TOKEN,CID,{
       q:$('#regSearch')?$('#regSearch').value:'',
@@ -1245,9 +1285,9 @@ async function loadRegistrations(){
     $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
     initRegScrollSync();
     setTimeout(updateRegTopScrollbar, 50);
-  }finally{hide()}
+  }finally{if(!hasRows && !forceRefresh) hide()}
 }
-async function setRegStatus(id,status){const returning=status==='REGISTRATION_RETURNED';const x=await Swal.fire({icon:returning?'warning':'question',title:returning?'ส่งคืนข้อมูลให้ผู้สมัคร':'ยืนยันตรวจผ่าน',input:'textarea',inputLabel:returning?'ระบุเหตุผลที่ต้องแก้ไข':'หมายเหตุ (ถ้ามี)',inputPlaceholder:returning?'กรุณาระบุให้ชัดเจนเพื่อส่งไปทาง Email':'',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืนและแจ้ง Email':'ตรวจผ่าน',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังอัปเดตสถานะ');try{const r=await rpc('adminUpdateRegistrationStatus',TOKEN,CID,id,status,x.value||'');hide();await Swal.fire({icon:'success',title:'ดำเนินการเรียบร้อย',html:`สถานะใหม่: <b>${esc(r.newStatus)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});loadRegistrations()}catch(e){err(e)}}
+async function setRegStatus(id,status){const returning=status==='REGISTRATION_RETURNED';const x=await Swal.fire({icon:returning?'warning':'question',title:returning?'ส่งคืนข้อมูลให้ผู้สมัคร':'ยืนยันตรวจผ่าน',input:'textarea',inputLabel:returning?'ระบุเหตุผลที่ต้องแก้ไข':'หมายเหตุ (ถ้ามี)',inputPlaceholder:returning?'กรุณาระบุให้ชัดเจนเพื่อส่งไปทาง Email':'',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืนและแจ้ง Email':'ตรวจผ่าน',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังอัปเดตสถานะ');try{const r=await rpc('adminUpdateRegistrationStatus',TOKEN,CID,id,status,x.value||'');hide();await Swal.fire({icon:'success',title:'ดำเนินการเรียบร้อย',html:`สถานะใหม่: <b>${esc(r.newStatus)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});if(window.TAB_STATE&&window.TAB_STATE.loaded)delete window.TAB_STATE.loaded['registrations'];loadRegistrations(true)}catch(e){err(e)}}
 async function openRegistrationView(id){
   show('กำลังเปิดข้อมูล');
   try{
@@ -2118,7 +2158,7 @@ function renderSignSheetWindow(win,d,filters){
 
 window.PAYMENT_ROWS = [];
 
-async function loadPayments(){show('กำลังโหลดการเงิน');try{const q=($('#paySearch')?.value||'').trim();const status=($('#payStatus')?.value||'').trim();const needInvoice=($('#payInvoiceRequirement')?.value||'').trim();const receiptStatus=($('#payReceiptStatus')?.value||'').trim();let rows=await rpc('adminListPayments',TOKEN,CID,{q,status,needInvoice,receiptStatus});if(!rows||!Array.isArray(rows))rows=[];if(needInvoice==='NEED'){rows=rows.filter(p=>p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice);}else if(needInvoice==='NO'){rows=rows.filter(p=>!(p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice));}if(receiptStatus==='ISSUED'){rows=rows.filter(p=>p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued);}else if(receiptStatus==='NOT_ISSUED'){rows=rows.filter(p=>!(p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued));}window.PAYMENT_ROWS=rows;$('#payRows').innerHTML=rows.length?rows.map(p=>{const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>'}finally{hide()}}
+async function loadPayments(forceRefresh = false){const hasRows=!!(window.PAYMENT_ROWS&&window.PAYMENT_ROWS.length);if(!hasRows&&!forceRefresh)show('กำลังโหลดการเงิน');try{const q=($('#paySearch')?.value||'').trim();const status=($('#payStatus')?.value||'').trim();const needInvoice=($('#payInvoiceRequirement')?.value||'').trim();const receiptStatus=($('#payReceiptStatus')?.value||'').trim();let rows=await rpc('adminListPayments',TOKEN,CID,{q,status,needInvoice,receiptStatus});if(!rows||!Array.isArray(rows))rows=[];if(needInvoice==='NEED'){rows=rows.filter(p=>p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice);}else if(needInvoice==='NO'){rows=rows.filter(p=>!(p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice));}if(receiptStatus==='ISSUED'){rows=rows.filter(p=>p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued);}else if(receiptStatus==='NOT_ISSUED'){rows=rows.filter(p=>!(p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued));}window.PAYMENT_ROWS=rows;$('#payRows').innerHTML=rows.length?rows.map(p=>{const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>'}finally{if(!hasRows&&!forceRefresh)hide()}}
 
 function openEditReceiptModal(regId){const p=(window.PAYMENT_ROWS||[]).find(x=>x.RegID===regId)||{};const name=p.ReceiptName||p.FullName||p.Registration?.FullName||'';const taxId=p.ReceiptTaxID||p.ReceiptTaxId||'';const address=p.ReceiptAddress||'';const postalCode=p.ReceiptPostalCode||'';const phone=p.ReceiptPhone||p.Phone||p.Registration?.Phone||'';const needInvoice=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;const invoiceStatus=p.InvoiceStatus||p.ReceiptStatus||'NOT_ISSUED';const receiptNo=p.ReceiptNo||'';editReceiptInfoModal(regId,name,taxId,address,postalCode,phone,needInvoice,invoiceStatus,receiptNo);}
 
@@ -2356,118 +2396,130 @@ function formatWorkCategory(v) {
   return s;
 }
 
-async function loadWorks(){
-  show('กำลังโหลดผลงาน');
-  try{
-    const searchVal = ($('#workSearch')?.value || '').trim();
-    const statusVal = ($('#workStatus')?.value || '').trim();
-    const ptVal = ($('#workPresentationType')?.value || '').trim();
-    
-    const rows = await rpc('adminListWorks', TOKEN, CID, {
-      q: searchVal,
-      status: statusVal,
-      presentationType: ptVal
+function renderWorksTable(){
+  const rows = window.WORK_ROWS || [];
+  const searchVal = ($('#workSearch')?.value || '').trim().toLowerCase();
+  const statusVal = ($('#workStatus')?.value || '').trim();
+  const ptVal = ($('#workPresentationType')?.value || '').trim();
+
+  function normTitle(t){
+    return String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '').trim().toLowerCase();
+  }
+  const titleCountMap = {};
+  rows.forEach(w => {
+    const nt = normTitle(w.TitleTH || w.ThaiTitle);
+    if (nt) titleCountMap[nt] = (titleCountMap[nt] || 0) + 1;
+  });
+
+  let filteredRows = rows;
+  if(searchVal){
+    filteredRows = filteredRows.filter(w => {
+      const code = String(w.WorkCode || w.WorkID || '').toLowerCase();
+      const titleTH = String(w.TitleTH || w.ThaiTitle || '').toLowerCase();
+      const titleEN = String(w.TitleEN || w.EnglishTitle || '').toLowerCase();
+      const presenter = String(w.PresenterName || '').toLowerCase();
+      return code.includes(searchVal) || titleTH.includes(searchVal) || titleEN.includes(searchVal) || presenter.includes(searchVal);
     });
-    window.WORK_ROWS = rows;
-    
-    // ตรวจหาผลงานที่มีชื่อซ้ำกัน (ตัดช่องว่างทุกจุดและเทียบแบบ case-insensitive)
-    function normTitle(t){
-      return String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, '').trim().toLowerCase();
-    }
-    const titleCountMap = {};
-    (rows || []).forEach(w => {
-      const nt = normTitle(w.TitleTH || w.ThaiTitle);
-      if (nt) titleCountMap[nt] = (titleCountMap[nt] || 0) + 1;
-    });
+  }
+  if(statusVal){
+    filteredRows = filteredRows.filter(w => (w.Status || w.CurrentStatus) === statusVal);
+  }
+  if (ptVal) {
+    const ptf = ptVal.toLowerCase();
+    filteredRows = filteredRows.filter(w => {
+      const raw = [
+        w.PresentationTypeName,
+        w.PresentationType,
+        w.PresentationTypeFinal,
+        w.PresentationTypeRequested,
+        w['รูปแบบการนำเสนอ'],
+        w['รูปแบบ']
+      ].filter(Boolean).join(' ').toLowerCase();
 
-    let filteredRows = rows || [];
-    if (ptVal) {
-      const ptf = ptVal.toLowerCase();
-      filteredRows = filteredRows.filter(w => {
-        const raw = [
-          w.PresentationTypeName,
-          w.PresentationType,
-          w.PresentationTypeFinal,
-          w.PresentationTypeRequested,
-          w['รูปแบบการนำเสนอ'],
-          w['รูปแบบ']
-        ].filter(Boolean).join(' ').toLowerCase();
-
-        if (ptf.includes('บรรยาย') || ptf.includes('oral')) {
-          return raw.includes('บรรยาย') || raw.includes('oral') || raw.includes('pt-2026-000001') || raw.includes('pt-oral');
-        }
-        if (ptf.includes('โปสเตอร์') || ptf.includes('poster') || ptf.includes('eposter')) {
-          return raw.includes('โปสเตอร์') || raw.includes('poster') || raw.includes('eposter') || raw.includes('pt-2026-000002') || raw.includes('pt-eposter');
-        }
-        return raw.includes(ptf);
-      });
-    }
-
-    $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
-      let rawPt = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '').trim();
-      let ptDisplay = rawPt;
-      let badgeClass = '';
-      if (/oral|บรรยาย|pt-2026-000001/i.test(rawPt)) {
-        ptDisplay = 'แบบบรรยาย';
-        badgeClass = 'ok';
-      } else if (/poster|โปสเตอร์|eposter|pt-2026-000002/i.test(rawPt)) {
-        ptDisplay = 'แบบโปสเตอร์ (e-poster)';
-        badgeClass = 'warn';
-      } else if (!ptDisplay || ptDisplay === '-') {
-        ptDisplay = '-';
+      if (ptf.includes('บรรยาย') || ptf.includes('oral')) {
+        return raw.includes('บรรยาย') || raw.includes('oral') || raw.includes('pt-2026-000001') || raw.includes('pt-oral');
       }
+      if (ptf.includes('โปสเตอร์') || ptf.includes('poster') || ptf.includes('eposter')) {
+        return raw.includes('โปสเตอร์') || raw.includes('poster') || raw.includes('eposter') || raw.includes('pt-2026-000002') || raw.includes('pt-eposter');
+      }
+      return raw.includes(ptf);
+    });
+  }
 
-      const nt = normTitle(w.TitleTH || w.ThaiTitle);
-      const isDuplicate = nt && (titleCountMap[nt] > 1);
-      const dupCount = isDuplicate ? titleCountMap[nt] : 0;
-      const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
-      const catDisplay = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+  $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
+    let rawPt = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '').trim();
+    let ptDisplay = rawPt;
+    let badgeClass = '';
+    if (/oral|บรรยาย|pt-2026-000001/i.test(rawPt)) {
+      ptDisplay = 'แบบบรรยาย';
+      badgeClass = 'ok';
+    } else if (/poster|โปสเตอร์|eposter|pt-2026-000002/i.test(rawPt)) {
+      ptDisplay = 'แบบโปสเตอร์ (e-poster)';
+      badgeClass = 'warn';
+    } else if (!ptDisplay || ptDisplay === '-') {
+      ptDisplay = '-';
+    }
 
-      return `<tr>
-      <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
-      <td>
-        ${isDuplicate 
-          ? `<div style="color:#dc2626; font-weight:700; display:flex; align-items:flex-start; gap:6px;">
-              <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px; flex-shrink:0; color:#dc2626;" title="อาจมีชื่อผลงานซ้ำ (${dupCount} รายการ)"></i>
-              <div>
-                <span style="color:#dc2626;">${titleDisplay}</span>
-                <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.7rem; padding:1px 6px; margin-left:4px; font-weight:600;"><i class="fa-solid fa-clone"></i> ชื่อซ้ำ (${dupCount} เรื่อง)</span>
-              </div>
-             </div>`
-          : `<div>${titleDisplay}</div>`
-        }
-        ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
-      </td>
-      <td>${esc(catDisplay)}</td>
-      <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
-      <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
-      <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
-      <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
-      <td><div style="margin-bottom:4px">งาน: ${statusBadge(w.Status||w.CurrentStatus)}</div><div>ลงทะเบียน: ${statusBadge(w.RegistrationStatus||'ไม่พบข้อมูล')}</div></td>
-      <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-        <button class="btn btn-primary btn-sm" title="จ่ายผู้ประเมิน" onclick="openAssignReviewerModal('${esc(w.WorkID)}')"><i class="fa-solid fa-user-plus"></i></button>
-        <button class="btn btn-blue btn-sm" title="คะแนนประเมิน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple"></i></button>
-        <button class="btn btn-gold btn-sm" title="ปรับสถานะ/ประเภท" onclick="openUpdateWorkStatus('${esc(w.WorkID)}', '${esc(w.Status||w.CurrentStatus)}')"><i class="fa-solid fa-pen-to-square"></i></button>
-        <button class="btn btn-soft btn-sm" title="ส่งอีเมล" onclick="openEmail('${esc(w.PresenterEmail||'')}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(w.PresenterName||'')}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
-        <button class="btn btn-gold btn-sm" title="แนบ/จัดการไฟล์" onclick="openUploadModal('${esc(w.WorkID)}','${esc(w.RegID||'')}')"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-        <button class="btn btn-sm" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="ลบผลงานนี้ (รวมไฟล์แนบ)" onclick="deleteWorkItem('${esc(w.WorkID)}', '${esc(w.WorkCode||w.WorkID)}', '${esc((w.TitleTH||w.TitleEN||'').replace(/['\"\\`]/g, ' '))}')"><i class="fa-solid fa-trash-can"></i></button>
-        ${(w.files||[]).sort((a,b)=>{
-          const wa = (a.FileCategory||'').includes('PRESENT') ? 2 : (a.FileCategory==='BLIND' ? 1 : 0);
-          const wb = (b.FileCategory||'').includes('PRESENT') ? 2 : (b.FileCategory==='BLIND' ? 1 : 0);
-          return wa - wb;
-        }).map(f=>{
-          let t = f.FileCategory, i = 'fa-file-pdf';
-          if(t==='BLIND'){ t='ไฟล์ปกปิดชื่อ (Blind)'; i='fa-user-secret'; }
-          else if(t==='PRESENTER_BIO'){ t='ประวัติผู้นำเสนอ (Bio)'; i='fa-address-card'; }
-          else if((t||'').includes('PRESENT')){ t='ไฟล์นำเสนอ'; i='fa-display'; }
-          else{ t='ไฟล์ต้นฉบับ ('+t+')'; if(t==='WORD') i='fa-file-word'; }
-          return `<a target="_blank" href="${esc(f.FileUrl)}" class="btn btn-soft btn-sm" title="${t}"><i class="fa-solid ${i}"></i></a>`;
-        }).join('')}
-      </td>
-    </tr>`;
-    }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+    const nt = normTitle(w.TitleTH || w.ThaiTitle);
+    const isDuplicate = nt && (titleCountMap[nt] > 1);
+    const dupCount = isDuplicate ? titleCountMap[nt] : 0;
+    const titleDisplay = esc(w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle||'-');
+    const catDisplay = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+
+    return `<tr>
+    <td><b>${esc(w.WorkCode||w.WorkID)}</b></td>
+    <td>
+      ${isDuplicate 
+        ? `<div style="color:#dc2626; font-weight:700; display:flex; align-items:flex-start; gap:6px;">
+            <i class="fa-solid fa-triangle-exclamation" style="margin-top:3px; flex-shrink:0; color:#dc2626;" title="อาจมีชื่อผลงานซ้ำ (${dupCount} รายการ)"></i>
+            <div>
+              <span style="color:#dc2626;">${titleDisplay}</span>
+              <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.7rem; padding:1px 6px; margin-left:4px; font-weight:600;"><i class="fa-solid fa-clone"></i> ชื่อซ้ำ (${dupCount} เรื่อง)</span>
+            </div>
+           </div>`
+        : `<div>${titleDisplay}</div>`
+      }
+      ${w.TitleEN&&w.TitleTH?`<div class="muted" style="font-size:0.75rem">${esc(w.TitleEN)}</div>`:''}
+    </td>
+    <td>${esc(catDisplay)}</td>
+    <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
+    <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
+    <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
+    <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
+    <td><div style="margin-bottom:4px">งาน: ${statusBadge(w.Status||w.CurrentStatus)}</div><div>ลงทะเบียน: ${statusBadge(w.RegistrationStatus||'ไม่พบข้อมูล')}</div></td>
+    <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
+      <button class="btn btn-primary btn-sm" title="จ่ายผู้ประเมิน" onclick="openAssignReviewerModal('${esc(w.WorkID)}')"><i class="fa-solid fa-user-plus"></i></button>
+      <button class="btn btn-blue btn-sm" title="คะแนนประเมิน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple"></i></button>
+      <button class="btn btn-gold btn-sm" title="ปรับสถานะ/ประเภท" onclick="openUpdateWorkStatus('${esc(w.WorkID)}', '${esc(w.Status||w.CurrentStatus)}')"><i class="fa-solid fa-pen-to-square"></i></button>
+      <button class="btn btn-soft btn-sm" title="ส่งอีเมล" onclick="openEmail('${esc(w.PresenterEmail||'')}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(w.PresenterName||'')}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
+      <button class="btn btn-gold btn-sm" title="แนบ/จัดการไฟล์" onclick="openUploadModal('${esc(w.WorkID)}','${esc(w.RegID||'')}')"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+      <button class="btn btn-sm" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="ลบผลงานนี้ (รวมไฟล์แนบ)" onclick="deleteWorkItem('${esc(w.WorkID)}', '${esc(w.WorkCode||w.WorkID)}', '${esc((w.TitleTH||w.TitleEN||'').replace(/['\"\\`]/g, ' '))}')"><i class="fa-solid fa-trash-can"></i></button>
+      ${(w.files||[]).sort((a,b)=>{
+        const wa = (a.FileCategory||'').includes('PRESENT') ? 2 : (a.FileCategory==='BLIND' ? 1 : 0);
+        const wb = (b.FileCategory||'').includes('PRESENT') ? 2 : (b.FileCategory==='BLIND' ? 1 : 0);
+        return wa - wb;
+      }).map(f=>{
+        let t = f.FileCategory, i = 'fa-file-pdf';
+        if(t==='BLIND'){ t='ไฟล์ปกปิดชื่อ (Blind)'; i='fa-user-secret'; }
+        else if(t==='PRESENTER_BIO'){ t='ประวัติผู้นำเสนอ (Bio)'; i='fa-address-card'; }
+        else if((t||'').includes('PRESENT')){ t='ไฟล์นำเสนอ'; i='fa-display'; }
+        else{ t='ไฟล์ต้นฉบับ ('+t+')'; if(t==='WORD') i='fa-file-word'; }
+        return `<a target="_blank" href="${esc(f.FileUrl)}" class="btn btn-soft btn-sm" title="${t}"><i class="fa-solid ${i}"></i></a>`;
+      }).join('')}
+    </td>
+  </tr>`;
+  }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+}
+
+async function loadWorks(forceRefresh = false){
+  const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
+  if(!hasRows && !forceRefresh) show('กำลังโหลดผลงาน');
+  try{
+    const rows = await rpc('adminListWorks', TOKEN, CID, {});
+    window.WORK_ROWS = rows || [];
+    renderWorksTable();
   }finally{
-    hide();
+    if(!hasRows && !forceRefresh) hide();
   }
 }
 function num(v){return Number(v)||0;}
@@ -3101,32 +3153,39 @@ async function deleteWorkFileAction(workFileId, fileName, wid, regId) {
     }
   }
 }
-async function loadReviewers(){
-  show('กำลังโหลด Reviewer');
+function renderReviewersTable(){
+  const rows = window.REVIEWER_ROWS || [];
+  const q = ($('#revSearch')?.value || '').toLowerCase();
+  const filtered = rows.filter(x=>{
+    const s = [x.reviewer?.ReviewerID, x.reviewer?.FullName, x.reviewer?.Email, x.reviewer?.Institution, x.reviewer?.Department].join(' ').toLowerCase();
+    return !q || s.includes(q);
+  });
+  $('#reviewerRows').innerHTML=filtered.map(x=>`<tr>
+    <td>${esc(x.reviewer.ReviewerID)}</td>
+    <td><b>${esc(x.reviewer.Prefix||'')}${esc(x.reviewer.FirstName||'')} ${esc(x.reviewer.LastName||'')}</b><br><span class="muted">${esc(x.reviewer.Position||'')}</span></td>
+    <td>${esc(x.reviewer.Email)}</td>
+    <td>${esc(x.reviewer.Institution)}<br><span class="muted">${esc(x.reviewer.Department||'')}</span></td>
+    <td>${esc(x.reviewer.Phone||'-')}</td>
+    <td>${esc(x.ExpertiseCategories||x.reviewer.ExpertiseCategories)}</td>
+    <td>${x.CurrentAssignedCount}/${x.MaxWorkload}</td>
+    <td>${statusBadge(x.Status)}</td>
+    <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
+      <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
+      <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-key"></i></button>
+      <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(x.reviewer.Email)}','','เรียน ${esc(x.reviewer.FullName||'')}', '')"><i class="fa-solid fa-envelope"></i></button>
+    </td>
+  </tr>`).join('');
+}
+
+async function loadReviewers(forceRefresh = false){
+  const hasRows = !!(window.REVIEWER_ROWS && window.REVIEWER_ROWS.length);
+  if(!hasRows && !forceRefresh) show('กำลังโหลด Reviewer');
   try{
     const rows=await rpc('adminListReviewers',TOKEN,CID);
-    const q = ($('#revSearch').value||'').toLowerCase();
-    const filtered = rows.filter(x=>{
-      const s = [x.reviewer.ReviewerID, x.reviewer.FullName, x.reviewer.Email, x.reviewer.Institution, x.reviewer.Department].join(' ').toLowerCase();
-      return !q || s.includes(q);
-    });
-    $('#reviewerRows').innerHTML=filtered.map(x=>`<tr>
-      <td>${esc(x.reviewer.ReviewerID)}</td>
-      <td><b>${esc(x.reviewer.Prefix||'')}${esc(x.reviewer.FirstName||'')} ${esc(x.reviewer.LastName||'')}</b><br><span class="muted">${esc(x.reviewer.Position||'')}</span></td>
-      <td>${esc(x.reviewer.Email)}</td>
-      <td>${esc(x.reviewer.Institution)}<br><span class="muted">${esc(x.reviewer.Department||'')}</span></td>
-      <td>${esc(x.reviewer.Phone||'-')}</td>
-      <td>${esc(x.ExpertiseCategories||x.reviewer.ExpertiseCategories)}</td>
-      <td>${x.CurrentAssignedCount}/${x.MaxWorkload}</td>
-      <td>${statusBadge(x.Status)}</td>
-      <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-        <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-key"></i></button>
-        <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(x.reviewer.Email)}','','เรียน ${esc(x.reviewer.FullName||'')}', '')"><i class="fa-solid fa-envelope"></i></button>
-      </td>
-    </tr>`).join('');
+    window.REVIEWER_ROWS = rows || [];
+    renderReviewersTable();
   }finally{
-    hide();
+    if(!hasRows && !forceRefresh) hide();
   }
 }
 async function resendReviewerCreds(id){
@@ -3184,7 +3243,7 @@ async function openReviewerForm(id){
     loadReviewers();
   } catch(e) { err(e); }
 }
-async function loadReviewConfig(){const d=await rpc('adminGetReviewConfig',TOKEN,CID);$('#reviewConfig').innerHTML='<h4>รอบประเมิน</h4>'+d.rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers}-${r.MaxReviewers}</div>`).join('')+'<h4>เกณฑ์คะแนน</h4>'+d.criteria.map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('')}
+async function loadReviewConfig(forceRefresh = false){if($('#reviewConfig')?.children?.length && !forceRefresh) return;const d=await rpc('adminGetReviewConfig',TOKEN,CID);$('#reviewConfig').innerHTML='<h4>รอบประเมิน</h4>'+d.rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers}-${r.MaxReviewers}</div>`).join('')+'<h4>เกณฑ์คะแนน</h4>'+d.criteria.map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('')}
 
 function switchUploadTab(t){
   if(t==='local'){
@@ -3312,8 +3371,9 @@ async function promptReplaceWorkFile(workId, regId, existingFilesHtml) {
   Swal.fire({title:'อัปโหลดไฟล์ผลงาน', html:h, width:600, showConfirmButton:false, showCloseButton:true});
 }
 // Users Management
-async function loadUsers(){
-  show('กำลังโหลดผู้ใช้งาน');
+async function loadUsers(forceRefresh = false){
+  const hasRows = !!(window.USERS_LIST_CACHE && window.USERS_LIST_CACHE.length);
+  if(!hasRows && !forceRefresh) show('กำลังโหลดผู้ใช้งาน');
   try{
     const rows=await rpc('adminListUsers',TOKEN,CID);
     window.USERS_LIST_CACHE = rows || [];
@@ -3329,7 +3389,7 @@ async function loadUsers(){
       </td>
     </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
   }finally{
-    hide();
+    if(!hasRows && !forceRefresh) hide();
   }
 }
 
@@ -3424,7 +3484,7 @@ async function adminRevokeUser(uid){
 }
 
 function foodFilters(){return {q:$('#foodSearch').value,eligibility:$('#foodEligibility').value,paymentStatus:$('#foodPayment').value,sentStatus:$('#foodSent').value}}
-async function loadFood(){show('กำลังโหลดคูปองอาหาร');try{FOOD_ROWS=await rpc('adminListMealPasses',TOKEN,CID,foodFilters());$('#foodRows').innerHTML=FOOD_ROWS.length?FOOD_ROWS.map(r=>`<tr><td><input class="food-check" type="checkbox" value="${esc(r.RegID)}" ${r.Eligible?'':'disabled'} onchange="updateFoodCount()"></td><td><b>${esc(r.FullName)}</b><br><span class="muted">${esc(r.RegID)}<br>${esc(r.Email)}</span></td><td>${esc(r.ParticipantTypeName)}</td><td>${statusBadge(r.DataCompletenessStatus)}<br>${statusBadge(r.RegistrationStatus)}</td><td>${statusBadge(r.PaymentStatus)}</td><td>${r.Eligible?'<span class="badge ok">พร้อมออกคูปอง</span>':`<span class="badge bad">${esc(r.EligibilityReason)}</span>`}<br><span class="muted">${esc(r.MealPassStatus||'NOT_READY')}</span></td><td><b>${r.DispatchCount}</b> ครั้ง</td><td>${r.LastSentAt?formatBeDateTime(r.LastSentAt):'-'}</td><td class="actions"><button class="btn btn-blue btn-sm" onclick="viewUserScanHistory('${esc(r.RegID)}')">ประวัติ</button> <button class="btn btn-soft btn-sm" ${r.Eligible?'':'disabled'} onclick="previewFood('${esc(r.RegID)}')">ดู QR</button><button class="btn btn-gold btn-sm" ${r.Eligible?'':'disabled'} onclick="sendFood('${esc(r.RegID)}')">สร้างและส่ง</button></td></tr>`).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';$('#foodAll').checked=false;updateFoodCount()}finally{hide()}}
+async function loadFood(forceRefresh = false){const hasRows = !!(typeof FOOD_ROWS !== 'undefined' && FOOD_ROWS && FOOD_ROWS.length);if(!hasRows && !forceRefresh) show('กำลังโหลดคูปองอาหาร');try{FOOD_ROWS=await rpc('adminListMealPasses',TOKEN,CID,foodFilters());$('#foodRows').innerHTML=FOOD_ROWS.length?FOOD_ROWS.map(r=>`<tr><td><input class="food-check" type="checkbox" value="${esc(r.RegID)}" ${r.Eligible?'':'disabled'} onchange="updateFoodCount()"></td><td><b>${esc(r.FullName)}</b><br><span class="muted">${esc(r.RegID)}<br>${esc(r.Email)}</span></td><td>${esc(r.ParticipantTypeName)}</td><td>${statusBadge(r.DataCompletenessStatus)}<br>${statusBadge(r.RegistrationStatus)}</td><td>${statusBadge(r.PaymentStatus)}</td><td>${r.Eligible?'<span class="badge ok">พร้อมออกคูปอง</span>':`<span class="badge bad">${esc(r.EligibilityReason)}</span>`}<br><span class="muted">${esc(r.MealPassStatus||'NOT_READY')}</span></td><td><b>${r.DispatchCount}</b> ครั้ง</td><td>${r.LastSentAt?formatBeDateTime(r.LastSentAt):'-'}</td><td class="actions"><button class="btn btn-blue btn-sm" onclick="viewUserScanHistory('${esc(r.RegID)}')">ประวัติ</button> <button class="btn btn-soft btn-sm" ${r.Eligible?'':'disabled'} onclick="previewFood('${esc(r.RegID)}')">ดู QR</button><button class="btn btn-gold btn-sm" ${r.Eligible?'':'disabled'} onclick="sendFood('${esc(r.RegID)}')">สร้างและส่ง</button></td></tr>`).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';$('#foodAll').checked=false;updateFoodCount()}finally{if(!hasRows && !forceRefresh) hide()}}
 function toggleAllFood(on){$$('.food-check:not(:disabled)').forEach(x=>x.checked=!!on);$('#foodAll').checked=!!on;updateFoodCount()}function selectedFood(){return $$('.food-check:checked').map(x=>x.value)}function updateFoodCount(){$('#foodSelectedCount').textContent=`เลือก ${selectedFood().length} คน`}
 async function previewFood(id){
   show('กำลังสร้างตัวอย่าง QR');

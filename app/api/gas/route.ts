@@ -127,9 +127,12 @@ function setCachedResponse(action:string,args:unknown[],data:ApiResponse<unknown
 }
 
 function invalidateServerCache(action:string){
-  // If a write occurs, clear memory cache
   if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(action)){
-    memoryCache.clear();
+    for(const key of memoryCache.keys()){
+      if(!key.startsWith("getPublic") && !key.startsWith("getAdminSettings")){
+        memoryCache.delete(key);
+      }
+    }
   }
 }
 
@@ -208,7 +211,8 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
         return result;
       }catch(error){
         lastError = error;
-        if(attempt+1>=attempts && urls.indexOf(url) === urls.length - 1) throw error;
+        const isTimeout = error instanceof Error && (error.name === "AbortError" || /abort|timeout/i.test(error.message));
+        if(isTimeout || (attempt+1>=attempts && urls.indexOf(url) === urls.length - 1)) throw error;
       }finally{
         clearTimeout(timeout);
       }
