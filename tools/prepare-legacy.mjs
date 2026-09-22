@@ -13,10 +13,22 @@ const rpcCode=`window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=
 const canonicalCode=`function canonicalRoute(page){const routes={public:'/',admin:'/admin',reviewer:'/reviewer',scanner:'/scanner',launcher:'/launcher'};const target=routes[page||'public']||'/';return target+'?conferenceId='+encodeURIComponent(CID)}`;
 
 function replaceFunction(text,name,code){
-  const start=text.indexOf(`function ${name}(`);
-  if(start<0)return text;
+  let start = text.search(new RegExp(`(?:async\\s+)?function\\s+${name}\\s*\\(`));
+  if (start < 0) {
+    start = text.indexOf(`function ${name}(`);
+    if (start < 0) return text;
+  }
+  // If replacing rpc and window._rpcCache preceded it in text, strip the preceding declaration
+  if (name === "rpc") {
+    const cacheIdx = text.lastIndexOf("window._rpcCache=", start);
+    if (cacheIdx >= 0 && start - cacheIdx < 160) {
+      start = cacheIdx;
+    }
+  }
+  const funcKeyword = text.indexOf("function", start);
+  const openParen = text.indexOf("(", funcKeyword >= 0 ? funcKeyword : start);
   let depth=0,quote="",escaped=false,opened=false;
-  for(let i=start;i<text.length;i+=1){
+  for(let i=openParen;i<text.length;i+=1){
     const c=text[i];
     if(quote){
       if(escaped)escaped=false;
