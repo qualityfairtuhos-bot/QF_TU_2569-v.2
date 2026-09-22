@@ -1349,7 +1349,9 @@ function invalidateCache_(conferenceId){
       'ADM_USERS_' + cid,
       'ADM_RCFG_' + cid,
       'ADM_WORKS_' + cid,
-      'ADM_REGS_' + cid
+      'ADM_REGS_' + cid,
+      'ADM_PAYMENTS_' + cid,
+      'ADM_MEALPASS_' + cid
     ];
     MASTER_TABLES_.forEach(function(t){ keys.push('TBL_' + t); });
     keys.forEach(function(k){ cacheRemoveLarge_(k); });
@@ -3552,41 +3554,56 @@ function adminListPayments(token,conferenceId,filters){
   return runSafely_('adminListPayments',function(){
     requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','FINANCE_STAFF'],conferenceId);
     filters=filters||{};
-    const types={};findMany_('RegistrationTypes',{ConferenceID:conferenceId}).forEach(function(t){types[t.TypeCode]=t;});
-    const paymentByReg={};findMany_('Payments',{ConferenceID:conferenceId}).forEach(function(p){paymentByReg[p.RegID]=p;});
-    const allDocs = findMany_('FinanceDocuments',{ConferenceID:conferenceId}).filter(function(d){return bool_(d.Active);});
-    const docsByReg = {};
-    allDocs.forEach(function(d){ (docsByReg[d.RegID] || (docsByReg[d.RegID] = [])).push(d); });
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cacheKey = 'ADM_PAYMENTS_' + cid;
+    let baseRows = null;
+    try {
+      baseRows = cacheGetLarge_(cacheKey);
+    } catch(e) {}
 
-    let rows=findMany_('Registrations',{ConferenceID:conferenceId}).filter(function(r){const t=types[r.ParticipantType]||{};return bool_(t.PaymentRequired);}).map(function(r){
-      const t=types[r.ParticipantType]||{},p=paymentByReg[r.RegID]||{};
-      const docs = docsByReg[r.RegID] || [];
-      const receiptStatus = p.ReceiptStatus || (r.ReceiptRequirement === 'NO_RECEIPT' ? 'NO_RECEIPT' : 'WAIT_RECEIPT');
-      return Object.assign({
-        PaymentID:'',
-        ConferenceID:conferenceId,
-        RegID:r.RegID,
-        Amount:num_(t.FeeAmount),
-        Currency:'THB',
-        Status:r.PaymentStatus||'UNPAID',
-        SlipFileUrl:'',
-        SlipFileName:'',
-        ReceiptStatus:receiptStatus,
-        NeedInvoice:bool_(r.NeedInvoice),
-        InvoiceStatus:r.InvoiceStatus || (bool_(r.NeedInvoice) ? 'PENDING_INVOICE' : 'NO_INVOICE'),
-        ReceiptRequirement:r.ReceiptRequirement || 'NO_RECEIPT',
-        ReceiptName:r.ReceiptName || '',
-        ReceiptTaxID:r.ReceiptTaxID || '',
-        ReceiptPhone:r.ReceiptPhone || '',
-        ReceiptAddress:r.ReceiptAddress || '',
-        ReceiptPostalCode:r.ReceiptPostalCode || '',
-        FinanceDocs:docs
-      },p,{RequiredAmount:num_(t.FeeAmount),Registration:publicRegistration_(r)});
-    });
+    if (!baseRows || !Array.isArray(baseRows)) {
+      const types={};findMany_('RegistrationTypes',{ConferenceID:cid}).forEach(function(t){types[t.TypeCode]=t;});
+      const paymentByReg={};findMany_('Payments',{ConferenceID:cid}).forEach(function(p){paymentByReg[p.RegID]=p;});
+      const allDocs = findMany_('FinanceDocuments',{ConferenceID:cid}).filter(function(d){return bool_(d.Active);});
+      const docsByReg = {};
+      allDocs.forEach(function(d){ (docsByReg[d.RegID] || (docsByReg[d.RegID] = [])).push(d); });
+
+      baseRows=findMany_('Registrations',{ConferenceID:cid}).filter(function(r){const t=types[r.ParticipantType]||{};return bool_(t.PaymentRequired);}).map(function(r){
+        const t=types[r.ParticipantType]||{},p=paymentByReg[r.RegID]||{};
+        const docs = docsByReg[r.RegID] || [];
+        const receiptStatus = p.ReceiptStatus || (r.ReceiptRequirement === 'NO_RECEIPT' ? 'NO_RECEIPT' : 'WAIT_RECEIPT');
+        return Object.assign({
+          PaymentID:'',
+          ConferenceID:cid,
+          RegID:r.RegID,
+          Amount:num_(t.FeeAmount),
+          Currency:'THB',
+          Status:r.PaymentStatus||'UNPAID',
+          SlipFileUrl:'',
+          SlipFileName:'',
+          ReceiptStatus:receiptStatus,
+          NeedInvoice:bool_(r.NeedInvoice),
+          InvoiceStatus:r.InvoiceStatus || (bool_(r.NeedInvoice) ? 'PENDING_INVOICE' : 'NO_INVOICE'),
+          ReceiptRequirement:r.ReceiptRequirement || 'NO_RECEIPT',
+          ReceiptName:r.ReceiptName || '',
+          ReceiptTaxID:r.ReceiptTaxID || '',
+          ReceiptPhone:r.ReceiptPhone || '',
+          ReceiptAddress:r.ReceiptAddress || '',
+          ReceiptPostalCode:r.ReceiptPostalCode || '',
+          FinanceDocs:docs
+        },p,{RequiredAmount:num_(t.FeeAmount),Registration:publicRegistration_(r)});
+      });
+      baseRows.sort(function(a,b){return String(b.SubmittedAt||b.CreatedAt||'').localeCompare(String(a.SubmittedAt||a.CreatedAt||''));});
+      baseRows = serialize_(baseRows);
+      try {
+        cachePutLarge_(cacheKey, baseRows, 180);
+      } catch(e) {}
+    }
+
+    let rows = baseRows;
     if(filters.q){const q=clean_(filters.q).toLowerCase();rows=rows.filter(function(x){return [x.RegID,x.Registration.FullName,x.Registration.Email,x.Registration.Phone].join(' ').toLowerCase().indexOf(q)>=0;});}
     if(filters.status)rows=rows.filter(function(x){return upper_(x.Status)===upper_(filters.status);});
-    rows.sort(function(a,b){return String(b.SubmittedAt||b.CreatedAt||'').localeCompare(String(a.SubmittedAt||a.CreatedAt||''));});
-    return serialize_(rows);
+    return rows;
   });
 }
 function adminVerifyPayment(token,conferenceId,paymentId,decision,note,receipt){
@@ -4612,15 +4629,33 @@ function adminSaveRegistration(token,conferenceId,regId,payload){
 }
 function adminListMealPasses(token,conferenceId,filters){
   return runSafely_('adminListMealPasses',function(){
-    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF','FOOD_STAFF'],conferenceId);filters=filters||{};const typeMap=registrationTypeMap_(conferenceId),entCount={},dispatchMap={};
-    findMany_('MealEntitlements',{ConferenceID:conferenceId}).forEach(function(e){if(upper_(e.Status)!=='CANCELLED')entCount[e.RegID]=(entCount[e.RegID]||0)+1;});
-    findMany_('EmailLogs',{ConferenceID:conferenceId,RelatedType:'MEAL_PASS'}).forEach(function(x){if(upper_(x.Status)!=='SENT')return;const d=dispatchMap[x.RelatedID]||(dispatchMap[x.RelatedID]={count:0,lastSentAt:''});d.count++;if(!d.lastSentAt||new Date(x.SentAt).getTime()>new Date(d.lastSentAt).getTime())d.lastSentAt=x.SentAt;});
-    let rows=findMany_('Registrations',{ConferenceID:conferenceId}).map(function(r){const type=typeMap[r.ParticipantType]||{},elig=mealPassEligibility_(r,type),dispatch=dispatchMap[r.RegID]||{count:0,lastSentAt:''};return {RegID:r.RegID,FullName:r.FullName,Email:r.Email,Phone:r.Phone,ParticipantType:r.ParticipantType,ParticipantTypeName:type.TypeNameTH||r.ParticipantType,PaymentRequired:bool_(type.PaymentRequired),FeeAmount:num_(type.FeeAmount),RegistrationStatus:r.RegistrationStatus,DataCompletenessStatus:r.DataCompletenessStatus,PaymentStatus:r.PaymentStatus,MealPassStatus:r.MealPassStatus,Eligible:elig.ok,EligibilityReason:elig.reason,DispatchCount:dispatch.count,LastSentAt:dispatch.lastSentAt,EntitlementCount:entCount[r.RegID]||0};});
+    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF','FOOD_STAFF'],conferenceId);
+    filters=filters||{};
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cacheKey = 'ADM_MEALPASS_' + cid;
+    let baseRows = null;
+    try {
+      baseRows = cacheGetLarge_(cacheKey);
+    } catch(e) {}
+
+    if (!baseRows || !Array.isArray(baseRows)) {
+      const typeMap=registrationTypeMap_(cid),entCount={},dispatchMap={};
+      findMany_('MealEntitlements',{ConferenceID:cid}).forEach(function(e){if(upper_(e.Status)!=='CANCELLED')entCount[e.RegID]=(entCount[e.RegID]||0)+1;});
+      findMany_('EmailLogs',{ConferenceID:cid,RelatedType:'MEAL_PASS'}).forEach(function(x){if(upper_(x.Status)!=='SENT')return;const d=dispatchMap[x.RelatedID]||(dispatchMap[x.RelatedID]={count:0,lastSentAt:''});d.count++;if(!d.lastSentAt||new Date(x.SentAt).getTime()>new Date(d.lastSentAt).getTime())d.lastSentAt=x.SentAt;});
+      baseRows=findMany_('Registrations',{ConferenceID:cid}).map(function(r){const type=typeMap[r.ParticipantType]||{},elig=mealPassEligibility_(r,type),dispatch=dispatchMap[r.RegID]||{count:0,lastSentAt:''};return {RegID:r.RegID,FullName:r.FullName,Email:r.Email,Phone:r.Phone,ParticipantType:r.ParticipantType,ParticipantTypeName:type.TypeNameTH||r.ParticipantType,PaymentRequired:bool_(type.PaymentRequired),FeeAmount:num_(type.FeeAmount),RegistrationStatus:r.RegistrationStatus,DataCompletenessStatus:r.DataCompletenessStatus,PaymentStatus:r.PaymentStatus,MealPassStatus:r.MealPassStatus,Eligible:elig.ok,EligibilityReason:elig.reason,DispatchCount:dispatch.count,LastSentAt:dispatch.lastSentAt,EntitlementCount:entCount[r.RegID]||0};});
+      baseRows.sort(function(a,b){return String(a.FullName).localeCompare(String(b.FullName),'th');});
+      baseRows = serialize_(baseRows);
+      try {
+        cachePutLarge_(cacheKey, baseRows, 180);
+      } catch(e) {}
+    }
+
+    let rows = baseRows;
     if(filters.q){const q=clean_(filters.q).toLowerCase();rows=rows.filter(function(x){return [x.RegID,x.FullName,x.Email,x.Phone].join(' ').toLowerCase().indexOf(q)>=0;});}
     if(filters.eligibility==='ELIGIBLE')rows=rows.filter(function(x){return x.Eligible;});if(filters.eligibility==='NOT_ELIGIBLE')rows=rows.filter(function(x){return !x.Eligible;});
     if(filters.paymentStatus)rows=rows.filter(function(x){return upper_(x.PaymentStatus)===upper_(filters.paymentStatus);});
     if(filters.sentStatus==='SENT')rows=rows.filter(function(x){return x.DispatchCount>0;});if(filters.sentStatus==='NOT_SENT')rows=rows.filter(function(x){return x.DispatchCount===0;});
-    rows.sort(function(a,b){return String(a.FullName).localeCompare(String(b.FullName),'th');});return serialize_(rows);
+    return rows;
   });
 }
 function adminPreviewMealPass(token,conferenceId,regId){
@@ -5763,8 +5798,8 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
 
     // ถ้ามี cache ใช้ก่อน
     if (!forceRefresh) {
-      const cached = CacheService.getScriptCache().get(cacheKey);
-      if (cached) return JSON.parse(cached);
+      const cached = cacheGetLarge_(cacheKey);
+      if (cached) return cached;
     }
 
     let regs = findMany_('Registrations', { ConferenceID: cid });
@@ -5900,7 +5935,7 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       dailyQuota: getDailyQuotaStatus_(cid)
     };
 
-    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), APP.CACHE_SECONDS); } catch (ignore) {}
+    try { cachePutLarge_(cacheKey, result, 120); } catch (ignore) {}
     return result;
   });
 }
@@ -5912,8 +5947,49 @@ function adminListRegistrations(token, conferenceId, filters) {
   return runSafely_('adminListRegistrations', function() {
     requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'REGISTRATION_STAFF'], conferenceId);
     filters = filters || {};
-    var rows = findMany_('Registrations', { ConferenceID: conferenceId });
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cacheKey = 'ADM_REGS_' + cid;
+    let baseRows = null;
+    try {
+      baseRows = cacheGetLarge_(cacheKey);
+    } catch(e) {}
 
+    if (!baseRows || !Array.isArray(baseRows)) {
+      const fullRows = findMany_('Registrations', { ConferenceID: cid });
+      // Only keep fields needed for list table to keep payload small & lightning fast
+      baseRows = fullRows.map(function(r) {
+        return {
+          RegID: r.RegID,
+          FullName: r.FullName || [r.Prefix, r.FirstName, r.LastName].filter(Boolean).join(' ') || '',
+          ParticipantType: r.ParticipantType || '',
+          CID: r.CID || '',
+          Email: r.Email || '',
+          Phone: r.Phone || '',
+          DataCompletenessStatus: r.DataCompletenessStatus || '',
+          RegistrationStatus: r.RegistrationStatus || '',
+          PaymentStatus: r.PaymentStatus || '',
+          Institution: r.Institution || '',
+          OrganizationGroup: r.OrganizationGroup || '',
+          OrganizationUnit: r.OrganizationUnit || '',
+          AttendanceDay1: bool_(r.AttendanceDay1),
+          AttendanceDay2: bool_(r.AttendanceDay2),
+          AttendanceDay3: bool_(r.AttendanceDay3),
+          Prefix: r.Prefix || '',
+          FirstName: r.FirstName || '',
+          LastName: r.LastName || '',
+          Position: r.Position || '',
+          Note: r.Note || '',
+          CreatedAt: r.CreatedAt || ''
+        };
+      });
+      baseRows.sort(function(a, b) { return String(b.CreatedAt || '').localeCompare(String(a.CreatedAt || '')); });
+      baseRows = serialize_(baseRows);
+      try {
+        cachePutLarge_(cacheKey, baseRows, 180);
+      } catch(e) {}
+    }
+
+    let rows = baseRows;
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
       rows = rows.filter(function(r) {
@@ -5940,8 +6016,7 @@ function adminListRegistrations(token, conferenceId, filters) {
       }
     }
 
-    rows.sort(function(a, b) { return String(b.CreatedAt || '').localeCompare(String(a.CreatedAt || '')); });
-    return serialize_(rows);
+    return rows;
   });
 }
 
@@ -5986,110 +6061,125 @@ function adminListWorks(token, conferenceId, filters) {
   return runSafely_('adminListWorks', function() {
     requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
     filters = filters || {};
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cacheKey = 'ADM_WORKS_' + cid;
+    let baseRows = null;
+    try {
+      baseRows = cacheGetLarge_(cacheKey);
+    } catch(e) {}
 
-    var works = findMany_('Works', { ConferenceID: conferenceId });
-    var authorsByWork = {};
-    findMany_('WorkAuthors', { ConferenceID: conferenceId }).forEach(function(a) {
-      (authorsByWork[a.WorkID] || (authorsByWork[a.WorkID] = [])).push(a);
-    });
-    var assigns = findMany_('ReviewAssignments', { ConferenceID: conferenceId });
-    var asc = assigns.reduce(function(acc, c) {
-      if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
-        if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
-        acc[c.WorkID].a++;
-        if (['COMPLETE', 'LOCKED'].indexOf(upper_(c.Status)) >= 0) {
-          acc[c.WorkID].c++;
-          var sc = num_(c.TotalScore);
-          if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
-          acc[c.WorkID].t += sc;
-        }
-      }
-      return acc;
-    }, {});
-
-    var filesByWork = {};
-    findMany_('WorkFiles', { ConferenceID: conferenceId }).filter(function(f) { return bool_(f.Active); }).forEach(function(f) {
-      (filesByWork[f.WorkID] || (filesByWork[f.WorkID] = [])).push(f);
-    });
-
-    var categories = {};
-    findMany_('WorkCategories', { ConferenceID: conferenceId }).forEach(function(c) {
-      categories[c.CategoryID] = c;
-      if (c.CategoryCode) categories[c.CategoryCode] = c;
-    });
-
-    var ptMap = {};
-    findMany_('PresentationTypes', { ConferenceID: conferenceId }).forEach(function(pt) {
-      ptMap[pt.PresentationTypeID] = pt;
-      if (pt.TypeCode) ptMap[pt.TypeCode] = pt;
-    });
-
-    var regs = findMany_('Registrations', { ConferenceID: conferenceId });
-    var regMap = {};
-    regs.forEach(function(r) { regMap[r.RegID] = r; });
-
-    var rows = works.map(function(w) {
-      var ac = asc[w.WorkID] || { a: 0, c: 0, t: 0 };
-      var presenter = (authorsByWork[w.WorkID] || []).find(function(a) { return bool_(a.IsPresenter); }) || (authorsByWork[w.WorkID] || [])[0] || {};
-      var cat = categories[w.CategoryID] || {};
-      var ptReq = ptMap[w.PresentationTypeRequested] || {};
-      var ptFin = ptMap[w.PresentationTypeFinal] || {};
-      var regId = w.RegID || presenter.RegID || '';
-      var reg = regMap[regId] || {};
-
-      var resolvedCatName = resolveCategoryName_(w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '');
-      var rawPtName = clean_(w.PresentationTypeName || w['PresentationType Name'] || w['PresentationTypeName'] || w.presentationtypename || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
-      var rawPtReq = clean_(w.PresentationTypeRequested || w['PresentationTypeRequested'] || w.presentationtyperequested || '');
-      var rawPtFin = clean_(w.PresentationTypeFinal || w['PresentationTypeFinal'] || w.presentationtypefinal || '');
-      
-      var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || '';
-      var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || '';
-      
-      if (!resolvedPtReqName) {
-        if (/PT-2026-000001|ORAL/i.test(rawPtReq)) resolvedPtReqName = 'แบบบรรยาย';
-        else if (/PT-2026-000002|POSTER|EPOSTER/i.test(rawPtReq)) resolvedPtReqName = 'แบบโปสเตอร์ (e-poster)';
-        else resolvedPtReqName = rawPtReq;
-      }
-
-      var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || rawPtReq || '';
-      if (/oral|บรรยาย|PT-2026-000001/i.test(displayPt)) {
-        displayPt = 'แบบบรรยาย';
-      } else if (/poster|โปสเตอร์|eposter|PT-2026-000002/i.test(displayPt)) {
-        displayPt = 'แบบโปสเตอร์ (e-poster)';
-      }
-
-      return Object.assign({}, w, {
-        WorkID: w.WorkID,
-        RegID: regId,
-        WorkCode: w.WorkCode || w.WorkID,
-        TitleTH: w.TitleTH || w.ThaiTitle || '',
-        TitleEN: w.TitleEN || w.EnglishTitle || '',
-        ThaiTitle: w.TitleTH || w.ThaiTitle || '',
-        EnglishTitle: w.TitleEN || w.EnglishTitle || '',
-        CategoryID: w.CategoryID || '',
-        CategoryName: resolvedCatName,
-        CategoryNameTH: resolvedCatName,
-        Category: resolvedCatName,
-        WorkType: resolvedCatName,
-        Field: resolvedCatName,
-        Theme: resolvedCatName,
-        PresentationTypeRequested: rawPtReq,
-        PresentationTypeName: displayPt || rawPtName || resolvedPtReqName || '',
-        PresentationTypeFinal: rawPtFin,
-        PresentationType: displayPt || rawPtName || resolvedPtReqName || '',
-        Status: w.Status || w.CurrentStatus || '',
-        CurrentStatus: w.Status || w.CurrentStatus || '',
-        RegistrationStatus: reg.RegistrationStatus || '',
-        PresenterName: presenter.FullName || w.PresenterName || '',
-        PresenterEmail: presenter.Email || w.PresenterEmail || '',
-        ReviewerAssignedCount: ac.a,
-        ReviewerCompletedCount: ac.c,
-        AverageScore: ac.c ? ac.t / ac.c : 0,
-        authors: authorsByWork[w.WorkID] || [],
-        files: filesByWork[w.WorkID] || []
+    if (!baseRows || !Array.isArray(baseRows)) {
+      var works = findMany_('Works', { ConferenceID: cid });
+      var authorsByWork = {};
+      findMany_('WorkAuthors', { ConferenceID: cid }).forEach(function(a) {
+        (authorsByWork[a.WorkID] || (authorsByWork[a.WorkID] = [])).push(a);
       });
-    });
+      var assigns = findMany_('ReviewAssignments', { ConferenceID: cid });
+      var asc = assigns.reduce(function(acc, c) {
+        if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
+          if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
+          acc[c.WorkID].a++;
+          if (['COMPLETE', 'LOCKED'].indexOf(upper_(c.Status)) >= 0) {
+            acc[c.WorkID].c++;
+            var sc = num_(c.TotalScore);
+            if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
+            acc[c.WorkID].t += sc;
+          }
+        }
+        return acc;
+      }, {});
 
+      var filesByWork = {};
+      findMany_('WorkFiles', { ConferenceID: cid }).filter(function(f) { return bool_(f.Active); }).forEach(function(f) {
+        (filesByWork[f.WorkID] || (filesByWork[f.WorkID] = [])).push(f);
+      });
+
+      var categories = {};
+      findMany_('WorkCategories', { ConferenceID: cid }).forEach(function(c) {
+        categories[c.CategoryID] = c;
+        if (c.CategoryCode) categories[c.CategoryCode] = c;
+      });
+
+      var ptMap = {};
+      findMany_('PresentationTypes', { ConferenceID: cid }).forEach(function(pt) {
+        ptMap[pt.PresentationTypeID] = pt;
+        if (pt.TypeCode) ptMap[pt.TypeCode] = pt;
+      });
+
+      var regs = findMany_('Registrations', { ConferenceID: cid });
+      var regMap = {};
+      regs.forEach(function(r) { regMap[r.RegID] = r; });
+
+      baseRows = works.map(function(w) {
+        var ac = asc[w.WorkID] || { a: 0, c: 0, t: 0 };
+        var presenter = (authorsByWork[w.WorkID] || []).find(function(a) { return bool_(a.IsPresenter); }) || (authorsByWork[w.WorkID] || [])[0] || {};
+        var cat = categories[w.CategoryID] || {};
+        var ptReq = ptMap[w.PresentationTypeRequested] || {};
+        var ptFin = ptMap[w.PresentationTypeFinal] || {};
+        var regId = w.RegID || presenter.RegID || '';
+        var reg = regMap[regId] || {};
+
+        var resolvedCatName = resolveCategoryName_(w.CategoryName || cat.CategoryNameTH || cat.CategoryNameEN || cat.CategoryCode || w.CategoryID || '');
+        var rawPtName = clean_(w.PresentationTypeName || w['PresentationType Name'] || w['PresentationTypeName'] || w.presentationtypename || w.PresentationType || w.PresentationFormat || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '');
+        var rawPtReq = clean_(w.PresentationTypeRequested || w['PresentationTypeRequested'] || w.presentationtyperequested || '');
+        var rawPtFin = clean_(w.PresentationTypeFinal || w['PresentationTypeFinal'] || w.presentationtypefinal || '');
+        
+        var resolvedPtReqName = rawPtName || ptReq.TypeNameTH || ptReq.TypeNameEN || ptReq.TypeCode || '';
+        var resolvedPtFinName = ptFin.TypeNameTH || ptFin.TypeNameEN || ptFin.TypeCode || '';
+        
+        if (!resolvedPtReqName) {
+          if (/PT-2026-000001|ORAL/i.test(rawPtReq)) resolvedPtReqName = 'แบบบรรยาย';
+          else if (/PT-2026-000002|POSTER|EPOSTER/i.test(rawPtReq)) resolvedPtReqName = 'แบบโปสเตอร์ (e-poster)';
+          else resolvedPtReqName = rawPtReq;
+        }
+
+        var displayPt = rawPtName || resolvedPtFinName || resolvedPtReqName || rawPtReq || '';
+        if (/oral|บรรยาย|PT-2026-000001/i.test(displayPt)) {
+          displayPt = 'แบบบรรยาย';
+        } else if (/poster|โปสเตอร์|eposter|PT-2026-000002/i.test(displayPt)) {
+          displayPt = 'แบบโปสเตอร์ (e-poster)';
+        }
+
+        return Object.assign({}, w, {
+          WorkID: w.WorkID,
+          RegID: regId,
+          WorkCode: w.WorkCode || w.WorkID,
+          TitleTH: w.TitleTH || w.ThaiTitle || '',
+          TitleEN: w.TitleEN || w.EnglishTitle || '',
+          ThaiTitle: w.TitleTH || w.ThaiTitle || '',
+          EnglishTitle: w.TitleEN || w.EnglishTitle || '',
+          CategoryID: w.CategoryID || '',
+          CategoryName: resolvedCatName,
+          CategoryNameTH: resolvedCatName,
+          Category: resolvedCatName,
+          WorkType: resolvedCatName,
+          Field: resolvedCatName,
+          Theme: resolvedCatName,
+          PresentationTypeRequested: rawPtReq,
+          PresentationTypeName: displayPt || rawPtName || resolvedPtReqName || '',
+          PresentationTypeFinal: rawPtFin,
+          PresentationType: displayPt || rawPtName || resolvedPtReqName || '',
+          Status: w.Status || w.CurrentStatus || '',
+          CurrentStatus: w.Status || w.CurrentStatus || '',
+          RegistrationStatus: reg.RegistrationStatus || '',
+          PresenterName: presenter.FullName || w.PresenterName || '',
+          PresenterEmail: presenter.Email || w.PresenterEmail || '',
+          ReviewerAssignedCount: ac.a,
+          ReviewerCompletedCount: ac.c,
+          AverageScore: ac.c ? ac.t / ac.c : 0,
+          authors: authorsByWork[w.WorkID] || [],
+          files: filesByWork[w.WorkID] || []
+        });
+      });
+
+      baseRows.sort(function(a, b) { return String(a.WorkCode).localeCompare(String(b.WorkCode)); });
+      baseRows = serialize_(baseRows);
+      try {
+        cachePutLarge_(cacheKey, baseRows, 180);
+      } catch(e) {}
+    }
+
+    let rows = baseRows;
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
       rows = rows.filter(function(x) {
@@ -6118,8 +6208,7 @@ function adminListWorks(token, conferenceId, filters) {
       });
     }
 
-    rows.sort(function(a, b) { return String(a.WorkCode).localeCompare(String(b.WorkCode)); });
-    return serialize_(rows);
+    return rows;
   });
 }
 
