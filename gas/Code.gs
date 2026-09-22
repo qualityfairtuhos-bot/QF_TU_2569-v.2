@@ -305,7 +305,9 @@ function defaultSettings_(){ return {
   MIN_REVIEWERS_PER_WORK:{value:'2',type:'NUMBER',group:'REVIEW',th:'Reviewer ขั้นต่ำต่อผลงาน',en:'Minimum reviewers per work'},
   REVIEWER_CAN_EDIT_AFTER_SUBMIT:{value:'FALSE',type:'BOOLEAN',group:'REVIEW',th:'Reviewer แก้คะแนนหลังส่งได้',en:'Reviewer may edit after submit'},
   DEFAULT_LANGUAGE:{value:'TH',type:'TEXT',group:'GENERAL',th:'ภาษาเริ่มต้น',en:'Default language'},
-  IMPORT_MAPPING_VERSION:{value:'TUH_GOOGLE_FORM_2569_V1_2',type:'TEXT',group:'IMPORT',th:'เวอร์ชัน mapping',en:'Import mapping version'}
+  IMPORT_MAPPING_VERSION:{value:'TUH_GOOGLE_FORM_2569_V1_2',type:'TEXT',group:'IMPORT',th:'เวอร์ชัน mapping',en:'Import mapping version'},
+  ORAL_TEMPLATE_URL:{value:'',type:'TEXT',group:'WORK',th:'ลิงก์ Template นำเสนอแบบบรรยาย (Oral)',en:'Oral presentation template URL'},
+  POSTER_TEMPLATE_URL:{value:'',type:'TEXT',group:'WORK',th:'ลิงก์ Template โปสเตอร์ (Poster)',en:'Poster template URL'}
 }; }
 
 function seedRegistrationTypes_(cid){
@@ -3627,7 +3629,58 @@ function canSubmitWork_(reg){
   if(!reg||['CANCELLED','REGISTRATION_RETURNED'].indexOf(upper_(reg.RegistrationStatus))>=0)return {ok:false,message:'สถานะการลงทะเบียนไม่สามารถส่งผลงานได้'};
   return {ok:true};
 }
-function verifyWorkAccess(conferenceId,regId,emailOrPhone){return runSafely_('verifyWorkAccess',function(){const r=requireWorkAccess_(conferenceId||APP.DEFAULT_CONFERENCE_ID,regId,emailOrPhone);const works=findMany_('Works',{ConferenceID:r.ConferenceID,RegID:r.RegID});const files=findMany_('WorkFiles',{ConferenceID:r.ConferenceID,RegID:r.RegID}).filter(function(f){return bool_(f.Active);});const outWorks=works.map(function(w){const cw=Object.assign({},w);cw.files=files.filter(function(f){return f.WorkID===w.WorkID;});return cw;});return {registration:publicRegistration_(r),works:serialize_(outWorks)};});}
+function verifyWorkAccess(conferenceId,regId,emailOrPhone){
+  return runSafely_('verifyWorkAccess',function(){
+    const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID;
+    const r=requireRegistrationAccess_(cid,regId,emailOrPhone,'');
+    const works=findMany_('Works',{ConferenceID:r.ConferenceID,RegID:r.RegID});
+    const files=findMany_('WorkFiles',{ConferenceID:r.ConferenceID,RegID:r.RegID}).filter(function(f){return bool_(f.Active);});
+    const allAssignments=findMany_('ReviewAssignments',{ConferenceID:r.ConferenceID});
+    const allDecisions=findMany_('FinalDecisions',{ConferenceID:r.ConferenceID});
+    const settings=settingsMap_(cid);
+
+    const outWorks=works.map(function(w){
+      const cw=Object.assign({},w);
+      cw.files=files.filter(function(f){return f.WorkID===w.WorkID;});
+
+      const comments=[];
+      if(w.ScreeningNote&&String(w.ScreeningNote).trim()){
+        comments.push({
+          source:'ผลการตรวจคัดกรองเบื้องต้น',
+          comment:String(w.ScreeningNote).trim()
+        });
+      }
+      const wAsns=allAssignments.filter(function(a){return a.WorkID===w.WorkID&&a.Status==='COMPLETE';});
+      wAsns.forEach(function(a,idx){
+        if(a.RecommendationToAuthor&&String(a.RecommendationToAuthor).trim()){
+          comments.push({
+            source:'ข้อเสนอแนะจากผู้ทรงคุณวุฒิท่านที่ '+(idx+1),
+            comment:String(a.RecommendationToAuthor).trim()
+          });
+        }
+      });
+      const wDecs=allDecisions.filter(function(d){return d.WorkID===w.WorkID;});
+      wDecs.forEach(function(d){
+        if(d.AuthorVisibleComment&&String(d.AuthorVisibleComment).trim()){
+          comments.push({
+            source:'มติและความเห็นจากคณะกรรมการ',
+            comment:String(d.AuthorVisibleComment).trim()
+          });
+        }
+      });
+      cw.authorComments=comments;
+      cw.revisionDeadline=w.RevisionDeadline||'';
+      return cw;
+    });
+
+    return {
+      registration:publicRegistration_(r),
+      works:serialize_(outWorks),
+      oralTemplateUrl:clean_(settings.ORAL_TEMPLATE_URL||''),
+      posterTemplateUrl:clean_(settings.POSTER_TEMPLATE_URL||'')
+    };
+  });
+}
 function submitWork(conferenceId,regId,emailOrPhone,payload,files){
   return runSafely_('submitWork',function(){
     const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID,r=requireWorkAccess_(cid,regId,emailOrPhone);payload=payload||{};files=files||{};

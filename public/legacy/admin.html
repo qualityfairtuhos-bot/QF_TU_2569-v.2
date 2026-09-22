@@ -97,6 +97,11 @@
           <div class="field"><label>Reviewer ขั้นต่ำ<input name="MIN_REVIEWERS_PER_WORK" type="number"></label></div><div class="field"><label>Reviewer สูงสุด<input name="MAX_REVIEWERS_PER_WORK" type="number"></label></div>
           <div class="field"><label>วันจัดงาน JSON (ปี พ.ศ.)<input name="EVENT_DATES_JSON" placeholder='["2569-11-18","2569-11-19","2569-11-20"]'></label><small>สูงสุด 3 วัน</small></div>
         </div>
+        <h4>ลิงก์ Template สำหรับผู้นำเสนอผลงาน<span class="en">Presentation Templates</span></h4><div class="info-box">กรอก URL หรือลิงก์ Google Drive ของไฟล์ Template เพื่อให้ผู้ส่งผลงานที่ผ่านการคัดเลือกสามารถกดดาวน์โหลดได้จากหน้า "สถานะผลงาน"</div>
+        <div class="grid">
+          <div class="field"><label><b><i class="fa-solid fa-file-powerpoint" style="color:#d97706;"></i> ลิงก์ Template นำเสนอแบบบรรยาย (Oral)</b><span class="en">Oral Presentation Template URL</span><input name="ORAL_TEMPLATE_URL" placeholder="https://drive.google.com/... หรือ https://..."></label></div>
+          <div class="field"><label><b><i class="fa-solid fa-file-image" style="color:#0284c7;"></i> ลิงก์ Template โปสเตอร์ (Poster)</b><span class="en">Poster Template URL</span><input name="POSTER_TEMPLATE_URL" placeholder="https://drive.google.com/... หรือ https://..."></label></div>
+        </div>
         <h4>กำหนดตัวเลือกในแบบลงทะเบียน<span class="en">Registration dropdown options</span></h4><div class="info-box">กรอกหนึ่งตัวเลือกต่อหนึ่งบรรทัด สามารถเพิ่ม ลบ หรือเรียงลำดับใหม่ได้เอง</div>
         <div class="grid3">
           <div class="field"><label>คำนำหน้า<textarea name="PREFIX_OPTIONS_JSON"></textarea></label></div><div class="field"><label>ตำแหน่ง<textarea name="POSITION_OPTIONS_JSON"></textarea></label></div><div class="field"><label>วิชาชีพ<textarea name="PROFESSION_OPTIONS_JSON"></textarea></label></div>
@@ -687,7 +692,7 @@ async function loadSettings(forceRefresh = false){
     DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));
     const sm={};
     d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);
-    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>f.elements[k].value=sm[k]||'');
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL'].forEach(k=>f.elements[k].value=sm[k]||'');
     f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);
     const o=d.optionConfig||{};
     f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');
@@ -983,7 +988,7 @@ $('#settingsForm').onsubmit=async e=>{
     ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);
     DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
     const settings={};
-    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK'].forEach(k=>settings[k]=o[k]);
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL'].forEach(k=>settings[k]=o[k]||'');
     settings.INTERNAL_DAILY_QUOTA = o.INTERNAL_QUOTA || '400';
     settings.EXTERNAL_DAILY_QUOTA = o.EXTERNAL_QUOTA || '200';
     settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
