@@ -814,6 +814,16 @@ async function init(){
       alertErr(e);
     }
   }
+  try{
+    const savedAuthor=sessionStorage.getItem('TUH_AUTHOR_SEARCH');
+    if(savedAuthor){
+      const parsed=JSON.parse(savedAuthor);
+      if(parsed&&parsed.regId&&$('#authorWorkRegId')){
+        $('#authorWorkRegId').value=parsed.regId;
+        if(parsed.key&&$('#authorWorkKey'))$('#authorWorkKey').value=parsed.key;
+      }
+    }
+  }catch(e){}
 }
 
 $('#regForm').addEventListener('submit',async e=>{
@@ -1000,11 +1010,40 @@ function renderWorkForm(reg){
   updateWorkRules();updateRegion4Intent();
   $('#workForm').onsubmit=async e=>{e.preventDefault();load('กำลังส่งผลงาน');try{const o=formObj(e.target);if(o.Region4Affiliation==='YES'&&!o.Region4AwardIntentChoice)throw new Error('กรุณาเลือกว่ามีหรือไม่มีความประสงค์ส่งผลงานเข้าคัดเลือกในนามเขตสุขภาพที่ 4');const original=await fileObj($('#workOriginal')),ethics=await fileObj($('#workEthics')),presenterBio=await fileObj($('#workBio'));if(!original)throw new Error('กรุณาแนบไฟล์แบบฟอร์มการนำเสนอผลงาน');const nurseCheck=/พยาบาล/i.test(String(reg.Profession||'').trim())||/พยาบาล/i.test(String(reg.Position||'').trim())||/พยาบาล/i.test(String(o.AProfession||'').trim())||/พยาบาล/i.test(String(o.APosition||'').trim());if(nurseCheck&&!presenterBio)throw new Error('กรุณาแนบประวัติผู้นำเสนอเพื่อรับคะแนน CNEU (สำหรับวิชาชีพพยาบาล)');o.Authors=[{Prefix:o.APrefix,FirstName:o.AFirstName,LastName:o.ALastName,Position:o.APosition,Profession:o.AProfession||reg.Profession,Email:o.AEmail,Phone:o.APhone,Organization:o.AOrganization,IsPresenter:true,IsCorrespondingAuthor:true}];const files={original,ethics,presenterBio};const r=await rpc('submitWork',CID,$('#workRegId').value,$('#workKey').value,o,files);done();await Swal.fire({icon:'success',title:'ส่งผลงานสำเร็จ',html:`รหัสผลงาน <b>${esc(r.WorkCode)}</b>`,confirmButtonColor:'#006D70'});e.target.reset();updateWorkRules();updateRegion4Intent()}catch(x){alertErr(x)}}
 }
-async function lookupAuthorWorks(){load('กำลังค้นหาข้อมูลผลงาน');try{const r=await rpc('verifyWorkAccess',CID,$('#authorWorkRegId').value,$('#authorWorkKey').value);done();renderAuthorWorks(r.works,r.registration,{oral:r.oralTemplateUrl,poster:r.posterTemplateUrl})}catch(e){alertErr(e)}}
+const AUTHOR_WORKS_CACHE = {};
+async function lookupAuthorWorks(forceRefresh){
+  const regId = ($('#authorWorkRegId')?.value || '').trim();
+  const key = ($('#authorWorkKey')?.value || '').trim();
+  if(!regId || !key){
+    Swal.fire({icon:'warning',title:'กรุณากรอกข้อมูล',text:'กรุณากรอกเลขลงทะเบียน และ Email หรือเบอร์โทรศัพท์',confirmButtonColor:'#006D70'});
+    return;
+  }
+  const cacheKey = regId + '_' + key;
+  if(!forceRefresh && AUTHOR_WORKS_CACHE[cacheKey]){
+    const cached = AUTHOR_WORKS_CACHE[cacheKey];
+    renderAuthorWorks(cached.works, cached.registration, {oral: cached.oralTemplateUrl, poster: cached.posterTemplateUrl});
+  } else {
+    load('กำลังค้นหาข้อมูลผลงาน');
+  }
+
+  try{
+    const r=await rpc('verifyWorkAccess',CID,regId,key);
+    AUTHOR_WORKS_CACHE[cacheKey] = r;
+    try{
+      sessionStorage.setItem('TUH_AUTHOR_SEARCH', JSON.stringify({regId, key}));
+    }catch(e){}
+    done();
+    renderAuthorWorks(r.works,r.registration,{oral:r.oralTemplateUrl,poster:r.posterTemplateUrl});
+  }catch(e){
+    done();
+    alertErr(e);
+  }
+}
+
 function renderAuthorWorks(works,reg,templates){
   works=works||[];
   if(!works.length){
-    $('#authorWorkResult').innerHTML='<div class="card"><div class="notice">ยังไม่พบข้อมูลผลงานของคุณ<br>หากต้องการส่งผลงานใหม่ กรุณาไปที่เมนู "ส่งผลงาน"</div></div>';
+    $('#authorWorkResult').innerHTML='<div class="card"><div class="notice">ยังไม่พบข้อมูลผลงานของคุณ<br>หากท่านเพิ่งส่งผลงาน หรือต้องการส่งผลงานใหม่ กรุณาตรวจสอบเลขลงทะเบียนและเบอร์โทรศัพท์/อีเมล</div></div>';
     return;
   }
   const oralTpl = (templates && templates.oral) || (BOOT && BOOT.settings && BOOT.settings.ORAL_TEMPLATE_URL) || '';
@@ -1014,6 +1053,7 @@ function renderAuthorWorks(works,reg,templates){
     const st=String(w.Status||'').toUpperCase();
     const canOriginal=['DRAFT','SUBMITTED','ACADEMIC_SCREENING','RETURNED_FOR_EDIT'].includes(st);
     const canRevise=['REVISION_REQUIRED','REVISE_REQUIRED','REVISION_REQUESTED','REVISION_SUBMITTED'].includes(st);
+    const isRevisionSubmitted = (st === 'REVISION_SUBMITTED');
     const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED'].includes(st);
 
     // ตรวจสอบรูปแบบการนำเสนอว่าเป็น Oral หรือ Poster
@@ -1023,49 +1063,170 @@ function renderAuthorWorks(works,reg,templates){
 
     const filesHtml=(w.files||[]).map(f=>`<div style="margin-top:6px;"><a href="${f.FileUrl}" target="_blank" style="color:var(--teal);text-decoration:underline;word-break:break-all;"><i class="fa-solid fa-paperclip"></i> <b>${esc(f.FileCategory)}:</b> ${esc(f.FileName)}</a></div>`).join('');
 
-    let actions='';
-    if(canOriginal) {
-      actions+=`<button class="btn btn-soft" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;" onclick="promptReplaceWorkFile('${w.WorkID}','ORIGINAL','อัปโหลดไฟล์ผลงานเดิม (แทนที่ของเดิม)')"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์ผลงานเดิม</button>`;
-    }
-    if(canRevise) {
-      actions+=`<button class="btn btn-gold" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;background:#d97706;color:#fff;" onclick="promptReplaceWorkFile('${w.WorkID}','REVISION','ส่งไฟล์บทคัดย่อ / ผลงานฉบับแก้ไข (Revision)')"><i class="fa-solid fa-file-pen"></i> ส่งไฟล์แก้ไข (Revision)</button>`;
-    }
+    // แบนเนอร์กรณีผลงานผ่านการคัดเลือก (Accepted)
+    let presentationBanner = '';
     if(canPresent) {
-      // แสดงปุ่มดาวน์โหลด Template ตามประเภทที่ได้รับการคัดเลือก
-      if(isOral && oralTpl) {
-        actions+=`<a href="${esc(oralTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;background:#f59e0b;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:6px;font-weight:600;"><i class="fa-solid fa-file-powerpoint"></i> ดาวน์โหลด Template นำเสนอ Oral</a>`;
-      }
-      if(isPoster && posterTpl) {
-        actions+=`<a href="${esc(posterTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;background:#0284c7;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:6px;font-weight:600;"><i class="fa-solid fa-file-image"></i> ดาวน์โหลด Template โปสเตอร์ Poster</a>`;
-      }
-      // กรณีไม่สามารถระบุได้ชัดเจนว่าเป็น Oral หรือ Poster แต่มีลิงก์ template ไว้
-      if(!isOral && !isPoster) {
-        if(oralTpl) actions+=`<a href="${esc(oralTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;background:#f59e0b;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:6px;font-weight:600;"><i class="fa-solid fa-file-powerpoint"></i> ดาวน์โหลด Template Oral</a>`;
-        if(posterTpl) actions+=`<a href="${esc(posterTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;background:#0284c7;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:6px;font-weight:600;"><i class="fa-solid fa-file-image"></i> ดาวน์โหลด Template Poster</a>`;
-      }
-      actions+=`<button class="btn btn-blue" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:7px 14px;" onclick="promptReplaceWorkFile('${w.WorkID}','FINAL_PRESENTATION','อัปโหลดไฟล์นำเสนอ (Presentation)')"><i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์นำเสนอ (Presentation)</button>`;
+      const hasUploadedPres = (w.files||[]).some(f=>f.FileCategory==='FINAL_PRESENTATION') || ['PRESENTATION_FILE_SUBMITTED'].includes(st);
+      presentationBanner = `
+        <div style="margin-top:12px;margin-bottom:14px;padding:14px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-left:5px solid #16a34a;border-radius:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="font-weight:700;color:#166534;font-size:0.98rem;display:flex;align-items:center;gap:8px;">
+              <i class="fa-solid fa-award" style="color:#16a34a;font-size:1.15rem;"></i> ขอแสดงความยินดี! ผลงานผ่านการพิจารณาคัดเลือก
+            </div>
+            ${hasUploadedPres 
+              ? `<span style="background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #86efac;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-circle-check"></i> ส่งไฟล์นำเสนอเรียบร้อยแล้ว</span>` 
+              : `<span style="background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #fde68a;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-clock"></i> รอส่งไฟล์นำเสนอเข้าระบบ</span>`}
+          </div>
+          <div style="font-size:0.88rem;color:#14532d;margin-top:6px;line-height:1.5;">
+            รูปแบบการนำเสนอที่ได้รับการคัดเลือก: <b>${isOral ? 'แบบบรรยาย (Oral Presentation)' : (isPoster ? 'แบบโปสเตอร์ (e-Poster Presentation)' : esc(w.PresentationTypeName||'แบบนำเสนอ'))}</b>
+          </div>
+          <div style="font-size:0.84rem;color:#15803d;margin-top:4px;">
+            ท่านสามารถคลิกดาวน์โหลด Template ด้านล่าง เพื่อเตรียมไฟล์นำเสนอตามข้อกำหนด และอัปโหลดไฟล์นำเสนอ (.pptx / .pdf) เข้าระบบได้ทันที
+          </div>
+        </div>
+      `;
     }
 
-    // กล่องแสดงข้อเสนอแนะจากผู้ทรงคุณวุฒิ / คณะกรรมการ และกำหนดส่งแก้ไข
-    let commentsBox = '';
-    const comments = w.authorComments || [];
-    if(comments.length > 0 || (canRevise && w.revisionDeadline)) {
-      commentsBox = `
-        <div style="margin-top:12px;margin-bottom:14px;padding:12px 14px;background:#fffdf0;border:1.5px solid #fef08a;border-left:5px solid #eab308;border-radius:8px;">
-          <div style="font-weight:700;color:#854d0e;font-size:0.95rem;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
-            <i class="fa-solid fa-clipboard-question"></i> ข้อเสนอแนะสำหรับการปรับปรุงแก้ไขผลงาน
+    // แบนเนอร์กรณีคณะกรรมการขอให้ปรับปรุงแก้ไข (Revision)
+    let revisionBanner = '';
+    if(canRevise) {
+      revisionBanner = `
+        <div style="margin-top:12px;margin-bottom:14px;padding:14px 16px;background:#fffbeb;border:1.5px solid #fde68a;border-left:5px solid #d97706;border-radius:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="font-weight:700;color:#92400e;font-size:0.98rem;display:flex;align-items:center;gap:8px;">
+              <i class="fa-solid fa-file-pen" style="color:#d97706;font-size:1.15rem;"></i> ผลงานอยู่ในสถานะต้องปรับปรุงแก้ไข (Revision Required)
+            </div>
+            ${isRevisionSubmitted 
+              ? `<span style="background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #86efac;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-circle-check"></i> ส่งไฟล์ฉบับแก้ไขแล้ว (รอการพิจารณา)</span>` 
+              : `<span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #fca5a5;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-triangle-exclamation"></i> รอส่งไฟล์บทคัดย่อฉบับแก้ไข</span>`}
           </div>
-          ${w.revisionDeadline ? `<div style="font-size:0.88rem;color:#b45309;font-weight:700;margin-bottom:10px;"><i class="fa-solid fa-calendar-xmark"></i> กำหนดส่งผลงานฉบับแก้ไขภายใน: <span style="background:#fef3c7;padding:2px 8px;border-radius:4px;border:1px solid #fde68a;">${esc(w.revisionDeadline)}</span></div>` : ''}
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            ${comments.map(c=>`
-              <div style="background:#ffffff;padding:10px 12px;border-radius:6px;border:1px solid #fde68a;font-size:0.88rem;line-height:1.5;color:#1f2937;">
-                <div style="font-weight:700;color:#92400e;margin-bottom:2px;"><i class="fa-regular fa-comment-dots"></i> ${esc(c.source)}:</div>
-                <div style="white-space:pre-wrap;">${esc(c.comment)}</div>
+          <div style="font-size:0.88rem;color:#78350f;margin-top:6px;line-height:1.5;">
+            กรุณาศึกษาข้อเสนอแนะจากผู้ทรงคุณวุฒิด้านล่าง ปรับปรุงเนื้อหาบทคัดย่อ/ผลงาน และอัปโหลดไฟล์ฉบับแก้ไข (.docx / .pdf) เข้าระบบ
+          </div>
+          ${w.revisionDeadline ? `<div style="font-size:0.88rem;color:#b45309;font-weight:700;margin-top:8px;"><i class="fa-solid fa-calendar-xmark"></i> กำหนดส่งผลงานฉบับแก้ไขภายใน: <span style="background:#fef3c7;padding:2px 8px;border-radius:4px;border:1px solid #fde68a;">${esc(w.revisionDeadline)}</span></div>` : ''}
+        </div>
+      `;
+    }
+
+    // ส่วนข้อเสนอแนะจาก Reviewer แต่ละท่าน (ไม่แสดงชื่อผู้ประเมิน เพื่อความเป็นธรรมและความเป็นส่วนตัว)
+    const reviewers = w.reviewerFeedback || [];
+    let reviewerSection = '';
+    if(reviewers.length > 0) {
+      reviewerSection = `
+        <div style="margin-top:14px;margin-bottom:14px;background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+          <div style="background:#f1f5f9;padding:12px 16px;border-bottom:1px solid #cbd5e1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="font-weight:700;color:#0f172a;font-size:0.96rem;display:flex;align-items:center;gap:8px;">
+              <i class="fa-solid fa-comments" style="color:var(--teal);"></i> ข้อเสนอแนะจากผู้ทรงคุณวุฒิ (Reviewer Feedback)
+            </div>
+            <div style="font-size:0.8rem;color:#64748b;display:flex;align-items:center;gap:5px;">
+              <i class="fa-solid fa-user-shield"></i> ประเมินแบบไม่เปิดเผยตัวตน (Double-blind Peer Review)
+            </div>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:14px;">
+            ${reviewers.map((rev, idx)=>`
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed #cbd5e1;">
+                  <span style="font-weight:700;color:#0369a1;font-size:0.92rem;display:inline-flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-user-check"></i> ${esc(rev.reviewerLabel || ('ผู้ประเมินท่านที่ ' + (idx+1)))}
+                  </span>
+                  ${rev.decision ? `<span class="status" style="font-size:0.8rem;padding:3px 8px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">ความเห็น: ${esc(rev.decision)}</span>` : ''}
+                </div>
+
+                <!-- ข้อเสนอแนะภาพรวม (แบบรวม) -->
+                <div style="margin-bottom:12px;">
+                  <div style="font-weight:700;color:#0f766e;font-size:0.88rem;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-quote-left"></i> ข้อเสนอแนะภาพรวม (แบบรวม):
+                  </div>
+                  ${rev.overallComment ? `
+                    <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-left:4px solid #0d9488;padding:10px 14px;border-radius:6px;font-size:0.88rem;line-height:1.6;color:#134e4a;white-space:pre-wrap;">${esc(rev.overallComment)}</div>
+                  ` : `
+                    <div style="color:#94a3b8;font-size:0.85rem;font-style:italic;padding:4px 0;">(ไม่มีข้อเสนอแนะภาพรวมเพิ่มเติม)</div>
+                  `}
+                </div>
+
+                <!-- ข้อเสนอแนะตามเกณฑ์การประเมิน (แบบรายข้อ) -->
+                <div>
+                  <div style="font-weight:700;color:#1e40af;font-size:0.88rem;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-list-check"></i> ข้อเสนอแนะตามเกณฑ์การประเมิน (แบบรายข้อ):
+                  </div>
+                  ${rev.criteriaFeedback && rev.criteriaFeedback.length > 0 ? `
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                      ${rev.criteriaFeedback.map(crit=>`
+                        <div style="background:#ffffff;border:1px solid #e2e8f0;border-left:3px solid #3b82f6;border-radius:6px;padding:8px 12px;">
+                          <div style="font-weight:600;color:#1e293b;font-size:0.86rem;display:flex;align-items:center;gap:6px;">
+                            <i class="fa-regular fa-circle-dot" style="color:#3b82f6;font-size:0.75rem;"></i>
+                            <span>${esc(crit.criteriaName)}</span>
+                          </div>
+                          <div style="color:#334155;font-size:0.85rem;line-height:1.5;margin-top:4px;padding-left:14px;white-space:pre-wrap;">${esc(crit.comment)}</div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : `
+                    <div style="color:#94a3b8;font-size:0.85rem;font-style:italic;padding:4px 0;">(ไม่มีข้อเสนอแนะแบบรายข้อ)</div>
+                  `}
+                </div>
+
+                ${rev.annotatedFileUrl ? `
+                  <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;">
+                    <a href="${esc(rev.annotatedFileUrl)}" target="_blank" class="btn btn-soft" style="font-size:0.82rem;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                      <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลดไฟล์ข้อเสนอแนะแนบจากผู้ประเมิน
+                    </a>
+                  </div>
+                ` : ''}
               </div>
             `).join('')}
           </div>
         </div>
       `;
+    } else {
+      // หากยังไม่มีข้อมูลจาก reviewer แต่มีข้อความแจ้งจากคณะกรรมการคัดกรอง หรือข้อเสนอแนะรวม
+      const comments = w.authorComments || [];
+      if(comments.length > 0) {
+        reviewerSection = `
+          <div style="margin-top:12px;margin-bottom:14px;padding:12px 14px;background:#fffdf0;border:1.5px solid #fef08a;border-left:5px solid #eab308;border-radius:8px;">
+            <div style="font-weight:700;color:#854d0e;font-size:0.95rem;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <i class="fa-solid fa-clipboard-question"></i> ข้อเสนอแนะจากคณะกรรมการ
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${comments.map(c=>`
+                <div style="background:#ffffff;padding:10px 12px;border-radius:6px;border:1px solid #fde68a;font-size:0.88rem;line-height:1.5;color:#1f2937;">
+                  <div style="font-weight:700;color:#92400e;margin-bottom:2px;"><i class="fa-regular fa-comment-dots"></i> ${esc(c.source)}:</div>
+                  <div style="white-space:pre-wrap;">${esc(c.comment)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (['UNDER_REVIEW','ACADEMIC_SCREENING','SUBMITTED'].includes(st)) {
+        reviewerSection = `
+          <div style="margin-top:10px;margin-bottom:12px;padding:10px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;color:#166534;font-size:0.86rem;display:flex;align-items:center;gap:8px;">
+            <i class="fa-solid fa-spinner fa-spin"></i> ผลงานกำลังอยู่ระหว่างกระบวนการประเมินโดยคณะกรรมการผู้ทรงคุณวุฒิ ระบบจะแสดงข้อเสนอแนะเมื่อเสร็จสิ้นรอบการประเมิน
+          </div>
+        `;
+      }
+    }
+
+    let actions='';
+    if(canOriginal) {
+      actions+=`<button class="btn btn-soft" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 14px;" onclick="promptReplaceWorkFile('${w.WorkID}','ORIGINAL','อัปโหลดไฟล์ผลงานเดิม (แทนที่ของเดิม)')"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์ผลงานเดิม</button>`;
+    }
+    if(canRevise) {
+      actions+=`<button class="btn btn-gold" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#d97706;color:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="promptReplaceWorkFile('${w.WorkID}','REVISION','ส่งไฟล์บทคัดย่อ / ผลงานฉบับแก้ไข (Revision)')"><i class="fa-solid fa-file-pen"></i> อัปโหลดไฟล์แก้ไข (Revision)</button>`;
+    }
+    if(canPresent) {
+      // แสดงปุ่มดาวน์โหลด Template ตามประเภทที่ได้รับการคัดเลือก
+      if(isOral && oralTpl) {
+        actions+=`<a href="${esc(oralTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#f59e0b;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);"><i class="fa-solid fa-file-powerpoint"></i> ดาวน์โหลด Template Oral (.PPTX)</a>`;
+      }
+      if(isPoster && posterTpl) {
+        actions+=`<a href="${esc(posterTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#0284c7;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);"><i class="fa-solid fa-file-image"></i> ดาวน์โหลด Template Poster</a>`;
+      }
+      // กรณีไม่สามารถระบุได้ชัดเจนว่าเป็น Oral หรือ Poster แต่มีลิงก์ template ไว้
+      if(!isOral && !isPoster) {
+        if(oralTpl) actions+=`<a href="${esc(oralTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#f59e0b;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-weight:700;"><i class="fa-solid fa-file-powerpoint"></i> ดาวน์โหลด Template Oral</a>`;
+        if(posterTpl) actions+=`<a href="${esc(posterTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#0284c7;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-weight:700;"><i class="fa-solid fa-file-image"></i> ดาวน์โหลด Template Poster</a>`;
+      }
+      actions+=`<button class="btn btn-blue" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:var(--blue);color:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="promptReplaceWorkFile('${w.WorkID}','FINAL_PRESENTATION','อัปโหลดไฟล์นำเสนอ (Presentation)')"><i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์นำเสนอ (Presentation)</button>`;
     }
 
     return `
@@ -1081,9 +1242,11 @@ function renderAuthorWorks(works,reg,templates){
           <span>•</span>
           <span>สถานะ: <span class="status" style="font-weight:700;">${esc(w.Status)}</span></span>
         </div>
-        ${commentsBox}
+        ${presentationBanner}
+        ${revisionBanner}
+        ${reviewerSection}
         <div style="padding:10px 14px;background:#f8fcfd;border:1px solid #dce5ea;border-radius:8px;margin-bottom:12px;">
-          <b style="color:#0f172a;font-size:0.9rem;"><i class="fa-solid fa-folder-open"></i> ไฟล์ที่แนบไว้:</b>
+          <b style="color:#0f172a;font-size:0.9rem;"><i class="fa-solid fa-folder-open"></i> ไฟล์ที่แนบไว้ในระบบ:</b>
           ${filesHtml||'<div style="color:#888;font-size:0.85rem;margin-top:4px;">ยังไม่มีไฟล์แนบ</div>'}
         </div>
         <div style="display:flex;flex-wrap:wrap;align-items:center;">${actions}</div>
@@ -1092,7 +1255,43 @@ function renderAuthorWorks(works,reg,templates){
   }).join('');
   $('#authorWorkResult').innerHTML=html;
 }
-async function promptReplaceWorkFile(workId,category,title){const {value:file}=await Swal.fire({title:title,input:'file',inputAttributes:{'accept':['ORIGINAL','REVISION','FINAL_PRESENTATION'].includes(category)?'.pdf,.doc,.docx,.ppt,.pptx':'*/*','aria-label':'Upload your file'},showCancelButton:true,confirmButtonText:'อัปโหลด',cancelButtonText:'ยกเลิก',confirmButtonColor:'#006D70'});if(file){load('กำลังอัปโหลดไฟล์...');try{const f=await fileObj({files:[file]});await rpc('replaceWorkFile',CID,$('#authorWorkRegId').value,$('#authorWorkKey').value,workId,category,f);done();Swal.fire({icon:'success',title:'อัปโหลดสำเร็จ',confirmButtonColor:'#006D70'});lookupAuthorWorks()}catch(e){alertErr(e)}}}
+
+async function promptReplaceWorkFile(workId,category,title){
+  const isPres = (category === 'FINAL_PRESENTATION');
+  const isRev = (category === 'REVISION');
+  const acceptTypes = isPres ? '.pdf,.ppt,.pptx,.zip' : (isRev ? '.pdf,.doc,.docx' : '.pdf,.doc,.docx,.ppt,.pptx');
+  const hintText = isPres 
+    ? '<div style="font-size:0.88rem;color:#475569;margin-bottom:10px;">รองรับไฟล์ Presentation (.pptx, .ppt, .pdf) หรือ .zip ขนาดไม่เกิน 50MB</div>' 
+    : (isRev ? '<div style="font-size:0.88rem;color:#475569;margin-bottom:10px;">รองรับไฟล์ผลงานฉบับแก้ไข (.docx, .doc, .pdf) ขนาดไม่เกิน 20MB</div>' : '');
+
+  const {value:file}=await Swal.fire({
+    title: title,
+    html: hintText,
+    input: 'file',
+    inputAttributes: {
+      'accept': acceptTypes,
+      'aria-label': 'Upload your file'
+    },
+    showCancelButton: true,
+    confirmButtonText: '<i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70'
+  });
+
+  if(file){
+    load('กำลังอัปโหลดไฟล์...');
+    try{
+      const f=await fileObj({files:[file]});
+      await rpc('replaceWorkFile',CID,$('#authorWorkRegId').value,$('#authorWorkKey').value,workId,category,f);
+      done();
+      await Swal.fire({icon:'success',title:'อัปโหลดสำเร็จ',text:'ไฟล์ของคุณได้รับการบันทึกเข้าระบบเรียบร้อยแล้ว',confirmButtonColor:'#006D70'});
+      lookupAuthorWorks(true);
+    }catch(e){
+      done();
+      alertErr(e);
+    }
+  }
+}
 function updateWorkRules(){const sel=$('#workCategory'),code=sel?.selectedOptions?.[0]?.dataset?.code||'',researchOrInnovation=['RESEARCH','INNOVATION'].includes(code),ethics=$('#ethicsRequired'),hint=$('#ethicsFileHint');if(hint)hint.textContent=researchOrInnovation?'แนบไฟล์หลักฐานจริยธรรม (ถ้ามี / ไม่บังคับแนบ)':'แนบเมื่อมีเอกสารรับรองจริยธรรม (ไม่บังคับแนบ)';if(ethics&&researchOrInnovation)ethics.closest('.work-rule')?.classList.add('gold');else ethics?.closest('.work-rule')?.classList.remove('gold')}
 function updateRegion4Intent(){const yes=document.querySelector('input[name="Region4Affiliation"][value="YES"]')?.checked,box=$('#region4IntentBox');if(box)box.classList.toggle('show',!!yes);document.querySelectorAll('input[name="Region4AwardIntentChoice"]').forEach(x=>{x.required=!!yes;if(!yes)x.checked=false})}
 async function emailMyPass(){load('กำลังส่งคูปองเข้า Email');try{await rpc('emailMyMealPass',CID,$('#passRegId').value,$('#passKey').value);done();Swal.fire({icon:'success',title:'ส่ง Email สำเร็จ',text:'กรุณาตรวจสอบในกล่องจดหมาย หรือ Junk/Spam',confirmButtonColor:'#006D70'})}catch(e){alertErr(e)}}

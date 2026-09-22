@@ -1120,7 +1120,7 @@ function getRecords_(name){
   if(globalThis.__TUH_RECORDS[name]) return globalThis.__TUH_RECORDS[name];
   
   const isMaster = MASTER_TABLES_.indexOf(name) >= 0;
-  const isCachable = isMaster || ['Works', 'WorkAuthors', 'ReviewAssignments', 'Reviewers', 'ReviewerPool', 'Registrations', 'Payments', 'MealEntitlements', 'WorkFiles'].indexOf(name) >= 0;
+  const isCachable = isMaster || ['Works', 'WorkAuthors', 'ReviewAssignments', 'ReviewScores', 'ScoringCriteria', 'Templates', 'FinalDecisions', 'Reviewers', 'ReviewerPool', 'Registrations', 'Payments', 'MealEntitlements', 'WorkFiles'].indexOf(name) >= 0;
   if (isCachable) {
     try {
       const cached = cacheGetLarge_('TBL_' + name);
@@ -1662,7 +1662,11 @@ function getDailyQuotaStatus_(cid) {
 
 function getPublicBootstrap(conferenceId){
   return runSafely_('getPublicBootstrap',function(){
-    const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID, key='PUBLIC_'+cid, cache=CacheService.getScriptCache(), cached=cache.get(key); if(cached)return JSON.parse(cached);
+    const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID, key='PUBLIC_'+cid;
+    try {
+      const cached = cacheGetLarge_(key);
+      if (cached) return cached;
+    } catch(e) {}
     const conf=findOne_('Conferences',{ConferenceID:cid}); if(!conf)throw new Error('ไม่พบข้อมูลงานประชุม');
     const types=findMany_('RegistrationTypes',{ConferenceID:cid}).filter(function(x){return bool_(x.Active);}).sort(function(a,b){return num_(a.SortOrder)-num_(b.SortOrder);});
     const categories=findMany_('WorkCategories',{ConferenceID:cid}).filter(function(x){return bool_(x.Active);});
@@ -1675,7 +1679,10 @@ function getPublicBootstrap(conferenceId){
     try{eventDates=JSON.parse(normalizeEventDatesJson_(settings.EVENT_DATES_JSON||'[]'));}catch(e){eventDates=[];}
     const dailyQuota=getDailyQuotaStatus_(cid);
     const out={conference:publicConference,settings:settings,eventDates:eventDates,registrationTypes:serialize_(types),organizationUnits:serialize_(units),workCategories:serialize_(categories),presentationTypes:serialize_(presentations),dailyQuota:dailyQuota};
-    cache.put(key,JSON.stringify(out),APP.CACHE_SECONDS); return out;
+    try {
+      cachePutLarge_(key, out, 600);
+    } catch(e) {}
+    return out;
   });
 }
 function serialize_(v){return JSON.parse(JSON.stringify(v,function(k,x){return x instanceof Date?formatDateTime_(x):x;}));}
@@ -3711,8 +3718,14 @@ function getPublicFinanceDocuments(conferenceId, regId, emailOrPhone) {
   });
 }
 
-function requireWorkAccess_(conferenceId,regId,emailOrPhone){
-  const r=requireRegistrationAccess_(conferenceId,regId,emailOrPhone,''); const c=canSubmitWork_(r); if(!c.ok)throw new Error(c.message); assertConferenceWindow_(conferenceId,'SubmissionOpenAt','SubmissionCloseAt','การส่งผลงาน'); return r;
+function requireWorkAccess_(conferenceId,regId,emailOrPhone,isNewSubmission){
+  const r=requireRegistrationAccess_(conferenceId,regId,emailOrPhone,'');
+  const c=canSubmitWork_(r);
+  if(!c.ok)throw new Error(c.message);
+  if(isNewSubmission){
+    assertConferenceWindow_(conferenceId,'SubmissionOpenAt','SubmissionCloseAt','การส่งผลงาน');
+  }
+  return r;
 }
 
 function normalizeWorkTitle_(title){
@@ -3723,10 +3736,149 @@ function canSubmitWork_(reg){
   if(!reg||['CANCELLED','REGISTRATION_RETURNED'].indexOf(upper_(reg.RegistrationStatus))>=0)return {ok:false,message:'สถานะการลงทะเบียนไม่สามารถส่งผลงานได้'};
   return {ok:true};
 }
-function verifyWorkAccess(conferenceId,regId,emailOrPhone){return runSafely_('verifyWorkAccess',function(){const r=requireWorkAccess_(conferenceId||APP.DEFAULT_CONFERENCE_ID,regId,emailOrPhone);const works=findMany_('Works',{ConferenceID:r.ConferenceID,RegID:r.RegID});const files=findMany_('WorkFiles',{ConferenceID:r.ConferenceID,RegID:r.RegID}).filter(function(f){return bool_(f.Active);});const outWorks=works.map(function(w){const cw=Object.assign({},w);cw.files=files.filter(function(f){return f.WorkID===w.WorkID;});return cw;});return {registration:publicRegistration_(r),works:serialize_(outWorks)};});}
+
+function findTemplateUrl_(conferenceId, type){
+  try {
+    const key = String(type||'').toUpperCase();
+    const tpls = findMany_('Templates', {ConferenceID: conferenceId});
+    const tpl = tpls.find(function(t){
+      return bool_(t.Active) && String(t.TemplateKey||'').toUpperCase() === key;
+    }) || tpls.find(function(t){
+      return bool_(t.Active) && (String(t.TemplateKey||'').toUpperCase().indexOf(key) >= 0 || String(t.TemplateNameTH||'').toUpperCase().indexOf(key) >= 0);
+    });
+    return tpl && tpl.FileUrl ? tpl.FileUrl : '';
+  } catch(e) {
+    return '';
+  }
+}
+
+function verifyWorkAccess(conferenceId,regId,emailOrPhone){
+  return runSafely_('verifyWorkAccess',function(){
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const cleanRegId = clean_(regId);
+    const r = requireWorkAccess_(cid, cleanRegId, emailOrPhone, false);
+
+    const authCacheKey = 'AUTH_WORKS_' + cid + '_' + cleanRegId;
+    try {
+      const cached = cacheGetLarge_(authCacheKey);
+      if (cached) return cached;
+    } catch(e) {}
+
+    let canSubmitNewWork = true;
+    try {
+      assertConferenceWindow_(cid, 'SubmissionOpenAt', 'SubmissionCloseAt', 'การส่งผลงาน');
+    } catch(e) {
+      canSubmitNewWork = false;
+    }
+
+    const works = findMany_('Works', {ConferenceID: cid, RegID: r.RegID});
+    const files = findMany_('WorkFiles', {ConferenceID: cid, RegID: r.RegID}).filter(function(f){ return bool_(f.Active); });
+
+    const allCriteria = findMany_('ScoringCriteria', {ConferenceID: cid}).filter(function(x){ return bool_(x.Active); });
+    const critMap = {};
+    allCriteria.forEach(function(crit){
+      critMap[crit.CriteriaID] = crit;
+    });
+
+    const settings = settingsMap_(cid);
+    const oralTpl = settings.ORAL_TEMPLATE_URL || findTemplateUrl_(cid, 'ORAL') || 'https://docs.google.com/presentation/d/1exampleOralTemplate/edit';
+    const posterTpl = settings.POSTER_TEMPLATE_URL || findTemplateUrl_(cid, 'POSTER') || 'https://docs.google.com/presentation/d/1examplePosterTemplate/edit';
+
+    const outWorks = works.map(function(w){
+      const cw = Object.assign({}, w);
+      cw.files = files.filter(function(f){ return f.WorkID === w.WorkID; });
+
+      // Fetch completed or submitted reviews for this work
+      const assignments = findMany_('ReviewAssignments', {ConferenceID: cid, WorkID: w.WorkID}).filter(function(a){
+        return ['COMPLETE', 'LOCKED'].indexOf(upper_(a.Status)) >= 0 || clean_(a.RecommendationToAuthor);
+      });
+
+      const reviewerFeedback = [];
+      const authorComments = [];
+
+      assignments.forEach(function(a, idx){
+        const reviewerNumber = idx + 1;
+        const anonymousLabel = 'ผู้ประเมินท่านที่ ' + reviewerNumber;
+
+        // Fetch scores/criteria comments for this assignment
+        const scores = findMany_('ReviewScores', {ConferenceID: cid, AssignmentID: a.AssignmentID});
+        const criteriaFeedback = [];
+
+        scores.forEach(function(s){
+          const comment = clean_(s.Comment);
+          if (comment) {
+            const crit = critMap[s.CriteriaID] || {};
+            criteriaFeedback.push({
+              criteriaId: s.CriteriaID,
+              itemNo: crit.ItemNo || '',
+              criteriaName: crit.CriteriaNameTH || crit.CriteriaNameEN || ('เกณฑ์ข้อ ' + (crit.ItemNo || '')),
+              maxScore: crit.MaxScore,
+              comment: comment
+            });
+            authorComments.push({
+              source: anonymousLabel + ' (เกณฑ์: ' + (crit.CriteriaNameTH || ('ข้อ ' + crit.ItemNo)) + ')',
+              comment: comment
+            });
+          }
+        });
+
+        const overallComment = clean_(a.RecommendationToAuthor);
+        if (overallComment) {
+          authorComments.unshift({
+            source: anonymousLabel + ' (ข้อเสนอแนะรวม)',
+            comment: overallComment
+          });
+        }
+
+        reviewerFeedback.push({
+          reviewerLabel: anonymousLabel,
+          reviewerIndex: reviewerNumber,
+          decision: clean_(a.Decision),
+          overallComment: overallComment,
+          annotatedFileUrl: clean_(a.AnnotatedFileUrl),
+          criteriaFeedback: criteriaFeedback
+        });
+      });
+
+      if (clean_(w.ScreeningNote)) {
+        authorComments.unshift({
+          source: 'คณะกรรมการคัดกรองเบื้องต้น',
+          comment: clean_(w.ScreeningNote)
+        });
+      }
+
+      const finalDec = findOne_('FinalDecisions', {ConferenceID: cid, WorkID: w.WorkID});
+      if (finalDec && clean_(finalDec.AuthorVisibleComment)) {
+        authorComments.unshift({
+          source: 'คณะกรรมการพิจารณาผลงาน (มติสุดท้าย)',
+          comment: clean_(finalDec.AuthorVisibleComment)
+        });
+      }
+
+      cw.reviewerFeedback = reviewerFeedback;
+      cw.authorComments = authorComments;
+      cw.revisionDeadline = clean_(w.RevisionDeadline);
+      return cw;
+    });
+
+    const result = {
+      registration: publicRegistration_(r),
+      works: serialize_(outWorks),
+      canSubmitNewWork: canSubmitNewWork,
+      oralTemplateUrl: oralTpl,
+      posterTemplateUrl: posterTpl
+    };
+
+    try {
+      cachePutLarge_(authCacheKey, result, 180);
+    } catch(e) {}
+
+    return result;
+  });
+}
 function submitWork(conferenceId,regId,emailOrPhone,payload,files){
   return runSafely_('submitWork',function(){
-    const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID,r=requireWorkAccess_(cid,regId,emailOrPhone);payload=payload||{};files=files||{};
+    const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID,r=requireWorkAccess_(cid,regId,emailOrPhone,true);payload=payload||{};files=files||{};
     if(!payload.CategoryID||!payload.PresentationTypeRequested||!clean_(payload.TitleTH))throw new Error('กรุณากรอกประเภทผลงาน รูปแบบนำเสนอ และชื่อผลงาน');
     const category=findOne_('WorkCategories',{ConferenceID:cid,CategoryID:payload.CategoryID});if(!category||!bool_(category.Active))throw new Error('ประเภทผลงานไม่ถูกต้อง');
     const presentation=findOne_('PresentationTypes',{ConferenceID:cid,PresentationTypeID:payload.PresentationTypeRequested});if(!presentation||!bool_(presentation.Active))throw new Error('รูปแบบการนำเสนอไม่ถูกต้อง');
@@ -3834,6 +3986,8 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
     if(category==='REVISION')updateRecord_('Works',w.__row,{Status:'REVISION_SUBMITTED',UpdatedAt:new Date()});
     if(category==='FINAL_PRESENTATION')updateRecord_('Works',w.__row,{PresentationUploadStatus:'SUBMITTED',Status:'PRESENTATION_FILE_SUBMITTED',UpdatedAt:new Date()});
     invalidateCache_(cid);
+    try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + regId); } catch(e) {}
+    try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
     return up;
   });
 }
@@ -4211,6 +4365,9 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     if(submit)appendRecord_('ReviewSummary',{SummaryID:nextId_('SUM'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),CreatedAt:new Date(),UpdatedAt:new Date()});
     try { cacheRemoveLarge_('REV_ASG_' + assignmentId); } catch(e) {}
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e) {}
+    if (work && work.RegID) {
+      try { cacheRemoveLarge_('AUTH_WORKS_' + conferenceId + '_' + work.RegID); } catch(e) {}
+    }
     return {status:status,totalScore:total};
   });
 }
