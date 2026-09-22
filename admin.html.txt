@@ -2782,17 +2782,86 @@ async function openScoreSummary(wid){
         </div>
       `;
     }
+
+    const anyLocked = assignments.some(a => a.Locked || a.ScoreAcceptedByAdmin || a.AdminLocked);
+    html += `
+      <div style="margin-top:20px; padding:12px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-weight:600; font-size:0.9rem; color:#1e293b;">
+            สถานะแบบประเมินของกรรมการ: 
+            ${anyLocked 
+              ? '<span class="badge" style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:999px;">🔒 ล็อกแล้ว (กรรมการแก้ไขไม่ได้)</span>' 
+              : '<span class="badge" style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:999px;">🔓 เปิดให้กรรมการแก้ไขคะแนนได้</span>'}
+          </div>
+          <div style="font-size:0.8rem; color:#64748b; margin-top:3px;">
+            ${anyLocked 
+              ? 'ผู้ดูแลระบบได้รับคะแนนแล้ว หรือผลงานอยู่ในขั้นตอนสรุปผล' 
+              : 'กรรมการสามารถเข้าแก้ไขหรือส่งคะแนนใหม่ได้ตลอดจนกว่าผู้ดูแลจะกดรับคะแนน'}
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${anyLocked 
+            ? `<button type="button" class="btn soft" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; font-size:0.85rem;" onclick="adminUnlockScoresAction('${esc(wid)}')">🔓 ปลดล็อกให้กรรมการแก้ไข</button>`
+            : `<button type="button" class="btn soft" style="background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:0.85rem;" onclick="adminLockScoresAction('${esc(wid)}')">🔒 รับคะแนนและล็อกแบบประเมิน</button>`}
+          <button type="button" class="btn primary" style="font-size:0.85rem;" onclick="Swal.close(); openUpdateWorkStatus('${esc(wid)}', '${esc(work.Status)}')">📝 ตัดสินผลงาน</button>
+        </div>
+      </div>
+    `;
     
     html += `</div>`;
     
     Swal.fire({
       title: 'สรุปคะแนนประเมินผลงาน',
       html: html,
-      width: 750,
+      width: 780,
       confirmButtonColor: '#006D70',
       confirmButtonText: 'ปิด'
     });
   } catch(e) {
+    err(e);
+  }
+}
+
+async function adminLockScoresAction(wid) {
+  const conf = await Swal.fire({
+    title: 'ยืนยันรับคะแนนและล็อกแบบประเมิน?',
+    text: 'เมื่อล็อกแล้ว กรรมการจะไม่สามารถแก้ไขคะแนนของผลงานนี้ได้อีก จนกว่าจะได้รับการปลดล็อก',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'ยืนยันล็อก',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#b42318'
+  });
+  if (!conf.isConfirmed) return;
+  show('กำลังบันทึกสถานะ...');
+  try {
+    await rpc('adminAcceptWorkScores', TOKEN, CID, wid, true);
+    hide();
+    toast('รับคะแนนและล็อกแบบประเมินเรียบร้อยแล้ว');
+    openScoreSummary(wid);
+  } catch (e) {
+    err(e);
+  }
+}
+
+async function adminUnlockScoresAction(wid) {
+  const conf = await Swal.fire({
+    title: 'ยืนยันปลดล็อกแบบประเมิน?',
+    text: 'ระบบจะอนุญาตให้กรรมการเข้าประเมินและปรับปรุงคะแนนของผลงานนี้ได้อีกครั้ง',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'ยืนยันปลดล็อก',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70'
+  });
+  if (!conf.isConfirmed) return;
+  show('กำลังปลดล็อก...');
+  try {
+    await rpc('adminUnlockWorkScores', TOKEN, CID, wid);
+    hide();
+    toast('ปลดล็อกให้กรรมการแก้ไขคะแนนเรียบร้อยแล้ว');
+    openScoreSummary(wid);
+  } catch (e) {
     err(e);
   }
 }

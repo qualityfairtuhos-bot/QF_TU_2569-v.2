@@ -4437,7 +4437,16 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     if(round && ['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว ไม่สามารถบันทึกผลได้');
     if(round && round.StartAt && new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');
     if(round && round.EndAt && new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');
-    if(bool_(a.Locked))throw new Error('แบบประเมินถูกล็อกแล้ว ไม่สามารถแก้ไขได้');
+    
+    // Admin acceptance / locking logic:
+    // Reviewers can edit their scores until Admin accepts the scores or finalizes the work!
+    const workStatus = upper_(work ? work.Status : '');
+    const isWorkAcceptedOrFinalizedByAdmin = ['ACCEPTED_ORAL','ACCEPTED_POSTER','REVISION_REQUIRED','REJECTED','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED','PUBLISHED','WITHDRAWN'].indexOf(workStatus) >= 0;
+    const isAdminExplicitlyLocked = bool_(a.ScoreAcceptedByAdmin) || bool_(a.AdminLocked) || (bool_(a.Locked) && isWorkAcceptedOrFinalizedByAdmin);
+
+    if(isWorkAcceptedOrFinalizedByAdmin || isAdminExplicitlyLocked){
+      throw new Error('ผู้ดูแลระบบได้สรุปผลและรับคะแนนของผลงานนี้แล้ว แบบประเมินจึงถูกล็อก ไม่สามารถแก้ไขได้');
+    }
     
     const scores=payload.Scores||[];
     let allCriteria=findMany_('ScoringCriteria',{ConferenceID:cid});
@@ -4451,54 +4460,105 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     const criteriaMap={};
     allCriteria.forEach(function(c){criteriaMap[c.CriteriaID]=c;});
 
-    let total=0;
+    // Fetch existing scores once to avoid repeated sheet reads
+    const existingScores = findMany_('ReviewScores', {ConferenceID: cid, AssignmentID: assignmentId});
+    const existingMap = {};
+    existingScores.forEach(function(es){ existingMap[es.CriteriaID] = es; });
+
+    const updates = [];
+    const inserts = [];
+    const savedScoresList = [];
+    let total = 0;
+
     scores.forEach(function(s){
       if(s.Score === '' || s.Score === null || s.Score === undefined) return;
-      const c=criteriaMap[s.CriteriaID];
-      if(!c)return;
-      const score=num_(s.Score);
-      const max=num_(c.MaxScore, 100);
-      if(score<0||score>max)throw new Error('คะแนน ' + score + ' ในหัวข้อ "' + (c.CriteriaNameTH||c.CriteriaID) + '" เกินคะแนนเต็ม (' + max + ' คะแนน)');
-      let old=findOne_('ReviewScores',{ConferenceID:cid,AssignmentID:assignmentId,CriteriaID:s.CriteriaID}) ||
-              findOne_('ReviewScores',{AssignmentID:assignmentId,CriteriaID:s.CriteriaID});
-      const patch={Score:score,WeightedScore:score*(num_(c.WeightPercent,100)/100),Comment:clean_(s.Comment),UpdatedAt:new Date()};
-      if(old)updateRecord_('ReviewScores',old.__row,patch);
-      else appendRecord_('ReviewScores',Object.assign({ScoreID:nextId_('SCORE'),ConferenceID:cid,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid||a.ReviewerID,CriteriaID:s.CriteriaID,CreatedAt:new Date()},patch));
-      total+=score;
+      const c = criteriaMap[s.CriteriaID];
+      if(!c) return;
+      const score = num_(s.Score);
+      const max = num_(c.MaxScore, 100);
+      if(score < 0 || score > max) throw new Error('คะแนน ' + score + ' ในหัวข้อ "' + (c.CriteriaNameTH||c.CriteriaID) + '" เกินคะแนนเต็ม (' + max + ' คะแนน)');
+      
+      const weighted = score * (num_(c.WeightPercent, 100) / 100);
+      const comment = clean_(s.Comment);
+      const existing = existingMap[s.CriteriaID];
+      if(existing){
+        updates.push({
+          rowNumber: existing.__row,
+          patch: { Score: score, WeightedScore: weighted, Comment: comment, UpdatedAt: new Date() }
+        });
+        savedScoresList.push(Object.assign({}, existing, { Score: score, WeightedScore: weighted, Comment: comment }));
+      } else {
+        const newScoreRecord = {
+          ScoreID: nextId_('SCORE'),
+          ConferenceID: cid,
+          AssignmentID: assignmentId,
+          ReviewRoundID: a.ReviewRoundID,
+          WorkID: a.WorkID,
+          ReviewerID: rid || a.ReviewerID,
+          CriteriaID: s.CriteriaID,
+          Score: score,
+          WeightedScore: weighted,
+          Comment: comment,
+          CreatedAt: new Date(),
+          UpdatedAt: new Date()
+        };
+        inserts.push(newScoreRecord);
+        savedScoresList.push(newScoreRecord);
+      }
+      total += score;
     });
 
-    total=Math.round(total*100)/100;
-    if(total>100)total=100; // strictly capped at 100 points max
+    if (updates.length > 0) {
+      batchUpdateRecords_('ReviewScores', updates);
+    }
+    if (inserts.length > 0) {
+      appendRecords_('ReviewScores', inserts);
+    }
 
-    const status=submit?'COMPLETE':'DRAFT_SAVED';
-    const canEditAfterSubmit = bool_(getSetting_(cid,'REVIEWER_CAN_EDIT_AFTER_SUBMIT','FALSE'));
-    const isLocked = submit && !canEditAfterSubmit;
+    total = Math.round(total * 100) / 100;
+    if(total > 100) total = 100; // strictly capped at 100 points max
 
-    updateRecord_('ReviewAssignments',a.__row,{
-      Status:status,
-      CompletedAt:submit?new Date():(a.CompletedAt||''),
-      TotalScore:total,
-      Decision:clean_(payload.Decision),
-      RecommendationToAuthor:clean_(payload.RecommendationToAuthor),
-      InternalComment:clean_(payload.InternalComment),
-      Locked:isLocked,
-      UpdatedAt:new Date()
+    const status = submit ? 'COMPLETE' : 'DRAFT_SAVED';
+    // Reviewer submit never locks out reviewer themselves; only Admin accepts/locks!
+    const isLocked = false;
+
+    updateRecord_('ReviewAssignments', a.__row, {
+      Status: status,
+      CompletedAt: submit ? new Date() : (a.CompletedAt || ''),
+      TotalScore: total,
+      Decision: clean_(payload.Decision),
+      RecommendationToAuthor: clean_(payload.RecommendationToAuthor),
+      InternalComment: clean_(payload.InternalComment),
+      Locked: isLocked,
+      UpdatedAt: new Date()
     });
 
-    if(submit)appendRecord_('ReviewSummary',{
-      SummaryID:nextId_('SUM'),
-      ConferenceID:cid,
-      AssignmentID:assignmentId,
-      ReviewRoundID:a.ReviewRoundID,
-      WorkID:a.WorkID,
-      ReviewerID:rid||a.ReviewerID,
-      TotalScore:total,
-      Decision:clean_(payload.Decision),
-      RecommendationToAuthor:clean_(payload.RecommendationToAuthor),
-      InternalComment:clean_(payload.InternalComment),
-      CreatedAt:new Date(),
-      UpdatedAt:new Date()
-    });
+    // Update or append ReviewSummary
+    let sumRec = findOne_('ReviewSummary', {ConferenceID: cid, AssignmentID: assignmentId});
+    if(sumRec){
+      updateRecord_('ReviewSummary', sumRec.__row, {
+        TotalScore: total,
+        Decision: clean_(payload.Decision),
+        RecommendationToAuthor: clean_(payload.RecommendationToAuthor),
+        InternalComment: clean_(payload.InternalComment),
+        UpdatedAt: new Date()
+      });
+    } else if(submit) {
+      appendRecord_('ReviewSummary', {
+        SummaryID: nextId_('SUM'),
+        ConferenceID: cid,
+        AssignmentID: assignmentId,
+        ReviewRoundID: a.ReviewRoundID,
+        WorkID: a.WorkID,
+        ReviewerID: rid || a.ReviewerID,
+        TotalScore: total,
+        Decision: clean_(payload.Decision),
+        RecommendationToAuthor: clean_(payload.RecommendationToAuthor),
+        InternalComment: clean_(payload.InternalComment),
+        CreatedAt: new Date(),
+        UpdatedAt: new Date()
+      });
+    }
 
     try { cacheRemoveLarge_('REV_ASG_' + assignmentId); } catch(e) {}
     try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
@@ -4506,7 +4566,19 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     if (work && work.RegID) {
       try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + work.RegID); } catch(e) {}
     }
-    return {status:status,totalScore:total};
+    return {
+      status: status,
+      totalScore: total,
+      assignment: Object.assign({}, serialize_(a), {
+        Status: status,
+        TotalScore: total,
+        Decision: clean_(payload.Decision),
+        RecommendationToAuthor: clean_(payload.RecommendationToAuthor),
+        InternalComment: clean_(payload.InternalComment),
+        Locked: isLocked
+      }),
+      scores: serialize_(savedScoresList)
+    };
   });
 }
 
@@ -6718,6 +6790,66 @@ function adminUpdateWorkStatus(token, conferenceId, workId, newStatus, categoryI
     updateRecord_('Works', w.__row, patch);
     logAudit_(cid, ctx.user, ctx.role, 'UPDATE_WORK_STATUS', 'Works', workId, patch);
     return { success: true, workId: workId, patch: patch };
+  });
+}
+
+function adminAcceptWorkScores(token, conferenceId, workId, lockReviewers) {
+  return runSafely_('adminAcceptWorkScores', function() {
+    var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || findOne_('Works', { WorkID: workId });
+    if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
+
+    var assignments = findMany_('ReviewAssignments', { ConferenceID: cid, WorkID: w.WorkID });
+    var updates = [];
+    assignments.forEach(function(a) {
+      updates.push({
+        rowNumber: a.__row,
+        patch: {
+          ScoreAcceptedByAdmin: true,
+          AdminLocked: !!lockReviewers,
+          Locked: !!lockReviewers,
+          UpdatedAt: new Date()
+        }
+      });
+    });
+    if (updates.length > 0) {
+      batchUpdateRecords_('ReviewAssignments', updates);
+    }
+    try { cacheRemoveLarge_('REV_ASG_' + w.WorkID); } catch(e) {}
+    try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
+    logAudit_(cid, ctx.user, ctx.role, 'ACCEPT_WORK_SCORES', 'Works', workId, { locked: !!lockReviewers, count: updates.length });
+    return { success: true, count: updates.length, locked: !!lockReviewers };
+  });
+}
+
+function adminUnlockWorkScores(token, conferenceId, workId) {
+  return runSafely_('adminUnlockWorkScores', function() {
+    var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || findOne_('Works', { WorkID: workId });
+    if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
+
+    var assignments = findMany_('ReviewAssignments', { ConferenceID: cid, WorkID: w.WorkID });
+    var updates = [];
+    assignments.forEach(function(a) {
+      updates.push({
+        rowNumber: a.__row,
+        patch: {
+          ScoreAcceptedByAdmin: false,
+          AdminLocked: false,
+          Locked: false,
+          UpdatedAt: new Date()
+        }
+      });
+    });
+    if (updates.length > 0) {
+      batchUpdateRecords_('ReviewAssignments', updates);
+    }
+    try { cacheRemoveLarge_('REV_ASG_' + w.WorkID); } catch(e) {}
+    try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
+    logAudit_(cid, ctx.user, ctx.role, 'UNLOCK_WORK_SCORES', 'Works', workId, { count: updates.length });
+    return { success: true, count: updates.length };
   });
 }
 
