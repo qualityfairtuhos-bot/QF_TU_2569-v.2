@@ -397,7 +397,6 @@ $('#loginForm').onsubmit=async e=>{
       renderAppShell(bootData);
       hide();
       await nav('dashboard');
-      prefetchAdminTabs();
     }else{
       await boot();
       hide();
@@ -419,29 +418,9 @@ async function boot(){
   renderAppShell(BOOT);
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
-  prefetchAdminTabs();
 }
 const TAB_STATE = window.TAB_STATE || { loaded: {}, inFlight: {} };
 window.TAB_STATE = TAB_STATE;
-function prefetchAdminTabs(){
-  if(!BOOT||!BOOT.role)return;
-  const allow=menuForRole(BOOT.role).map(x=>x[0]);
-  const queue=['works','registrations','payments','reviewers','food','settings'].filter(p=>allow.includes(p));
-  queue.forEach((p,idx)=>{
-    setTimeout(async()=>{
-      if(TAB_STATE.loaded[p]||TAB_STATE.inFlight[p])return;
-      try{
-        if(p==='works')await loadWorks(false);
-        else if(p==='registrations')await loadRegistrations(false);
-        else if(p==='payments')await loadPayments(false);
-        else if(p==='reviewers')await Promise.all([loadReviewers(false),loadReviewConfig(false)]);
-        else if(p==='food')await loadFood(false);
-        else if(p==='settings')await loadSettings(false);
-        TAB_STATE.loaded[p]=Date.now();
-      }catch(e){}
-    },800+idx*400);
-  });
-}
 
 async function nav(p, forceRefresh = false){
   const page=$('#page-'+p);

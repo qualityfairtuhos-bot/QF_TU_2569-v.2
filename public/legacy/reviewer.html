@@ -41,25 +41,44 @@
     .dash-icon { position:absolute; right:15px; top:15px; font-size:2.5rem; opacity:0.1; }
     .login-card .brand h1 { font-size:clamp(1.35rem,2.2vw,1.75rem); letter-spacing:-0.02em; white-space:nowrap; }
 
-    /* 5 Main Categories & 8 Criteria Scoring Styles */
+    /* 5 Main Categories & Criteria Scoring Styles */
     .category-section { background:#fff; border:1px solid var(--line); border-radius:16px; margin:18px 0; overflow:hidden; box-shadow:0 4px 15px rgba(12,56,91,0.03); }
     .category-header { background:linear-gradient(135deg,#f0f7f9 0%,#e6f1f4 100%); padding:14px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
     .category-header h3 { margin:0; font-size:1.02rem; color:var(--blue); font-weight:700; display:flex; align-items:center; gap:8px; }
     .cat-pill { background:#fff; color:var(--teal); border:1.5px solid var(--teal); padding:4px 12px; border-radius:999px; font-size:0.85rem; font-weight:700; white-space:nowrap; }
-    .category-body { padding:16px; display:flex; flex-direction:column; gap:14px; }
-    .criterion-card { border:1.5px solid #cbd5e1; border-radius:14px; padding:18px 20px; background:#ffffff; transition:border-color 0.2s, box-shadow 0.2s; box-shadow:0 2px 8px rgba(0,0,0,0.02); }
+    .category-body { padding:16px; display:flex; flex-direction:column; gap:16px; }
+    .criterion-card { border:1.5px solid #cbd5e1; border-radius:14px; padding:18px 20px; background:#ffffff; transition:border-color 0.2s, box-shadow 0.2s; box-shadow:0 2px 8px rgba(0,0,0,0.03); }
     .criterion-card:hover { border-color:#94a3b8; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
-    .criterion-title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
-    .criterion-title-row b { font-size:1.02rem; color:#0f172a; line-height:1.45; }
-    .criterion-num-pill { background:#0369a1; color:#ffffff; font-weight:800; font-size:0.88rem; padding:3px 10px; border-radius:8px; display:inline-block; margin-right:6px; vertical-align:middle; }
-    .criterion-max-badge { background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:0.85rem; font-weight:700; padding:4px 12px; border-radius:999px; white-space:nowrap; }
-    .criterion-rubric-desc { background:#f8fafc; border-left:4px solid #0284c7; border-radius:6px; padding:12px 16px; margin:10px 0 16px 0; font-size:0.9rem; color:#334155; line-height:1.65; white-space:pre-line; }
-    .score-input-box { background:#fefce8; border:2px solid #eab308; border-radius:12px; padding:14px; box-shadow:0 3px 8px rgba(234,179,8,0.12); }
-    .score-input-header { font-size:0.88rem; font-weight:700; color:#854d0e; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-    .score-input-control { width:100% !important; font-size:1.4rem !important; font-weight:800 !important; color:#713f12 !important; background:#ffffff !important; border:2px solid #ca8a04 !important; border-radius:8px !important; padding:8px 12px !important; text-align:center !important; box-sizing:border-box !important; }
-    .score-input-control:focus { outline:none !important; border-color:#854d0e !important; box-shadow:0 0 0 3px rgba(234,179,8,0.3) !important; background:#fffdf0 !important; }
+    
+    /* Header Row: Title on left, Prominent Score Input Box on right */
+    .criterion-header-row { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px; flex-wrap:wrap; }
+    .criterion-title-wrap { flex:1; min-width:260px; }
+    .criterion-main-title { font-size:1.02rem; color:#0f172a; line-height:1.45; }
+    .criterion-num-pill { background:#0369a1; color:#ffffff; font-weight:800; font-size:0.85rem; padding:3px 10px; border-radius:6px; display:inline-block; margin-right:8px; vertical-align:middle; }
+    .criterion-sub-en { color:#64748b; margin-top:4px; font-size:0.85rem; padding-left:2px; }
+    
+    /* Dedicated Score Box: Up to the Right with distinct background color */
+    .criterion-score-container { flex-shrink:0; min-width:220px; background:#fefce8; border:2px solid #eab308; border-radius:12px; padding:10px 14px; box-shadow:0 2px 8px rgba(234,179,8,0.15); display:flex; flex-direction:column; align-items:stretch; }
+    .score-box-badge { display:flex; justify-content:space-between; align-items:center; font-size:0.84rem; font-weight:700; color:#854d0e; margin-bottom:6px; }
+    .score-max-pill { background:#fef08a; color:#713f12; font-size:0.78rem; padding:2px 8px; border-radius:999px; font-weight:700; border:1px solid #fde047; }
+    .score-input-wrap { display:flex; align-items:center; gap:8px; }
+    .score-input-prominent { flex:1; min-width:0; font-size:1.35rem !important; font-weight:800 !important; text-align:center !important; color:#78350f !important; background:#ffffff !important; border:2px solid #ca8a04 !important; border-radius:8px !important; padding:6px 10px !important; box-sizing:border-box !important; transition:all 0.2s; }
+    .score-input-prominent:focus { outline:none !important; border-color:#854d0e !important; box-shadow:0 0 0 3px rgba(234,179,8,0.35) !important; background:#fffdf0 !important; }
+    .score-input-prominent.is-invalid { border-color:#dc2626 !important; background:#fef2f2 !important; color:#991b1b !important; }
+    .score-unit-text { font-size:0.88rem; font-weight:700; color:#854d0e; white-space:nowrap; }
+    
+    /* Rubric Description */
+    .criterion-rubric-desc { background:#f8fafc; border-left:4px solid #0284c7; border-radius:6px; padding:12px 16px; margin:10px 0 14px 0; font-size:0.9rem; color:#334155; line-height:1.65; white-space:pre-line; }
+    
+    /* Full-Width Long & Spacious Comment Box */
+    .criterion-comment-container { margin-top:10px; width:100%; }
+    .criterion-comment-label { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:0.88rem; font-weight:600; color:#334155; margin-bottom:6px; }
+    .criterion-comment-textarea { width:100%; min-height:80px; font-size:0.92rem; line-height:1.55; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 14px; box-sizing:border-box; background:#ffffff; transition:border-color 0.2s, box-shadow 0.2s; font-family:inherit; resize:vertical; }
+    .criterion-comment-textarea:focus { outline:none; border-color:#0284c7; box-shadow:0 0 0 3px rgba(2,132,199,0.15); background:#fcfdfe; }
+    
     @media(max-width: 680px) {
-      .review-grid { grid-template-columns: 1fr !important; }
+      .criterion-header-row { flex-direction:column; }
+      .criterion-score-container { width:100%; }
     }
     .live-summary-card { background:linear-gradient(145deg,#073552,#006d70); color:#fff; border-radius:18px; padding:20px 24px; margin-bottom:22px; box-shadow:0 10px 30px rgba(0,109,112,0.2); }
     .live-summary-top { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid rgba(255,255,255,0.18); padding-bottom:14px; }
@@ -210,10 +229,74 @@ async function boot(){BOOT=await rpc('reviewerBootstrap',TOKEN,CID);$('#loginVie
 function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); }
 function statusBadge(s){const c=s==='COMPLETE'?'ok':(s==='PASS'?'ok':'warn');return `<span class="badge ${c}">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
 let currentFilter = 'all';
-function renderAssignments(){const a=BOOT.assignments||[],complete=a.filter(x=>x.Status==='COMPLETE').length,pending=a.length-complete;const kh=[['ได้รับมอบหมาย',a.length],['ประเมินเสร็จ',complete],['รอดำเนินการ',pending],['ความคืบหน้า',a.length?Math.round(complete*100/a.length)+'%':'0%']].map(x=>`<div class="kpi"><span>${x[0]}</span><br><b>${x[1]}</b></div>`).join('');const dk=$('#kpis');if(dk)dk.innerHTML=kh;const ak=$('#assignments-kpis');if(ak)ak.innerHTML=kh;const elAll=$('#count-all');if(elAll)elAll.textContent=a.length;const elPen=$('#count-pending');if(elPen)elPen.textContent=pending;const elCom=$('#count-completed');if(elCom)elCom.textContent=complete;renderAssignmentsGrid()}
+const ASSIGNMENT_CACHE = {};
+
+async function prefetchAssignments() {
+  const a = BOOT.assignments || [];
+  for (const item of a) {
+    if (!ASSIGNMENT_CACHE[item.AssignmentID]) {
+      try {
+        const res = await rpc('reviewerGetAssignment', TOKEN, CID, item.AssignmentID);
+        if (res && res.assignment) {
+          ASSIGNMENT_CACHE[item.AssignmentID] = res;
+        }
+      } catch (err) {
+        // silent prefetch error
+      }
+    }
+  }
+}
+
+function renderAssignments(){const a=BOOT.assignments||[],complete=a.filter(x=>x.Status==='COMPLETE').length,pending=a.length-complete;const kh=[['ได้รับมอบหมาย',a.length],['ประเมินเสร็จ',complete],['รอดำเนินการ',pending],['ความคืบหน้า',a.length?Math.round(complete*100/a.length)+'%':'0%']].map(x=>`<div class="kpi"><span>${x[0]}</span><br><b>${x[1]}</b></div>`).join('');const dk=$('#kpis');if(dk)dk.innerHTML=kh;const ak=$('#assignments-kpis');if(ak)ak.innerHTML=kh;const elAll=$('#count-all');if(elAll)elAll.textContent=a.length;const elPen=$('#count-pending');if(elPen)elPen.textContent=pending;const elCom=$('#count-completed');if(elCom)elCom.textContent=complete;renderAssignmentsGrid();setTimeout(prefetchAssignments,250);}
 function renderAssignmentsGrid(){const grid=$('#assignmentGrid');if(!grid)return;const a=BOOT.assignments||[],search=($('#searchAssignment').value||'').toLowerCase();const filtered=a.filter(x=>{if(currentFilter==='pending'&&x.Status==='COMPLETE')return false;if(currentFilter==='completed'&&x.Status!=='COMPLETE')return false;if(search){const txt=`${x.WorkCode} ${x.TitleTH}`.toLowerCase();if(!txt.includes(search))return false}return true});if(filtered.length===0){grid.innerHTML=`<div class="kanban-empty">ไม่พบผลงานที่ตรงกับเงื่อนไข</div>`;return}grid.innerHTML=filtered.map(x=>`<div class="kanban-card" onclick="openAssignment('${esc(x.AssignmentID)}')"><div class="kanban-header"><div class="kanban-code"># ${esc(x.WorkCode)}</div><div class="kanban-score">${esc(x.TotalScore||'-')}</div></div><div class="kanban-title">${esc(x.TitleTH||'-')}</div><div class="kanban-meta"><span>📅 มอบหมาย: ${esc(formatDate(x.AssignedAt))}</span></div><div class="kanban-badges">${statusBadge(x.Status)}${x.Decision?statusBadge(x.Decision):''}${x.WorkStatus?statusBadge(x.WorkStatus):''}</div></div>`).join('');}
 document.addEventListener('click',e=>{const tab=e.target.closest('.filter-tab');if(tab){document.querySelectorAll('.filter-tab').forEach(el=>el.classList.remove('active'));tab.classList.add('active');currentFilter=tab.dataset.filter;renderAssignmentsGrid()}});
-async function openAssignment(id){show('กำลังเปิดผลงาน');try{CURRENT=await rpc('reviewerGetAssignment',TOKEN,CID,id);hide();renderReview()}catch(e){hide();Swal.fire({icon:'error',title:'เปิดผลงานไม่ได้',text:e.message})}}
+
+async function openAssignment(id){
+  if (ASSIGNMENT_CACHE[id]) {
+    CURRENT = ASSIGNMENT_CACHE[id];
+    renderReview();
+    return;
+  }
+  show('กำลังเปิดผลงาน');
+  try{
+    CURRENT = await rpc('reviewerGetAssignment', TOKEN, CID, id);
+    ASSIGNMENT_CACHE[id] = CURRENT;
+    hide();
+    renderReview();
+  }catch(e){
+    hide();
+    Swal.fire({icon:'error',title:'เปิดผลงานไม่ได้',text:e.message});
+  }
+}
+
+function handleScoreInput(input, maxScore) {
+  if (!input) return;
+  const max = parseFloat(maxScore) || 0;
+  let val = parseFloat(input.value);
+  if (!isNaN(val)) {
+    if (val > max) {
+      input.classList.add('is-invalid');
+      input.value = max;
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'warning',
+        title: `ห้ามลงคะแนนเกินคะแนนเต็ม (${max} คะแนน)`,
+        showConfirmButton: false,
+        timer: 2500
+      });
+    } else if (val < 0) {
+      input.value = 0;
+      input.classList.remove('is-invalid');
+    } else {
+      input.classList.remove('is-invalid');
+    }
+  } else {
+    input.classList.remove('is-invalid');
+  }
+  updateLiveReviewScores();
+}
+
 function updateLiveReviewScores() {
   const form = $('#reviewForm');
   if (!form || !CURRENT || !CURRENT.criteria) return;
@@ -271,42 +354,47 @@ function renderReview() {
   const itemsHtml = criteriaList.map(c => {
     const old = scoreMap[c.CriteriaID] || {};
     const val = (old.Score !== undefined && old.Score !== null) ? old.Score : '';
+    const max = Number(c.MaxScore) || 0;
     return `
-      <div class="criterion-card" style="margin-bottom:18px">
-        <div class="criterion-title-row">
-          <div>
-            <span class="criterion-num-pill">ข้อ ${esc(c.ItemNo)}</span>
-            <b>${esc(c.CriteriaNameTH || c.CriteriaName || '')}</b>
-            ${c.CriteriaNameEN ? `<div class="en" style="color:#64748b; margin-top:4px; font-size:0.88rem;">${esc(c.CriteriaNameEN)}</div>` : ''}
+      <div class="criterion-card" style="margin-bottom:16px">
+        <div class="criterion-header-row">
+          <div class="criterion-title-wrap">
+            <div class="criterion-main-title">
+              <span class="criterion-num-pill">ข้อ ${esc(c.ItemNo)}</span>
+              <b>${esc(c.CriteriaNameTH || c.CriteriaName || '')}</b>
+            </div>
+            ${c.CriteriaNameEN ? `<div class="criterion-sub-en">${esc(c.CriteriaNameEN)}</div>` : ''}
           </div>
-          <span class="criterion-max-badge">คะแนนเต็ม ${esc(c.MaxScore)} คะแนน</span>
+          <div class="criterion-score-container">
+            <div class="score-box-badge">
+              <span>ช่องลงคะแนน</span>
+              <span class="score-max-pill">เต็ม ${max} คะแนน</span>
+            </div>
+            <div class="score-input-wrap">
+              <input type="number" min="0" max="${max}" step="0.5" 
+                     class="score-input-prominent"
+                     name="score_${esc(c.CriteriaID)}" 
+                     value="${esc(val)}" 
+                     oninput="handleScoreInput(this, ${max})" 
+                     placeholder="0"
+                     required>
+              <span class="score-unit-text">คะแนน</span>
+            </div>
+          </div>
         </div>
         ${c.DescriptionTH ? `
           <div class="criterion-rubric-desc">
-            <div style="font-weight:700; color:#0369a1; font-size:0.85rem; margin-bottom:4px;">📖 คำอธิบายเกณฑ์และแนวทางการให้คะแนน:</div>
             ${esc(c.DescriptionTH)}
           </div>
         ` : ''}
-        <div class="review-grid" style="display:grid; grid-template-columns: 240px 1fr; gap:16px; align-items:start;">
-          <div class="score-input-box">
-            <div class="score-input-header">
-              <span>⭐ ช่องลงคะแนน <span style="color:#dc2626">*</span></span>
-              <span style="font-size:0.78rem; background:#fef08a; color:#854d0e; padding:2px 8px; border-radius:4px; font-weight:700;">เต็ม ${esc(c.MaxScore)}</span>
-            </div>
-            <input type="number" min="0" max="${esc(c.MaxScore)}" step="0.5" 
-                   name="score_${esc(c.CriteriaID)}" 
-                   value="${esc(val)}" 
-                   oninput="updateLiveReviewScores()" 
-                   placeholder="ใส่คะแนน (0-${esc(c.MaxScore)})"
-                   required 
-                   class="score-input-control">
+        <div class="criterion-comment-container">
+          <div class="criterion-comment-label">
+            <span>💬 ข้อเสนอแนะเฉพาะข้อนี้ (ถ้ามี)</span>
+            <span style="font-size:0.78rem; font-weight:normal; color:#64748b;">พิมพ์ข้อเสนอแนะเพิ่มเติมสำหรับหัวข้อนี้</span>
           </div>
-          <div class="field" style="margin:0">
-            <label style="font-size:0.88rem; font-weight:600; color:#334155; margin-bottom:6px; display:block;">💬 ข้อเสนอแนะเฉพาะข้อนี้ (ถ้ามี)</label>
-            <textarea name="comment_${esc(c.CriteriaID)}" 
-                      placeholder="ระบุความคิดเห็น/ข้อเสนอแนะเพิ่มเติมสำหรับข้อนี้..."
-                      style="width:100%; min-height:86px; font-size:0.9rem; line-height:1.5; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 12px; box-sizing:border-box; background:#ffffff;">${esc(old.Comment || '')}</textarea>
-          </div>
+          <textarea class="criterion-comment-textarea" 
+                    name="comment_${esc(c.CriteriaID)}" 
+                    placeholder="พิมพ์ข้อคิดเห็น ข้อเสนอแนะ หรือเหตุผลในการให้คะแนนข้อนี้เพื่อเป็นประโยชน์แก่ผู้ส่งผลงาน...">${esc(old.Comment || '')}</textarea>
         </div>
       </div>
     `;
@@ -551,16 +639,21 @@ async function saveReview(submit) {
   if (!f) return;
   const critList = CURRENT.criteria || [];
   const missing = [];
+  const exceeded = [];
   let totalEntered = 0;
   const totalMax = critList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
   
   const scores = critList.map(c => {
     const input = f.elements['score_' + c.CriteriaID];
     const rawVal = input ? input.value : '';
+    const max = Number(c.MaxScore) || 0;
     if (submit && (rawVal === '' || isNaN(parseFloat(rawVal)))) {
       missing.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName}`);
     }
     const sc = parseFloat(rawVal) || 0;
+    if (!isNaN(sc) && sc > max) {
+      exceeded.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName} (ระบุ ${sc} คะแนน ซึ่งเกินคะแนนเต็ม ${max} คะแนน)`);
+    }
     totalEntered += sc;
     return {
       CriteriaID: c.CriteriaID,
@@ -568,6 +661,14 @@ async function saveReview(submit) {
       Comment: f.elements['comment_' + c.CriteriaID] ? f.elements['comment_' + c.CriteriaID].value : ''
     };
   });
+
+  if (exceeded.length > 0) {
+    return Swal.fire({
+      icon: 'error',
+      title: 'คะแนนเกินคะแนนเต็ม!',
+      html: `<div style="text-align:left; font-size:0.9rem;">ห้ามลงคะแนนเกินคะแนนเต็มในแต่ละหัวข้อ กรุณาแก้ไขก่อนบันทึก:<br><ul style="margin:8px 0 0 20px; color:#dc2626; font-weight:600;">${exceeded.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
+    });
+  }
   
   if (submit && missing.length > 0) {
     return Swal.fire({
@@ -609,7 +710,9 @@ async function saveReview(submit) {
   
   show(submit ? 'กำลังส่งผลประเมิน' : 'กำลังบันทึกร่าง');
   try {
-    const r = await rpc('reviewerSaveReview', TOKEN, CID, CURRENT.assignment.AssignmentID, payload, submit);
+    const aid = CURRENT.assignment.AssignmentID;
+    const r = await rpc('reviewerSaveReview', TOKEN, CID, aid, payload, submit);
+    delete ASSIGNMENT_CACHE[aid];
     hide();
     await Swal.fire({
       icon: 'success',

@@ -4117,8 +4117,16 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
   return runSafely_('reviewerGetAssignment',function(){
     const ctx=requireSession_(token,['REVIEWER'],conferenceId),
     role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),
-    rid=jsonParse_(role.PermissionsJson,{}).ReviewerID,
-    a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});
+    rid=jsonParse_(role.PermissionsJson,{}).ReviewerID;
+
+    const cacheKey = 'REV_ASG_' + assignmentId;
+    let cached = null;
+    try { cached = cacheGetLarge_(cacheKey); } catch(e) {}
+    if (cached && cached.assignment && cached.work) {
+      return cached;
+    }
+
+    const a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});
     if(!a)throw new Error('ไม่มีสิทธิ์เปิดงานนี้');
     const work=findOne_('Works',{ConferenceID:conferenceId,WorkID:a.WorkID}),
     round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});
@@ -4156,7 +4164,9 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
     }
 
     if(!a.OpenedAt)updateRecord_('ReviewAssignments',a.__row,{OpenedAt:new Date(),Status:'OPENED'});
-    return {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};
+    const result = {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};
+    try { cachePutLarge_(cacheKey, result, 180); } catch(e) {}
+    return result;
   });
 }
 
@@ -4199,6 +4209,8 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     const status=submit?'COMPLETE':'DRAFT_SAVED';
     updateRecord_('ReviewAssignments',a.__row,{Status:status,CompletedAt:submit?new Date():'',TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),Locked:submit&&!bool_(getSetting_(conferenceId,'REVIEWER_CAN_EDIT_AFTER_SUBMIT','FALSE')),UpdatedAt:new Date()});
     if(submit)appendRecord_('ReviewSummary',{SummaryID:nextId_('SUM'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),CreatedAt:new Date(),UpdatedAt:new Date()});
+    try { cacheRemoveLarge_('REV_ASG_' + assignmentId); } catch(e) {}
+    try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e) {}
     return {status:status,totalScore:total};
   });
 }
