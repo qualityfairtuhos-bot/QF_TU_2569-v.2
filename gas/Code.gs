@@ -22,7 +22,7 @@ const APP = Object.freeze({
   PRESENTATION_DEADLINE: '2027-02-28T23:59:59',
   SPREADSHEET_ID: '1S-ycr1Gyam5Sgbbg0TG1eHJ1oAZ3y2Qwy7WoPxnPPcg', // เว้นว่างเมื่อเป็นสคริปต์ผูกกับ Google Sheet
   ROOT_FOLDER_ID: '10Ri9qA4__I5k76RBZqxwSUj_huD7Gp0C',
-  DEFAULT_LOGO_URL: 'https://img2.pic.in.th/logo-020c27d3e8c360c016.png',
+  DEFAULT_LOGO_URL: '/images/tuh-logo.png',
   MAX_UPLOAD_MB: 25,
   SESSION_HOURS: 12,
   CACHE_SECONDS: 300,
@@ -4175,45 +4175,74 @@ function reviewerBootstrap(token,conferenceId){
     return bootData;
   });
 }
+function resolveWorkCategoryInfo_(work) {
+  if (!work) return { categoryId: '', categoryCode: '', categoryNameTH: '', isServiceGroup: true };
+  var cid = work.ConferenceID || APP.DEFAULT_CONFERENCE_ID;
+  var catId = String(work.CategoryID || '').trim();
+  var catName = String(work.CategoryName || work.CategoryNameTH || work.CategoryCode || '').trim();
+  var cat = null;
+  if (catId) {
+    cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryID: catId }) ||
+          findOne_('WorkCategories', { CategoryID: catId }) ||
+          findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: catId }) ||
+          findOne_('WorkCategories', { CategoryCode: catId });
+  }
+  if (!cat && catName) {
+    cat = findOne_('WorkCategories', { ConferenceID: cid, CategoryNameTH: catName }) ||
+          findOne_('WorkCategories', { CategoryNameTH: catName }) ||
+          findOne_('WorkCategories', { ConferenceID: cid, CategoryCode: catName }) ||
+          findOne_('WorkCategories', { CategoryCode: catName });
+  }
+  var code = (cat ? (cat.CategoryCode || '') : (work.CategoryCode || catId)).toUpperCase();
+  var nameTH = (cat ? (cat.CategoryNameTH || cat.CategoryNameEN || '') : catName) || '';
+  
+  // Case-insensitive test if it belongs to Service / CQI / Primary group
+  var isService = /SERVICE|CQI|PRIMARY|บริการ|ปฐมภูมิ/i.test(code + ' ' + nameTH);
+  var isResearch = /RESEARCH|INNOVAT|R2R|วิจัย|นวัตกรรม|สิ่งประดิษฐ์/i.test(code + ' ' + nameTH);
+  
+  // Explicit check for CAT-1 / CAT-2 vs CAT-3 / CAT-4 / CAT-5 if category code wasn't clear
+  if (!isService && !isResearch && catId) {
+    if (/CAT-3|CAT-4|CAT-5/i.test(catId)) isService = true;
+    else if (/CAT-1|CAT-2/i.test(catId)) isResearch = true;
+  }
+
+  // Default to Service/CQI/Primary group if not explicitly research
+  var isServiceGroup = isService || (!isResearch);
+  return {
+    categoryId: cat ? cat.CategoryID : catId,
+    categoryCode: code,
+    categoryNameTH: nameTH,
+    isServiceGroup: isServiceGroup
+  };
+}
+
 function getWorkCriteriaGroup_(work) {
   if (!work) return 'SERVICE_CQI_PRIMARY';
-  var catVal = String(work.CategoryID || '').trim();
-  var catName = String(work.CategoryName || work.CategoryNameTH || work.CategoryCode || work.ThaiTitle || '').trim();
-  var resolved = (typeof resolveCategoryName_ === 'function') ? resolveCategoryName_(catName || catVal) : '';
-  var up = (catVal + ' ' + catName + ' ' + resolved).toUpperCase();
-
-  // 1. กรณีเป็นงานวิจัยหรือนวัตกรรม ให้ใช้เกณฑ์กลุ่ม RESEARCH,INNOVATION
-  if (/RESEARCH|INNOVAT|วิจัย|นวัตกรรม|สิ่งประดิษฐ์|R2R|CAT-1|CAT-2/.test(up)) {
-    return 'RESEARCH_INNOVATION';
-  }
-
-  // 2. กรณีเป็นประเภท Service หรือ CQI, PRIMARY ให้ใช้เกณฑ์กลุ่ม SERVICE,CQI,PRIMARY
-  if (/SERVICE|CQI|PRIMARY|CAT-3|CAT-4|CAT-5|บริการ|ปฐมภูมิ/.test(up)) {
-    return 'SERVICE_CQI_PRIMARY';
-  }
-
-  return 'SERVICE_CQI_PRIMARY';
+  var catInfo = resolveWorkCategoryInfo_(work);
+  return catInfo.isServiceGroup ? 'SERVICE_CQI_PRIMARY' : 'RESEARCH_INNOVATION';
 }
 
 function getCriterionGroup_(c) {
   if (!c) return '';
   var catVal = String(c.CategoryID || '').trim().toUpperCase();
-  var presVal = String(c.PresentationTypeID || '').trim().toUpperCase();
   var nameTh = String(c.CriteriaNameTH || '').trim();
   var nameEn = String(c.CriteriaNameEN || '').trim();
   var desc = String(c.DescriptionTH || '').trim();
-  var full = [catVal, presVal, nameTh, nameEn, desc].join(' ').toUpperCase();
+  var full = [catVal, nameTh, nameEn, desc].join(' ').toUpperCase();
 
-  // 1. Check CategoryID / code / name for Research & Innovation
-  if (/CAT-1|CAT-2|RESEARCH|INNOVAT|R2R/.test(catVal)) return 'RESEARCH_INNOVATION';
-  if (/CAT-3|CAT-4|CAT-5|SERVICE|CQI|PRIMARY/.test(catVal)) return 'SERVICE_CQI_PRIMARY';
+  // 1. Direct CategoryID / code check
+  if (catVal === 'SERVICE_CQI_PRIMARY' || /CAT-3|CAT-4|CAT-5|SERVICE|CQI|PRIMARY/i.test(catVal)) return 'SERVICE_CQI_PRIMARY';
+  if (catVal === 'RESEARCH_INNOVATION' || /RESEARCH|INNOVAT|R2R/i.test(catVal)) return 'RESEARCH_INNOVATION';
 
-  // 2. Check content keywords
-  if (/วิจัย|นวัตกรรม|สิ่งประดิษฐ์|R2R|ระเบียบวิธี|กลุ่มตัวอย่าง|เครื่องมือวิจัย|การวิเคราะห์ข้อมูล|สมมติฐาน/.test(full)) {
+  // 2. Keyword check on criteria title and description
+  if (/กระบวนการพัฒนา|นวัตกรรมบริการ|ระบบบริการ|ความคุ้มค่า|บทเรียนที่ได้รับ|การขยายผล|PDCA|Best Practice|ความพึงพอใจ|บริการ/i.test(full)) {
+    return 'SERVICE_CQI_PRIMARY';
+  }
+  if (/ระเบียบวิธีวิจัย|จริยธรรมการวิจัย|คำถามวิจัย|สมมติฐาน|เครื่องมือวิจัย/i.test(full)) {
     return 'RESEARCH_INNOVATION';
   }
-  if (/SERVICE|CQI|PRIMARY|บริการ|ปฐมภูมิ|กระบวนการพัฒนา|แนวคิดการพัฒนาระบบ|ผลลัพธ์การพัฒนา|PDCA|การขยายผล|Best Practice/i.test(full)) {
-    return 'SERVICE_CQI_PRIMARY';
+  if (/วิจัย|นวัตกรรม|สิ่งประดิษฐ์|R2R/i.test(nameTh + ' ' + nameEn)) {
+    return 'RESEARCH_INNOVATION';
   }
 
   return '';
@@ -4223,21 +4252,29 @@ function matchesWorkCriteria_(c, work) {
   if (!c || !bool_(c.Active)) return false;
   if (!work) return true;
 
+  var catInfo = resolveWorkCategoryInfo_(work);
+  var critCat = String(c.CategoryID || '').trim().toUpperCase();
+  var workCatId = String(catInfo.categoryId || work.CategoryID || '').trim().toUpperCase();
+  var workCatCode = String(catInfo.categoryCode || work.CategoryCode || '').trim().toUpperCase();
+
+  // 1. Direct CategoryID match
+  if (critCat) {
+    if (critCat === 'ALL') return true;
+    if (workCatId && (critCat === workCatId || critCat.split(/[,;\s]+/).indexOf(workCatId) >= 0)) return true;
+    if (workCatCode && (critCat === workCatCode || critCat.split(/[,;\s]+/).indexOf(workCatCode) >= 0)) return true;
+    if (catInfo.isServiceGroup && (critCat === 'SERVICE_CQI_PRIMARY' || /SERVICE|CQI|PRIMARY/i.test(critCat))) return true;
+    if (!catInfo.isServiceGroup && (critCat === 'RESEARCH_INNOVATION' || /RESEARCH|INNOVAT/i.test(critCat))) return true;
+  }
+
+  // 2. Criterion group match
   var workGroup = getWorkCriteriaGroup_(work);
   var critGroup = getCriterionGroup_(c);
-
   if (critGroup) {
     return critGroup === workGroup;
   }
 
-  // If criterion doesn't have an inferred group, check explicit CategoryID
-  var workCatId = String(work.CategoryID || '').trim().toUpperCase();
-  var critCat = String(c.CategoryID || '').trim().toUpperCase();
-  if (critCat && workCatId && (critCat === workCatId || critCat.split(/[,;\s]+/).indexOf(workCatId) >= 0)) {
-    return true;
-  }
-
-  return false;
+  // 3. Fallback: if criterion has no category, consider it general
+  return !critCat;
 }
 
 function filterCriteriaForWork_(allCriteria, work) {
@@ -4245,17 +4282,28 @@ function filterCriteriaForWork_(allCriteria, work) {
   var activeList = allCriteria.filter(function(c) { return bool_(c.Active); });
   if (!work) return activeList;
 
-  var workGroup = getWorkCriteriaGroup_(work);
-  var matched = activeList.filter(function(c) {
-    return matchesWorkCriteria_(c, work);
+  var catInfo = resolveWorkCategoryInfo_(work);
+  var workGroup = catInfo.isServiceGroup ? 'SERVICE_CQI_PRIMARY' : 'RESEARCH_INNOVATION';
+
+  // Priority 1: Direct Category match
+  var directMatched = activeList.filter(function(c) {
+    var critCat = String(c.CategoryID || '').trim().toUpperCase();
+    if (!critCat) return false;
+    var wId = String(catInfo.categoryId || work.CategoryID || '').toUpperCase();
+    var wCode = String(catInfo.categoryCode || work.CategoryCode || '').toUpperCase();
+    if (wId && (critCat === wId || critCat.split(/[,;\s]+/).indexOf(wId) >= 0)) return true;
+    if (wCode && (critCat === wCode || critCat.split(/[,;\s]+/).indexOf(wCode) >= 0)) return true;
+    if (catInfo.isServiceGroup && (critCat === 'SERVICE_CQI_PRIMARY' || /SERVICE|CQI|PRIMARY/i.test(critCat))) return true;
+    if (!catInfo.isServiceGroup && (critCat === 'RESEARCH_INNOVATION' || /RESEARCH|INNOVAT/i.test(critCat))) return true;
+    return false;
   });
 
-  if (matched.length > 0) {
-    matched.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
-    return matched;
+  if (directMatched.length > 0) {
+    directMatched.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
+    return directMatched;
   }
 
-  // Fallback: strictly filter activeList by group to avoid mixing
+  // Priority 2: Group match
   var groupMatched = activeList.filter(function(c) {
     return getCriterionGroup_(c) === workGroup;
   });
@@ -4264,14 +4312,23 @@ function filterCriteriaForWork_(allCriteria, work) {
     return groupMatched;
   }
 
+  // Priority 3: General criteria (CategoryID is empty or 'ALL')
+  var general = activeList.filter(function(c) {
+    var critCat = String(c.CategoryID || '').trim().toUpperCase();
+    return !critCat || critCat === 'ALL';
+  });
+  if (general.length > 0) {
+    general.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
+    return general;
+  }
+
   return [];
 }
 
 function reviewerGetAssignment(token,conferenceId,assignmentId){
   return runSafely_('reviewerGetAssignment',function(){
     const ctx=requireSession_(token,['REVIEWER'],conferenceId),
-    role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),
-    rid=jsonParse_(role.PermissionsJson,{}).ReviewerID;
+    cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
 
     const cacheKey = 'REV_ASG_' + assignmentId;
     let cached = null;
@@ -4280,14 +4337,32 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
       return cached;
     }
 
-    const a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});
-    if(!a)throw new Error('ไม่มีสิทธิ์เปิดงานนี้');
-    const work=findOne_('Works',{ConferenceID:conferenceId,WorkID:a.WorkID}),
-    round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});
+    const role=findOne_('UserConferenceRoles',{ConferenceID:cid,UserID:ctx.user.UserID,Role:'REVIEWER'}) ||
+               findOne_('UserConferenceRoles',{UserID:ctx.user.UserID,Role:'REVIEWER'});
+    const perm=jsonParse_(role&&role.PermissionsJson,'{}');
+    let rid=perm.ReviewerID;
+    if (!rid) {
+      const rev=findOne_('Reviewers',{ConferenceID:cid,Email:ctx.user.Email}) ||
+                findOne_('Reviewers',{Email:ctx.user.Email}) ||
+                findOne_('Reviewers',{UserID:ctx.user.UserID});
+      if (rev) rid = rev.ReviewerID;
+    }
+
+    let a = rid ? findOne_('ReviewAssignments',{ConferenceID:cid,AssignmentID:assignmentId,ReviewerID:rid}) : null;
+    if (!a) {
+      a = findOne_('ReviewAssignments',{ConferenceID:cid,AssignmentID:assignmentId,ReviewerEmail:ctx.user.Email}) ||
+          findOne_('ReviewAssignments',{AssignmentID:assignmentId});
+    }
+    if(!a)throw new Error('ไม่มีสิทธิ์เปิดงานนี้ หรือไม่พบข้อมูลการมอบหมาย');
+    const work=findOne_('Works',{ConferenceID:cid,WorkID:a.WorkID}) || findOne_('Works',{WorkID:a.WorkID}),
+    round=findOne_('ReviewRounds',{ConferenceID:cid,ReviewRoundID:a.ReviewRoundID}) ||
+          findOne_('ReviewRounds',{ReviewRoundID:a.ReviewRoundID}) ||
+          findOne_('ReviewRounds',{ConferenceID:cid,Status:'OPEN'}) ||
+          findOne_('ReviewRounds',{ConferenceID:cid});
     if(!round)throw new Error('ไม่พบรอบประเมิน');
     if(round.StartAt&&new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');
     if(round.EndAt&&new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');
-    const allWorkFiles=findMany_('WorkFiles',{ConferenceID:conferenceId,WorkID:a.WorkID}).filter(function(f){return bool_(f.Active);});
+    const allWorkFiles=findMany_('WorkFiles',{ConferenceID:cid,WorkID:a.WorkID}).filter(function(f){return bool_(f.Active);});
     const blindFiles=allWorkFiles.filter(function(f){return f.FileCategory==='BLIND';});
     let files=[];
     if(bool_(round.BlindReview)||blindFiles.length>0){
@@ -4297,13 +4372,20 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
     }
     
     // Filter active criteria matching the work category group (max 100 points)
-    const allCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).filter(function(c){return bool_(c.Active);});
+    let allCriteria=findMany_('ScoringCriteria',{ConferenceID:cid});
+    if(a.ReviewRoundID){
+      const roundSpecific=allCriteria.filter(function(c){
+        const rId=String(c.ReviewRoundID||'').trim();
+        return !rId || rId==='ALL' || rId===String(a.ReviewRoundID).trim();
+      });
+      if(roundSpecific.length>0) allCriteria=roundSpecific;
+    }
     const criteria=filterCriteriaForWork_(allCriteria,work);
     const validCritMap={};
     criteria.forEach(function(c){validCritMap[c.CriteriaID]=true;});
     
     // Filter scores to only include valid criteria for this work
-    const allScores=findMany_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId});
+    const allScores=findMany_('ReviewScores',{ConferenceID:cid,AssignmentID:assignmentId});
     const scores=allScores.filter(function(s){return !!validCritMap[s.CriteriaID];});
 
     // Auto-heal legacy total score if > 100 points or mismatched
@@ -4327,33 +4409,61 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
 function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
   return runSafely_('reviewerSaveReview',function(){
     const ctx=requireSession_(token,['REVIEWER'],conferenceId),
-    role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),
-    rid=jsonParse_(role.PermissionsJson,{}).ReviewerID,
-    a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});
-    if(!a)throw new Error('ไม่มีสิทธิ์');
-    const work=findOne_('Works',{ConferenceID:conferenceId,WorkID:a.WorkID});
-    const round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});
-    if(!round||['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว');
-    if(round.StartAt&&new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');
-    if(round.EndAt&&new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');
-    if(bool_(a.Locked))throw new Error('แบบประเมินถูกล็อก');
+    cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    payload = payload || {};
+
+    const role=findOne_('UserConferenceRoles',{ConferenceID:cid,UserID:ctx.user.UserID,Role:'REVIEWER'}) ||
+               findOne_('UserConferenceRoles',{UserID:ctx.user.UserID,Role:'REVIEWER'});
+    const perm=jsonParse_(role&&role.PermissionsJson,'{}');
+    let rid=perm.ReviewerID;
+    if (!rid) {
+      const rev=findOne_('Reviewers',{ConferenceID:cid,Email:ctx.user.Email}) ||
+                findOne_('Reviewers',{Email:ctx.user.Email}) ||
+                findOne_('Reviewers',{UserID:ctx.user.UserID});
+      if (rev) rid = rev.ReviewerID;
+    }
+
+    let a = rid ? findOne_('ReviewAssignments',{ConferenceID:cid,AssignmentID:assignmentId,ReviewerID:rid}) : null;
+    if (!a) {
+      a = findOne_('ReviewAssignments',{ConferenceID:cid,AssignmentID:assignmentId,ReviewerEmail:ctx.user.Email}) ||
+          findOne_('ReviewAssignments',{AssignmentID:assignmentId});
+    }
+    if(!a)throw new Error('ไม่พบข้อมูลการมอบหมายผลงานนี้ หรือท่านไม่มีสิทธิ์ประเมิน');
+    const work=findOne_('Works',{ConferenceID:cid,WorkID:a.WorkID}) || findOne_('Works',{WorkID:a.WorkID});
+    const round=findOne_('ReviewRounds',{ConferenceID:cid,ReviewRoundID:a.ReviewRoundID}) ||
+                  findOne_('ReviewRounds',{ReviewRoundID:a.ReviewRoundID}) ||
+                  findOne_('ReviewRounds',{ConferenceID:cid,Status:'OPEN'}) ||
+                  findOne_('ReviewRounds',{ConferenceID:cid});
+    if(round && ['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว ไม่สามารถบันทึกผลได้');
+    if(round && round.StartAt && new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');
+    if(round && round.EndAt && new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');
+    if(bool_(a.Locked))throw new Error('แบบประเมินถูกล็อกแล้ว ไม่สามารถแก้ไขได้');
     
     const scores=payload.Scores||[];
-    const allCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).filter(function(c){return bool_(c.Active);});
-    const relevantCriteria=filterCriteriaForWork_(allCriteria,work);
+    let allCriteria=findMany_('ScoringCriteria',{ConferenceID:cid});
+    if(a.ReviewRoundID){
+      const roundSpecific=allCriteria.filter(function(c){
+        const rId=String(c.ReviewRoundID||'').trim();
+        return !rId || rId==='ALL' || rId===String(a.ReviewRoundID).trim();
+      });
+      if(roundSpecific.length>0) allCriteria=roundSpecific;
+    }
     const criteriaMap={};
-    relevantCriteria.forEach(function(c){criteriaMap[c.CriteriaID]=c;});
+    allCriteria.forEach(function(c){criteriaMap[c.CriteriaID]=c;});
 
     let total=0;
     scores.forEach(function(s){
+      if(s.Score === '' || s.Score === null || s.Score === undefined) return;
       const c=criteriaMap[s.CriteriaID];
-      if(!c)return; // ignore scores not belonging to this work's criteria group
+      if(!c)return;
       const score=num_(s.Score);
-      if(score<0||score>num_(c.MaxScore))throw new Error('คะแนนเกินเกณฑ์ '+(c.CriteriaNameTH||c.CriteriaID));
-      let old=findOne_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId,CriteriaID:s.CriteriaID});
+      const max=num_(c.MaxScore, 100);
+      if(score<0||score>max)throw new Error('คะแนน ' + score + ' ในหัวข้อ "' + (c.CriteriaNameTH||c.CriteriaID) + '" เกินคะแนนเต็ม (' + max + ' คะแนน)');
+      let old=findOne_('ReviewScores',{ConferenceID:cid,AssignmentID:assignmentId,CriteriaID:s.CriteriaID}) ||
+              findOne_('ReviewScores',{AssignmentID:assignmentId,CriteriaID:s.CriteriaID});
       const patch={Score:score,WeightedScore:score*(num_(c.WeightPercent,100)/100),Comment:clean_(s.Comment),UpdatedAt:new Date()};
       if(old)updateRecord_('ReviewScores',old.__row,patch);
-      else appendRecord_('ReviewScores',Object.assign({ScoreID:nextId_('SCORE'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,CriteriaID:s.CriteriaID,CreatedAt:new Date()},patch));
+      else appendRecord_('ReviewScores',Object.assign({ScoreID:nextId_('SCORE'),ConferenceID:cid,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid||a.ReviewerID,CriteriaID:s.CriteriaID,CreatedAt:new Date()},patch));
       total+=score;
     });
 
@@ -4361,12 +4471,40 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     if(total>100)total=100; // strictly capped at 100 points max
 
     const status=submit?'COMPLETE':'DRAFT_SAVED';
-    updateRecord_('ReviewAssignments',a.__row,{Status:status,CompletedAt:submit?new Date():'',TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),Locked:submit&&!bool_(getSetting_(conferenceId,'REVIEWER_CAN_EDIT_AFTER_SUBMIT','FALSE')),UpdatedAt:new Date()});
-    if(submit)appendRecord_('ReviewSummary',{SummaryID:nextId_('SUM'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),CreatedAt:new Date(),UpdatedAt:new Date()});
+    const canEditAfterSubmit = bool_(getSetting_(cid,'REVIEWER_CAN_EDIT_AFTER_SUBMIT','FALSE'));
+    const isLocked = submit && !canEditAfterSubmit;
+
+    updateRecord_('ReviewAssignments',a.__row,{
+      Status:status,
+      CompletedAt:submit?new Date():(a.CompletedAt||''),
+      TotalScore:total,
+      Decision:clean_(payload.Decision),
+      RecommendationToAuthor:clean_(payload.RecommendationToAuthor),
+      InternalComment:clean_(payload.InternalComment),
+      Locked:isLocked,
+      UpdatedAt:new Date()
+    });
+
+    if(submit)appendRecord_('ReviewSummary',{
+      SummaryID:nextId_('SUM'),
+      ConferenceID:cid,
+      AssignmentID:assignmentId,
+      ReviewRoundID:a.ReviewRoundID,
+      WorkID:a.WorkID,
+      ReviewerID:rid||a.ReviewerID,
+      TotalScore:total,
+      Decision:clean_(payload.Decision),
+      RecommendationToAuthor:clean_(payload.RecommendationToAuthor),
+      InternalComment:clean_(payload.InternalComment),
+      CreatedAt:new Date(),
+      UpdatedAt:new Date()
+    });
+
     try { cacheRemoveLarge_('REV_ASG_' + assignmentId); } catch(e) {}
-    try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e) {}
+    try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
+    try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + (rid||a.ReviewerID)); } catch(e) {}
     if (work && work.RegID) {
-      try { cacheRemoveLarge_('AUTH_WORKS_' + conferenceId + '_' + work.RegID); } catch(e) {}
+      try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + work.RegID); } catch(e) {}
     }
     return {status:status,totalScore:total};
   });

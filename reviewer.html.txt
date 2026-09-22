@@ -635,81 +635,91 @@ function autoFillProportionalScores() {
 }
 
 async function saveReview(submit) {
-  const f = $('#reviewForm');
-  if (!f) return;
-  const critList = CURRENT.criteria || [];
-  const missing = [];
-  const exceeded = [];
-  let totalEntered = 0;
-  const totalMax = critList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
-  
-  const scores = critList.map(c => {
-    const input = f.elements['score_' + c.CriteriaID];
-    const rawVal = input ? input.value : '';
-    const max = Number(c.MaxScore) || 0;
-    if (submit && (rawVal === '' || isNaN(parseFloat(rawVal)))) {
-      missing.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName}`);
-    }
-    const sc = parseFloat(rawVal) || 0;
-    if (!isNaN(sc) && sc > max) {
-      exceeded.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName} (ระบุ ${sc} คะแนน ซึ่งเกินคะแนนเต็ม ${max} คะแนน)`);
-    }
-    totalEntered += sc;
-    return {
-      CriteriaID: c.CriteriaID,
-      Score: rawVal,
-      Comment: f.elements['comment_' + c.CriteriaID] ? f.elements['comment_' + c.CriteriaID].value : ''
-    };
-  });
-
-  if (exceeded.length > 0) {
-    return Swal.fire({
-      icon: 'error',
-      title: 'คะแนนเกินคะแนนเต็ม!',
-      html: `<div style="text-align:left; font-size:0.9rem;">ห้ามลงคะแนนเกินคะแนนเต็มในแต่ละหัวข้อ กรุณาแก้ไขก่อนบันทึก:<br><ul style="margin:8px 0 0 20px; color:#dc2626; font-weight:600;">${exceeded.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
-    });
-  }
-  
-  if (submit && missing.length > 0) {
-    return Swal.fire({
-      icon: 'warning',
-      title: 'กรุณากรอกคะแนนให้ครบทุกข้อ',
-      html: `<div style="text-align:left; font-size:0.9rem;">พบหัวข้อที่ยังไม่ได้ให้คะแนน:<br><ul style="margin:5px 0 0 20px; color:#b42318">${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
-    });
-  }
-  
-  const payload = {
-    Scores: scores,
-    Decision: f.elements.Decision.value,
-    RecommendationToAuthor: f.elements.RecommendationToAuthor.value,
-    InternalComment: f.elements.InternalComment.value
-  };
-  
-  if (submit && !payload.Decision) {
-    return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกผลการประเมิน (ผ่าน / แก้ไข / ไม่ผ่าน)' });
-  }
-  
-  if (submit) {
-    const x = await Swal.fire({
-      icon: 'question',
-      title: 'ยืนยันการส่งผลประเมิน?',
-      html: `
-        <div style="text-align:left; font-size:0.95rem;">
-          <p><b>คะแนนรวมสุทธิ: <span style="color:var(--teal); font-size:1.2rem">${totalEntered.toFixed(2).replace(/\.00$/,'')} / ${totalMax} คะแนน</span></b></p>
-          <p>ผลการประเมิน: <b>${payload.Decision === 'PASS' ? 'ผ่าน (PASS)' : payload.Decision === 'REVISION' ? 'แก้ไข (REVISION)' : 'ไม่ผ่าน (REJECT)'}</b></p>
-          <p style="color:#b42318; font-size:0.85rem;">* หลังส่งผลแล้วข้อมูลจะถูกส่งเข้าสู่ระบบหลักทันที</p>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: 'ยืนยันส่งผลประเมิน',
-      cancelButtonText: 'กลับไปแก้ไข',
-      confirmButtonColor: '#006D70'
-    });
-    if (!x.isConfirmed) return;
-  }
-  
-  show(submit ? 'กำลังส่งผลประเมิน' : 'กำลังบันทึกร่าง');
   try {
+    const f = $('#reviewForm') || document.querySelector('form#reviewForm') || document.forms['reviewForm'];
+    if (!f) {
+      return Swal.fire({ icon: 'error', title: 'ไม่พบแบบฟอร์มประเมิน', text: 'กรุณาลองรีเฟรชหน้าเว็บหรือเลือกผลงานใหม่อีกครั้ง' });
+    }
+    if (!CURRENT || !CURRENT.assignment) {
+      return Swal.fire({ icon: 'error', title: 'ไม่พบข้อมูลผลงาน', text: 'กรุณากลับไปเลือกผลงานที่ต้องการประเมินใหม่อีกครั้ง' });
+    }
+    const critList = CURRENT.criteria || [];
+    const missing = [];
+    const exceeded = [];
+    let totalEntered = 0;
+    const totalMax = critList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
+    
+    const scores = critList.map(c => {
+      const input = f.elements['score_' + c.CriteriaID] || f.querySelector(`[name="score_${c.CriteriaID}"]`);
+      const rawVal = input ? input.value.trim() : '';
+      const max = Number(c.MaxScore) || 0;
+      if (submit && (rawVal === '' || isNaN(parseFloat(rawVal)))) {
+        missing.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName || ''}`);
+      }
+      const sc = parseFloat(rawVal);
+      if (!isNaN(sc) && sc > max) {
+        exceeded.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName || ''} (ระบุ ${sc} คะแนน ซึ่งเกินคะแนนเต็ม ${max} คะแนน)`);
+      }
+      if (!isNaN(sc)) totalEntered += sc;
+      const commentInput = f.elements['comment_' + c.CriteriaID] || f.querySelector(`[name="comment_${c.CriteriaID}"]`);
+      return {
+        CriteriaID: c.CriteriaID,
+        Score: rawVal,
+        Comment: commentInput ? commentInput.value : ''
+      };
+    });
+
+    if (exceeded.length > 0) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'คะแนนเกินคะแนนเต็ม!',
+        html: `<div style="text-align:left; font-size:0.9rem;">ห้ามลงคะแนนเกินคะแนนเต็มในแต่ละหัวข้อ กรุณาแก้ไขก่อนบันทึก:<br><ul style="margin:8px 0 0 20px; color:#dc2626; font-weight:600;">${exceeded.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
+      });
+    }
+    
+    if (submit && missing.length > 0) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'กรุณากรอกคะแนนให้ครบทุกข้อ',
+        html: `<div style="text-align:left; font-size:0.9rem;">พบหัวข้อที่ยังไม่ได้ให้คะแนน:<br><ul style="margin:5px 0 0 20px; color:#b42318">${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
+      });
+    }
+    
+    const decisionEl = f.elements['Decision'] || f.querySelector('[name="Decision"]');
+    const recEl = f.elements['RecommendationToAuthor'] || f.querySelector('[name="RecommendationToAuthor"]');
+    const internalEl = f.elements['InternalComment'] || f.querySelector('[name="InternalComment"]');
+
+    const payload = {
+      Scores: scores,
+      Decision: decisionEl ? decisionEl.value : '',
+      RecommendationToAuthor: recEl ? recEl.value : '',
+      InternalComment: internalEl ? internalEl.value : ''
+    };
+    
+    if (submit && !payload.Decision) {
+      return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกผลการประเมิน (ผ่าน / แก้ไข / ไม่ผ่าน)' });
+    }
+    
+    if (submit) {
+      const x = await Swal.fire({
+        icon: 'question',
+        title: 'ยืนยันการส่งผลประเมิน?',
+        html: `
+          <div style="text-align:left; font-size:0.95rem;">
+            <p><b>คะแนนรวมสุทธิ: <span style="color:var(--teal); font-size:1.2rem">${totalEntered.toFixed(2).replace(/\.00$/,'')} / ${totalMax} คะแนน</span></b></p>
+            <p>ผลการประเมิน: <b>${payload.Decision === 'PASS' ? 'ผ่าน (PASS)' : payload.Decision === 'REVISION' ? 'แก้ไข (REVISION)' : 'ไม่ผ่าน (REJECT)'}</b></p>
+            <p style="color:#b42318; font-size:0.85rem;">* หลังส่งผลแล้วข้อมูลจะถูกส่งเข้าสู่ระบบหลักทันที</p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยันส่งผลประเมิน',
+        cancelButtonText: 'กลับไปแก้ไข',
+        confirmButtonColor: '#006D70'
+      });
+      if (!x.isConfirmed) return;
+    }
+    
+    show(submit ? 'กำลังส่งผลประเมิน' : 'กำลังบันทึกร่าง');
     const aid = CURRENT.assignment.AssignmentID;
     const r = await rpc('reviewerSaveReview', TOKEN, CID, aid, payload, submit);
     delete ASSIGNMENT_CACHE[aid];
@@ -717,14 +727,22 @@ async function saveReview(submit) {
     await Swal.fire({
       icon: 'success',
       title: submit ? 'ส่งผลประเมินเรียบร้อยแล้ว' : 'บันทึกร่างเรียบร้อยแล้ว',
-      text: 'คะแนนรวม ' + (r.totalScore !== undefined ? r.totalScore : totalEntered) + ' / ' + totalMax + ' คะแนน'
+      text: 'คะแนนรวม ' + (r && r.totalScore !== undefined ? r.totalScore : totalEntered.toFixed(2).replace(/\.00$/,'')) + ' / ' + totalMax + ' คะแนน'
     });
     BOOT = await rpc('reviewerBootstrap', TOKEN, CID);
     renderAll();
-    if (submit) $('#reviewHost').innerHTML = '';
+    if (submit) {
+      $('#reviewHost').innerHTML = '';
+      $('#reviewHost').scrollIntoView({ behavior: 'smooth' });
+    }
   } catch (e) {
     hide();
-    Swal.fire({ icon: 'error', title: 'บันทึกไม่ได้', text: e.message });
+    console.error('saveReview error:', e);
+    Swal.fire({
+      icon: 'error',
+      title: submit ? 'ส่งผลประเมินไม่สำเร็จ' : 'บันทึกร่างไม่สำเร็จ',
+      text: e.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
+    });
   }
 }
 async function refreshData() { show('กำลังดึงข้อมูล'); try { BOOT = await rpc('reviewerBootstrap', TOKEN, CID); renderAll(); hide(); Swal.fire({icon:'success', title:'รีเฟรชข้อมูลเรียบร้อย', timer:1500, showConfirmButton:false}); } catch(e) { hide(); Swal.fire({icon:'error', title:'ผิดพลาด', text:e.message}); } }

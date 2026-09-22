@@ -31,7 +31,7 @@
 <div class="shell">
   <section class="login-card" id="loginView">
     <div class="login-brand">
-      <div class="logos"><img src="https://img2.pic.in.th/logo-020c27d3e8c360c016.png" alt="TUH"><img src="https://img1.pic.in.th/images/logo-04.png" alt="HACC"></div>
+      <div class="logos"><img src="/images/tuh-logo.png" alt="TUH"><img src="/images/hacc-logo.png" alt="HACC"></div>
       <h1>TUH 19 & HA-Regional 1</h1><p>ระบบเช็คอินและสแกนสิทธิ์ สำหรับเจ้าหน้าที่ลงทะเบียนและจุดบริการอาหาร</p><span class="en" style="color:#d2ebec">Event check-in & meal scanner</span>
     </div>
     <form class="login-form" id="loginForm" autocomplete="on"><div style="display:flex; border-bottom:1px solid #d9e3e8; margin-bottom:20px;"><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('admin')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">Admin</a><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('reviewer')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">Reviewer</a><a style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:var(--teal); border-bottom:2px solid var(--teal); font-weight:600; cursor:default;">สแกนสิทธิ์</a></div>
@@ -47,7 +47,7 @@
 
   <main class="app-wrap hidden" id="appView">
     <header class="topbar">
-      <div class="brandline"><div class="logos"><img src="https://img2.pic.in.th/logo-020c27d3e8c360c016.png" alt="TUH"><img src="https://img1.pic.in.th/images/logo-04.png" alt="HACC"></div><div class="brand-title"><b>TUH 19 & HA-Regional 1</b><span class="en">Event scanner console</span></div></div>
+      <div class="brandline"><div class="logos"><img src="/images/tuh-logo.png" alt="TUH"><img src="/images/hacc-logo.png" alt="HACC"></div><div class="brand-title"><b>TUH 19 & HA-Regional 1</b><span class="en">Event scanner console</span></div></div>
       <div class="userbox"><b id="userName">-</b><span id="userRole">-</span><br><button class="btn btn-soft" style="padding:6px 10px;margin-top:5px" onclick="logoutScanner()">ออกจากระบบ</button></div>
     </header>
 

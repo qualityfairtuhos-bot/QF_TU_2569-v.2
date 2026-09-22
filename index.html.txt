@@ -190,7 +190,7 @@
               <div class="tuh-brand">TUH <span>19<sup>th</sup></span></div>
               <div class="qf-brand">QUALITY FAIR</div>
             </div>
-            <img class="tuh-logo-mini" id="heroLeftLogo" src="https://img2.pic.in.th/logo-020c27d3e8c360c016.png" alt="TUH Logo" referrerpolicy="no-referrer">
+            <img class="tuh-logo-mini" id="heroLeftLogo" src="/images/tuh-logo.png" alt="TUH Logo" referrerpolicy="no-referrer">
           </div>
         </div>
 
@@ -213,7 +213,7 @@
         <div class="banner-side right">
           <div class="banner-hacc-badge">
             <div class="hacc-circle-wrap">
-              <img id="heroRightLogo" src="https://img1.pic.in.th/images/logo-04.png" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
+              <img id="heroRightLogo" src="/images/hacc-logo.png" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
             </div>
             <div class="hacc-caption-text">
               <b>HACC นครจตุรศรีปทุมทอง</b>
@@ -499,8 +499,8 @@ function canonicalRoute(page){
 }
 window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
-const DEFAULT_LOGO='https://img2.pic.in.th/logo-020c27d3e8c360c016.png';
-const HACC_LOGO='https://img1.pic.in.th/images/logo-04.png';
+const DEFAULT_LOGO='/images/tuh-logo.png';
+const HACC_LOGO='/images/hacc-logo.png';
 let BOOT=null;
 let HERO_INDEX=0,HERO_TIMER=null,PDPA_READ=false;
 const $=s=>document.querySelector(s);
@@ -670,17 +670,23 @@ function renderHeroBanners(){
   const carousel = $('#heroCarousel');
   if(!carousel) return;
 
-  // Render ONLY banners uploaded by Admin
-  if(activeBanners.length > 0) {
+  // Default banners if none configured, ensuring immediate visual display without re-uploading
+  const bannersToRender = activeBanners.length > 0 ? activeBanners : [
+    { title: 'งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19', subtitle: 'TUH Quality Fair & HA-Regional Forum 2026', imageUrl: '/images/tuh-banner-main.jpg', active: true },
+    { title: 'CQI, Research & Innovation', subtitle: 'ส่งเสริมการพัฒนานวัตกรรมและคุณภาพอย่างต่อเนื่อง', imageUrl: '/images/tuh-banner-cqi.jpg', active: true },
+    { title: 'HACC นครจตุรศรีปทุมทอง เขต 4', subtitle: 'Value and Reliability for Healthcare Sustainability', imageUrl: '/images/tuh-banner-var.jpg', active: true }
+  ];
+
+  if(bannersToRender.length > 0) {
     let html = '';
-    activeBanners.forEach((b, idx) => {
+    bannersToRender.forEach((b, idx) => {
       const normalizedUrl = normalizeBannerImageUrl(b.imageUrl);
       const cursorStyle = b.linkUrl ? 'cursor:pointer;' : '';
       const clickAttr = b.linkUrl ? `onclick="window.open('${esc(b.linkUrl)}','_blank')"` : '';
       html += `
         <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
           <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
-            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" onerror="this.onerror=null; this.src='https://placehold.co/1920x600?text=Banner+Image';">
+            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" onerror="this.onerror=null; this.src='/images/tuh-banner-main.jpg';">
             ${(b.title || b.subtitle) ? `
               <div class="custom-banner-overlay">
                 <div class="custom-banner-card">
@@ -694,19 +700,19 @@ function renderHeroBanners(){
       `;
     });
 
-    if(activeBanners.length > 1) {
+    if(bannersToRender.length > 1) {
       html += `
         <button class="hero-arrow prev" type="button" aria-label="ภาพก่อนหน้า" onclick="nextHeroSlide(-1)">‹</button>
         <button class="hero-arrow next" type="button" aria-label="ภาพถัดไป" onclick="nextHeroSlide(1)">›</button>
         <div class="hero-controls" aria-label="เลือกแบนเนอร์">
-          ${activeBanners.map((b, idx) => `<button class="hero-dot ${idx === 0 ? 'active' : ''}" type="button" aria-label="${esc(b.title || 'แบนเนอร์ ' + (idx+1))}" onclick="setHeroSlide(${idx}, true)"></button>`).join('')}
+          ${bannersToRender.map((b, idx) => `<button class="hero-dot ${idx === 0 ? 'active' : ''}" type="button" aria-label="${esc(b.title || 'แบนเนอร์ ' + (idx+1))}" onclick="setHeroSlide(${idx}, true)"></button>`).join('')}
         </div>
       `;
     }
 
     carousel.innerHTML = html;
     HERO_INDEX = 0;
-    if(activeBanners.length > 1) {
+    if(bannersToRender.length > 1) {
       startHeroCarousel();
     } else {
       clearInterval(HERO_TIMER);
