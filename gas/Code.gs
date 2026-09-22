@@ -3955,37 +3955,61 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
     // Fetch existing scores for this assignment
     const scores=findMany_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId});
     const allCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId});
-    let criteria=[];
     
-    // IF THIS ASSIGNMENT HAS EXISTING SCORES: MUST PRESERVE the exact criteria evaluated
-    if(scores && scores.length>0){
-      const scoredCritIds=scores.map(function(s){return String(s.CriteriaID).trim();});
-      criteria=allCriteria.filter(function(c){
-        return scoredCritIds.indexOf(String(c.CriteriaID).trim())>=0;
+    // Find target active criteria by work category
+    const roundCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).filter(function(c){return bool_(c.Active);});
+    const allCats=findMany_('WorkCategories',{ConferenceID:conferenceId});
+    let targetCriteria=roundCriteria.filter(function(c){
+      return matchesWorkCategory_(c,work,allCats);
+    });
+    if(!targetCriteria || targetCriteria.length===0){
+      // Fallback to active criteria with empty CategoryID or general
+      const general=roundCriteria.filter(function(c){
+        return !c.CategoryID||String(c.CategoryID).trim()===''||String(c.CategoryID).trim()==='*';
       });
+      targetCriteria=general.length>0?general:roundCriteria;
     }
+    targetCriteria.sort(function(x,y){return num_(x.ItemNo||x.SortOrder)-num_(y.ItemNo||y.SortOrder);});
     
-    // If no existing scores (new evaluation), match criteria by work category
-    if(!criteria || criteria.length===0){
-      const roundCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).filter(function(c){return bool_(c.Active);});
-      const allCats=findMany_('WorkCategories',{ConferenceID:conferenceId});
-      const matched=roundCriteria.filter(function(c){
-        return matchesWorkCategory_(c,work,allCats);
-      });
-      if(matched.length>0){
-        criteria=matched;
-      }else{
-        // Fallback to active criteria with empty CategoryID or general
-        const general=roundCriteria.filter(function(c){
-          return !c.CategoryID||String(c.CategoryID).trim()===''||String(c.CategoryID).trim()==='*';
-        });
-        criteria=general.length>0?general:roundCriteria;
+    // Check if existing scores match current target criteria, or if they are from old criteria
+    let oldEvaluation = null;
+    let currentScores = [];
+    const targetCritIdSet = {};
+    targetCriteria.forEach(function(c){ targetCritIdSet[String(c.CriteriaID).trim()] = true; });
+    
+    if(scores && scores.length > 0){
+      const hasOldScores = scores.some(function(s){ return !targetCritIdSet[String(s.CriteriaID).trim()]; });
+      if(hasOldScores){
+        // Preserve old criteria and scores as historical record
+        const oldCritIds = scores.map(function(s){ return String(s.CriteriaID).trim(); });
+        const oldCriteriaList = allCriteria.filter(function(c){
+          return oldCritIds.indexOf(String(c.CriteriaID).trim()) >= 0 && !targetCritIdSet[String(c.CriteriaID).trim()];
+        }).sort(function(x,y){ return num_(x.ItemNo||x.SortOrder) - num_(y.ItemNo||y.SortOrder); });
+        
+        oldEvaluation = {
+          totalScore: a.TotalScore,
+          decision: a.Decision,
+          recommendationToAuthor: a.RecommendationToAuthor,
+          internalComment: a.InternalComment,
+          completedAt: a.CompletedAt,
+          criteria: oldCriteriaList,
+          scores: scores.filter(function(s){ return !targetCritIdSet[String(s.CriteriaID).trim()]; })
+        };
+        currentScores = scores.filter(function(s){ return !!targetCritIdSet[String(s.CriteriaID).trim()]; });
+      } else {
+        currentScores = scores;
       }
     }
     
-    criteria.sort(function(x,y){return num_(x.ItemNo||x.SortOrder)-num_(y.ItemNo||y.SortOrder);});
     if(!a.OpenedAt)updateRecord_('ReviewAssignments',a.__row,{OpenedAt:new Date(),Status:'OPENED'});
-    return {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};
+    return {
+      assignment:serialize_(a),
+      work:serialize_(work),
+      files:serialize_(files),
+      criteria:serialize_(targetCriteria),
+      scores:serialize_(currentScores),
+      oldEvaluation:serialize_(oldEvaluation)
+    };
   });
 }
 
@@ -4236,6 +4260,145 @@ function setupCategoryScoringCriteriaInternal_(conferenceId){
     updated: updated,
     message: 'ปรับปรุงเกณฑ์คะแนน 2 ชุด (วิจัย/นวัตกรรม 7 ข้อ และ CQI/Service/Primary 6 ข้อ) เรียบร้อยแล้ว โดยยังคงข้อมูลคะแนนเดิมในระบบอย่างปลอดภัย'
   };
+}
+
+/**
+ * ย้ายคะแนนที่อาจารย์เคยให้ไว้ตามเกณฑ์เดิมมาเข้าเกณฑ์ใหม่พร้อมข้อเสนอแนะ
+ * โดยยังคงข้อมูลคะแนนเดิมใน ReviewScores ไว้อย่างปลอดภัย ไม่ถูกลบ
+ * @param {string} [assignmentIdOrWorkCode] รหัสการมอบหมาย (AssignmentID) หรือ รหัสผลงาน (WorkCode) เช่น 'ASN-...' หรือ 'RES-...'
+ * @param {boolean} [dryRun] ถ้า true จะแค่จำลองผลการคำนวณ ไม่บันทึกลง Sheet
+ */
+function migrateReviewerScoresToNewCriteriaInSheet(assignmentIdOrWorkCode, dryRun) {
+  dryRun = (dryRun === true);
+  var cid = APP.DEFAULT_CONFERENCE_ID;
+  
+  var key = String(assignmentIdOrWorkCode || '').trim();
+  var a = null;
+  if (key) {
+    a = findOne_('ReviewAssignments', { AssignmentID: key }) ||
+        findOne_('ReviewAssignments', { WorkCode: key });
+  }
+  if (!a) {
+    var allAssignments = findMany_('ReviewAssignments', { ConferenceID: cid });
+    for (var i = 0; i < allAssignments.length; i++) {
+      var candidate = allAssignments[i];
+      var candidateScores = findMany_('ReviewScores', { ConferenceID: cid, AssignmentID: candidate.AssignmentID });
+      if (candidateScores && candidateScores.length > 0) {
+        a = candidate;
+        break;
+      }
+    }
+  }
+  if (!a) throw new Error('ไม่พบข้อมูลการประเมินที่ต้องการย้ายคะแนน (กรุณาระบุ AssignmentID หรือ WorkCode)');
+  
+  var assignmentId = a.AssignmentID;
+  var work = findOne_('Works', { ConferenceID: cid, WorkID: a.WorkID }) || {};
+  var scores = findMany_('ReviewScores', { ConferenceID: cid, AssignmentID: assignmentId });
+  if (!scores || scores.length === 0) {
+    throw new Error('ไม่พบรายการคะแนนเดิมในระบบสำหรับ ' + (a.WorkCode || assignmentId));
+  }
+  
+  var allCats = findMany_('WorkCategories', { ConferenceID: cid });
+  var roundCriteria = findMany_('ScoringCriteria', { ConferenceID: cid, ReviewRoundID: a.ReviewRoundID }).filter(function(c){ return bool_(c.Active); });
+  var newCriteria = roundCriteria.filter(function(c){ return matchesWorkCategory_(c, work, allCats); });
+  if (!newCriteria || newCriteria.length === 0) {
+    newCriteria = roundCriteria.filter(function(c){ return !c.CategoryID || String(c.CategoryID).trim() === '' || String(c.CategoryID).trim() === '*'; });
+  }
+  newCriteria.sort(function(x,y){ return num_(x.ItemNo||x.SortOrder) - num_(y.ItemNo||y.SortOrder); });
+  
+  if (newCriteria.length === 0) throw new Error('ไม่พบเกณฑ์คะแนนใหม่ในระบบ กรุณารัน runSetupScoringCriteriaInSheet() ก่อน');
+  
+  var oldTotal = num_(a.TotalScore);
+  if (!oldTotal) {
+    scores.forEach(function(s){ oldTotal += num_(s.Score); });
+  }
+  var oldPercentage = Math.min(100, Math.max(0, oldTotal));
+  
+  var oldComments = [];
+  scores.forEach(function(s){
+    if (s.Comment && String(s.Comment).trim()) {
+      oldComments.push(String(s.Comment).trim());
+    }
+  });
+  
+  var newScoresToSave = [];
+  var newTotalScore = 0;
+  
+  newCriteria.forEach(function(c, idx){
+    var max = num_(c.MaxScore, 10);
+    var calculated = Math.round((max * (oldPercentage / 100)) * 2) / 2;
+    newTotalScore += calculated;
+    
+    var commentForCrit = (idx === 0 && oldComments.length > 0) ? oldComments.join('; ') : '';
+    
+    newScoresToSave.push({
+      CriteriaID: c.CriteriaID,
+      CriteriaName: c.CriteriaNameTH,
+      MaxScore: max,
+      Score: calculated,
+      WeightedScore: calculated * (num_(c.WeightPercent, 100) / 100),
+      Comment: commentForCrit
+    });
+  });
+  
+  if (dryRun) {
+    return {
+      dryRun: true,
+      assignmentId: assignmentId,
+      workCode: a.WorkCode,
+      reviewerName: a.ReviewerName,
+      oldTotalScore: oldTotal,
+      newTotalScore: newTotalScore,
+      newScores: newScoresToSave
+    };
+  }
+  
+  newScoresToSave.forEach(function(ns){
+    var existingNewScore = findOne_('ReviewScores', {
+      ConferenceID: cid,
+      AssignmentID: assignmentId,
+      CriteriaID: ns.CriteriaID
+    });
+    var patch = {
+      Score: ns.Score,
+      WeightedScore: ns.WeightedScore,
+      Comment: ns.Comment,
+      UpdatedAt: new Date()
+    };
+    if (existingNewScore) {
+      updateRecord_('ReviewScores', existingNewScore.__row, patch);
+    } else {
+      appendRecord_('ReviewScores', Object.assign({
+        ScoreID: nextId_('SCORE'),
+        ConferenceID: cid,
+        AssignmentID: assignmentId,
+        ReviewRoundID: a.ReviewRoundID,
+        WorkID: a.WorkID,
+        ReviewerID: a.ReviewerID,
+        CriteriaID: ns.CriteriaID,
+        CreatedAt: new Date()
+      }, patch));
+    }
+  });
+  
+  updateRecord_('ReviewAssignments', a.__row, {
+    TotalScore: newTotalScore,
+    UpdatedAt: new Date()
+  });
+  
+  return {
+    success: true,
+    assignmentId: assignmentId,
+    workCode: a.WorkCode,
+    reviewerName: a.ReviewerName,
+    oldTotalScore: oldTotal,
+    newTotalScore: newTotalScore,
+    message: 'ย้ายคะแนนเข้าเกณฑ์ใหม่ ' + newCriteria.length + ' ข้อ เรียบร้อยแล้ว (คะแนนเดิมยังคงถูกบันทึกไว้ใน ReviewScores)'
+  };
+}
+
+function runMigrateReviewerScoresToNewCriteria() {
+  return migrateReviewerScoresToNewCriteriaInSheet(null, false);
 }
 
 function ensureMealEntitlements_(conferenceId,regId){

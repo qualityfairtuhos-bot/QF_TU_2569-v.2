@@ -299,6 +299,89 @@ function renderReview() {
   
   const workCategoryName = esc(w.CategoryName || w.CategoryNameTH || 'ผลงานวิชาการ');
   
+  const oe = d.oldEvaluation;
+  let oldEvaluationHtml = '';
+  if (oe && oe.scores && oe.scores.length > 0) {
+    const oldCritList = oe.criteria || [];
+    const oldScoreRows = oldCritList.map(c => {
+      const s = (oe.scores || []).find(x => String(x.CriteriaID).trim() === String(c.CriteriaID).trim()) || {};
+      return `
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:8px 10px;">
+            <b>ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH || c.CriteriaName || '')}</b>
+            <span style="color:#64748b; font-size:0.75rem;">(เต็ม ${esc(c.MaxScore)})</span>
+          </td>
+          <td style="padding:8px 10px; text-align:center; font-weight:700; color:#0369a1;">
+            ${esc(s.Score !== undefined && s.Score !== null ? s.Score : '-')}
+          </td>
+          <td style="padding:8px 10px; color:#334155; font-size:0.85rem;">
+            ${esc(s.Comment || '-')}
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    oldEvaluationHtml = `
+      <div class="card" style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; margin:16px 0; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <div style="font-weight:700; color:#0369a1; font-size:0.98rem; display:flex; align-items:center; gap:6px;">
+              <span>📌</span> ข้อมูลการประเมินเดิมที่อาจารย์เคยให้ไว้ตามเกณฑ์เดิม
+            </div>
+            <div style="font-size:0.85rem; color:#0284c7; margin-top:2px;">
+              คะแนนเดิมรวม: <b>${esc(oe.totalScore || '-')} คะแนน</b> • 
+              ผลการประเมิน: <b>${esc(oe.decision || '-')}</b>
+              ${oe.completedAt ? ` • บันทึกเมื่อ ${formatDate(oe.completedAt)}` : ''}
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn soft" style="font-size:0.82rem; padding:6px 12px; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc;" onclick="autoFillProportionalScores()">
+              ⚡ คำนวณคะแนนตามสัดส่วนเดิม
+            </button>
+            <button type="button" class="btn soft" style="font-size:0.82rem; padding:6px 12px; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc;" onclick="copyOldCommentsToForm()">
+              📋 คัดลอกข้อเสนอแนะเดิม
+            </button>
+            <button type="button" class="btn soft" id="toggleOldScoresBtn" style="font-size:0.82rem; padding:6px 12px; background:#fff; color:#0369a1; border:1px solid #7dd3fc;" onclick="toggleOldEvaluationDetails()">
+              👁️ แสดงเกณฑ์และคะแนนเดิม
+            </button>
+          </div>
+        </div>
+
+        <div id="oldEvaluationDetails" style="display:none; margin-top:14px; border-top:1px dashed #7dd3fc; padding-top:12px;">
+          <div style="font-size:0.85rem; color:#0369a1; margin-bottom:8px; font-weight:600;">
+            รายละเอียดคะแนนตามเกณฑ์เดิม (${oldCritList.length} ข้อ):
+          </div>
+          <div class="table-wrap" style="background:#fff; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:10px;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+              <thead>
+                <tr style="background:#f8fafc; color:#475569; text-align:left; border-bottom:1px solid #e2e8f0;">
+                  <th style="padding:8px 10px;">หัวข้อเกณฑ์เดิม</th>
+                  <th style="padding:8px 10px; width:100px; text-align:center;">คะแนนเดิม</th>
+                  <th style="padding:8px 10px;">ข้อเสนอแนะเดิม</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${oldScoreRows}
+              </tbody>
+            </table>
+          </div>
+          ${oe.recommendationToAuthor ? `
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-top:8px;">
+              <b style="font-size:0.8rem; color:#475569;">ข้อเสนอแนะถึงผู้ส่งผลงาน (เดิม):</b>
+              <div style="font-size:0.85rem; margin-top:4px; color:#1e293b;">${esc(oe.recommendationToAuthor)}</div>
+            </div>
+          ` : ''}
+          ${oe.internalComment ? `
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-top:8px;">
+              <b style="font-size:0.8rem; color:#475569;">ความเห็นภายในถึงคณะกรรมการ (เดิม):</b>
+              <div style="font-size:0.85rem; margin-top:4px; color:#1e293b;">${esc(oe.internalComment)}</div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+  
   $('#reviewHost').innerHTML = `
     <div class="card" style="margin-top:14px">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
@@ -352,6 +435,8 @@ function renderReview() {
         </div>
       </div>
 
+      ${oldEvaluationHtml}
+
       <form id="reviewForm" onsubmit="return false;">
         <div class="category-section" style="margin:0 0 20px 0;">
           <div class="category-header">
@@ -394,6 +479,56 @@ function renderReview() {
     </div>
   `;
   $('#reviewHost').scrollIntoView({ behavior: 'smooth' });
+}
+
+function toggleOldEvaluationDetails() {
+  const panel = $('#oldEvaluationDetails');
+  const btn = $('#toggleOldScoresBtn');
+  if (!panel || !btn) return;
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  btn.textContent = isHidden ? '🙈 ซ่อนเกณฑ์และคะแนนเดิม' : '👁️ แสดงเกณฑ์และคะแนนเดิม';
+}
+
+function copyOldCommentsToForm() {
+  if (!CURRENT || !CURRENT.oldEvaluation) return;
+  const oe = CURRENT.oldEvaluation;
+  const f = $('#reviewForm');
+  if (!f) return;
+  if (oe.recommendationToAuthor && f.elements['RecommendationToAuthor']) {
+    f.elements['RecommendationToAuthor'].value = oe.recommendationToAuthor;
+  }
+  if (oe.internalComment && f.elements['InternalComment']) {
+    f.elements['InternalComment'].value = oe.internalComment;
+  }
+  if (oe.decision && f.elements['Decision']) {
+    f.elements['Decision'].value = oe.decision;
+  }
+  toast('คัดลอกข้อเสนอแนะเดิมลงในฟอร์มเรียบร้อยแล้ว');
+}
+
+function autoFillProportionalScores() {
+  if (!CURRENT || !CURRENT.oldEvaluation || !CURRENT.criteria) return;
+  const oe = CURRENT.oldEvaluation;
+  const oldTotal = Number(oe.totalScore) || 0;
+  const oldMax = (oe.criteria || []).reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
+  const ratio = oldMax > 0 ? (oldTotal / oldMax) : 0;
+  
+  const f = $('#reviewForm');
+  if (!f) return;
+  
+  CURRENT.criteria.forEach(c => {
+    const input = f.elements['score_' + c.CriteriaID];
+    if (input) {
+      const max = Number(c.MaxScore) || 0;
+      const propScore = Math.round((max * ratio) * 2) / 2;
+      input.value = propScore;
+    }
+  });
+  
+  updateLiveReviewScores();
+  copyOldCommentsToForm();
+  toast('คำนวณคะแนนตามสัดส่วนเดิม (' + Math.round(ratio * 100) + '%) ให้เรียบร้อยแล้ว สามารถปรับแก้ได้ตามต้องการ');
 }
 
 async function saveReview(submit) {
