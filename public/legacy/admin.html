@@ -347,7 +347,7 @@ const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','Registratio
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|adminDash|adminBoot|reviewerGet|reviewerBoot|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap|Dashboard/i.test(n)?30000:60000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
+window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?15000:45000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
@@ -397,6 +397,7 @@ $('#loginForm').onsubmit=async e=>{
       renderAppShell(bootData);
       hide();
       await nav('dashboard');
+      prefetchAdminTabs();
     }else{
       await boot();
       hide();
@@ -418,9 +419,29 @@ async function boot(){
   renderAppShell(BOOT);
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
+  prefetchAdminTabs();
 }
 const TAB_STATE = window.TAB_STATE || { loaded: {}, inFlight: {} };
 window.TAB_STATE = TAB_STATE;
+function prefetchAdminTabs(){
+  if(!BOOT||!BOOT.role)return;
+  const allow=menuForRole(BOOT.role).map(x=>x[0]);
+  const queue=['works','registrations','payments','reviewers','food','settings'].filter(p=>allow.includes(p));
+  queue.forEach((p,idx)=>{
+    setTimeout(async()=>{
+      if(TAB_STATE.loaded[p]||TAB_STATE.inFlight[p])return;
+      try{
+        if(p==='works')await loadWorks(false);
+        else if(p==='registrations')await loadRegistrations(false);
+        else if(p==='payments')await loadPayments(false);
+        else if(p==='reviewers')await Promise.all([loadReviewers(false),loadReviewConfig(false)]);
+        else if(p==='food')await loadFood(false);
+        else if(p==='settings')await loadSettings(false);
+        TAB_STATE.loaded[p]=Date.now();
+      }catch(e){}
+    },800+idx*400);
+  });
+}
 
 async function nav(p, forceRefresh = false){
   const page=$('#page-'+p);
@@ -448,7 +469,7 @@ async function nav(p, forceRefresh = false){
     else if(p==='registrations')await loadRegistrations(forceRefresh);
     else if(p==='payments')await loadPayments(forceRefresh);
     else if(p==='works')await loadWorks(forceRefresh);
-    else if(p==='reviewers'){ await loadReviewers(forceRefresh); loadReviewConfig(forceRefresh).catch(console.warn); }
+    else if(p==='reviewers')await Promise.all([loadReviewers(forceRefresh), loadReviewConfig(forceRefresh)]);
     else if(p==='food')await loadFood(forceRefresh);
     else if(p==='users')await loadUsers(forceRefresh);
     TAB_STATE.loaded[p] = Date.now();
@@ -3304,19 +3325,9 @@ async function loadReviewConfig(forceRefresh = false){
   const d = await rpc('adminGetReviewConfig', TOKEN, CID);
   const roundsHtml = '<h4>รอบประเมิน</h4>' + (d.rounds || []).map(r=>`<div class="card" style="box-shadow:none; padding:10px; margin-bottom:8px; border:1px solid #e2e8f0; border-radius:8px;"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | สถานะ: <span class="badge" style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px;">${esc(r.Status)}</span> | Reviewer ${r.MinReviewers}-${r.MaxReviewers} ท่าน</div>`).join('');
   
-  const allCrit = d.criteria || [];
-  const critList = allCrit.filter(c => c.Active === undefined || c.Active === null || c.Active === true || String(c.Active).toLowerCase() === 'true' || c.Active === 1);
-  const inactiveCrit = allCrit.filter(c => !critList.includes(c));
-  
-  const researchCrit = critList.filter(c => {
-    const s = [c.CriteriaID, c.CategoryID, c.WorkCategory, c.CriteriaNameTH, c.CriteriaNameEN, c.DescriptionTH].join(' ').toUpperCase();
-    return /CAT-1|CAT-2|RESEARCH|INNOVAT|R2R|วิจัย|นวัตกรรม|สิ่งประดิษฐ์/.test(s);
-  });
-  const cqiCrit = critList.filter(c => {
-    if (researchCrit.includes(c)) return false;
-    const s = [c.CriteriaID, c.CategoryID, c.WorkCategory, c.CriteriaNameTH, c.CriteriaNameEN, c.DescriptionTH].join(' ').toUpperCase();
-    return /CAT-3|CAT-4|CAT-5|SERVICE|CQI|PRIMARY|บริการ|ปฐมภูมิ|กระบวนการพัฒนา/.test(s);
-  });
+  const critList = d.criteria || [];
+  const researchCrit = critList.filter(c => String(c.CriteriaID||'').includes('RESEARCH') || String(c.WorkCategory||'').includes('RESEARCH') || String(c.WorkCategory||'').includes('INNOVATION'));
+  const cqiCrit = critList.filter(c => String(c.CriteriaID||'').includes('CQI') || String(c.WorkCategory||'').includes('CQI') || String(c.WorkCategory||'').includes('SERVICE') || String(c.WorkCategory||'').includes('PRIMARY'));
   const otherCrit = critList.filter(c => !researchCrit.includes(c) && !cqiCrit.includes(c));
   
   const renderCritGroup = (title, badgeColor, items) => {

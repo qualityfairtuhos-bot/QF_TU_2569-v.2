@@ -28,6 +28,7 @@ const CACHE_TTLS:Record<string,number>={
   adminListFinanceDocuments: 180_000,
   adminGetReviewConfig: 300_000,
   reviewerBootstrap: 120_000,
+  reviewerGetAssignment: 60_000,
   getEventScannerBootstrap: 120_000,
   listImportBatches: 180_000
 };
