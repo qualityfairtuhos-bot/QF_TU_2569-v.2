@@ -3931,8 +3931,324 @@ function adminAssignReviewers(token,conferenceId,workId,reviewRoundId,reviewerId
 }
 function sendReviewAssignmentEmail_(cid,w,rev,assignmentId){const portal=buildWebAppRouteUrl_('reviewer',cid);sendEmailLogged_(cid,rev.Email,'แจ้งมอบหมายประเมินผลงาน '+w.WorkCode,'<p>เรียน '+rev.FullName+'</p><p>ท่านได้รับมอบหมายให้ประเมินผลงาน <b>'+w.WorkCode+'</b></p><p><a href="'+portal+'">เข้าสู่ระบบ Reviewer</a></p>','ASSIGNMENT',assignmentId,null);}
 function reviewerBootstrap(token,conferenceId){return runSafely_('reviewerBootstrap',function(){const ctx=requireSession_(token,['REVIEWER'],conferenceId),role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),perm=jsonParse_(role&&role.PermissionsJson,'{}'),reviewerId=perm.ReviewerID;const reviewer=findOne_('Reviewers',{ReviewerID:reviewerId});if(!reviewer)throw new Error('ไม่พบข้อมูล Reviewer');const assignments=findMany_('ReviewAssignments',{ConferenceID:conferenceId,ReviewerID:reviewerId}).filter(function(x){return upper_(x.Status)!=='CANCELLED';});const works=findMany_('Works',{ConferenceID:conferenceId});const workMap={};works.forEach(function(w){workMap[w.WorkID]=w;});assignments.forEach(function(a){const w=workMap[a.WorkID];if(w){a.TitleTH=w.TitleTH||w.TitleEN||w.ThaiTitle||w.EnglishTitle;a.WorkStatus=w.Status;a.WorkCode=a.WorkCode||w.WorkCode||w.WorkID;}a.AssignedAt=a.AssignedAt||a.CreatedAt||'';});return {reviewer:serialize_(reviewer),assignments:serialize_(assignments),conference:serialize_(findOne_('Conferences',{ConferenceID:conferenceId}))};});}
-function reviewerGetAssignment(token,conferenceId,assignmentId){return runSafely_('reviewerGetAssignment',function(){const ctx=requireSession_(token,['REVIEWER'],conferenceId),role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),rid=jsonParse_(role.PermissionsJson,{}).ReviewerID,a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});if(!a)throw new Error('ไม่มีสิทธิ์เปิดงานนี้');const work=findOne_('Works',{ConferenceID:conferenceId,WorkID:a.WorkID}),round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});if(!round)throw new Error('ไม่พบรอบประเมิน');if(round.StartAt&&new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');if(round.EndAt&&new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');const allWorkFiles=findMany_('WorkFiles',{ConferenceID:conferenceId,WorkID:a.WorkID}).filter(function(f){return bool_(f.Active);});const blindFiles=allWorkFiles.filter(function(f){return f.FileCategory==='BLIND';});let files=[];if(bool_(round.BlindReview)||blindFiles.length>0){files=blindFiles.length>0?blindFiles:allWorkFiles.filter(function(f){return ['ORIGINAL','WORD','FINAL_PRESENTATION','REVISION'].indexOf(f.FileCategory)>=0;});}else{files=allWorkFiles.filter(function(f){return ['BLIND','ORIGINAL','WORD','FINAL_PRESENTATION','REVISION'].indexOf(f.FileCategory)>=0;});}const criteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).filter(function(c){return bool_(c.Active);}),scores=findMany_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId});if(!a.OpenedAt)updateRecord_('ReviewAssignments',a.__row,{OpenedAt:new Date(),Status:'OPENED'});return {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};});}
-function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){return runSafely_('reviewerSaveReview',function(){const ctx=requireSession_(token,['REVIEWER'],conferenceId),role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),rid=jsonParse_(role.PermissionsJson,{}).ReviewerID,a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});if(!a)throw new Error('ไม่มีสิทธิ์');const round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});if(!round||['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว');if(round.StartAt&&new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');if(round.EndAt&&new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');if(bool_(a.Locked))throw new Error('แบบประเมินถูกล็อก');const scores=payload.Scores||[],criteria={};findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).forEach(function(c){criteria[c.CriteriaID]=c;});let total=0;scores.forEach(function(s){const c=criteria[s.CriteriaID];if(!c)throw new Error('เกณฑ์คะแนนไม่ถูกต้อง');const score=num_(s.Score);if(score<0||score>num_(c.MaxScore))throw new Error('คะแนนเกินเกณฑ์ '+c.CriteriaNameTH);let old=findOne_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId,CriteriaID:s.CriteriaID});const patch={Score:score,WeightedScore:score*(num_(c.WeightPercent,100)/100),Comment:clean_(s.Comment),UpdatedAt:new Date()};if(old)updateRecord_('ReviewScores',old.__row,patch);else appendRecord_('ReviewScores',Object.assign({ScoreID:nextId_('SCORE'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,CriteriaID:s.CriteriaID,CreatedAt:new Date()},patch));total+=score;});const status=submit?'COMPLETE':'DRAFT_SAVED';updateRecord_('ReviewAssignments',a.__row,{Status:status,CompletedAt:submit?new Date():'',TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),Locked:submit&&!bool_(getSetting_(conferenceId,'REVIEWER_CAN_EDIT_AFTER_SUBMIT','FALSE')),UpdatedAt:new Date()});if(submit)appendRecord_('ReviewSummary',{SummaryID:nextId_('SUM'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),CreatedAt:new Date(),UpdatedAt:new Date()});return {status:status,totalScore:total};});}
+function matchesWorkCategory_(criterion, work, allCategories) {
+  var critCat = String(criterion.CategoryID || criterion.CriteriaGroupID || criterion.WorkType || '').trim();
+  if (!critCat || critCat === '*' || critCat.toUpperCase() === 'ALL') {
+    return false; // general fallback
+  }
+  var workCatId = String((work && work.CategoryID) || '').trim();
+  var workCatName = String((work && (work.CategoryName || work.CategoryNameTH)) || '').trim();
+  var workCatCode = '';
+  var foundCat = (allCategories || []).find(function(c) {
+    return String(c.CategoryID).trim() === workCatId || String(c.CategoryCode).trim() === workCatId;
+  });
+  if (foundCat) {
+    workCatCode = String(foundCat.CategoryCode || '').trim().toUpperCase();
+    if (!workCatName) workCatName = String(foundCat.CategoryNameTH || foundCat.CategoryNameEN || '');
+  } else {
+    workCatCode = workCatId.toUpperCase();
+  }
+  var isResearchOrInnovation = workCatCode === 'RESEARCH' || workCatCode === 'INNOVATION' || 
+                               /วิจัย|นวัตกรรม|research|innovation/i.test(workCatName) || 
+                               /วิจัย|นวัตกรรม|research|innovation/i.test(workCatId);
+  var isCqiOrServiceOrPrimary = workCatCode === 'SERVICE' || workCatCode === 'CQI' || workCatCode === 'PRIMARY' ||
+                                /service|cqi|primary|excellence|practice|community/i.test(workCatName) ||
+                                /service|cqi|primary/i.test(workCatId);
+  var critUpper = critCat.toUpperCase();
+  if (workCatId && critUpper.indexOf(workCatId.toUpperCase()) >= 0) return true;
+  if (workCatCode && critUpper.indexOf(workCatCode) >= 0) return true;
+  if (isResearchOrInnovation) {
+    if (critUpper.indexOf('RESEARCH') >= 0 || critUpper.indexOf('INNOVATION') >= 0 || 
+        /วิจัย|นวัตกรรม|research|innovation/i.test(critCat)) {
+      return true;
+    }
+  }
+  if (isCqiOrServiceOrPrimary) {
+    if (critUpper.indexOf('SERVICE') >= 0 || critUpper.indexOf('CQI') >= 0 || critUpper.indexOf('PRIMARY') >= 0 ||
+        /service|cqi|primary|excellence|practice|community/i.test(critCat)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function reviewerGetAssignment(token,conferenceId,assignmentId){
+  return runSafely_('reviewerGetAssignment',function(){
+    const ctx=requireSession_(token,['REVIEWER'],conferenceId),
+          role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),
+          rid=jsonParse_(role.PermissionsJson,{}).ReviewerID,
+          a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});
+    if(!a)throw new Error('ไม่มีสิทธิ์เปิดงานนี้');
+    const work=findOne_('Works',{ConferenceID:conferenceId,WorkID:a.WorkID}),
+          round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});
+    if(!round)throw new Error('ไม่พบรอบประเมิน');
+    if(round.StartAt&&new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');
+    if(round.EndAt&&new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');
+    const allWorkFiles=findMany_('WorkFiles',{ConferenceID:conferenceId,WorkID:a.WorkID}).filter(function(f){return bool_(f.Active);});
+    const blindFiles=allWorkFiles.filter(function(f){return f.FileCategory==='BLIND';});
+    let files=[];
+    if(bool_(round.BlindReview)||blindFiles.length>0){
+      files=blindFiles.length>0?blindFiles:allWorkFiles.filter(function(f){return ['ORIGINAL','WORD','FINAL_PRESENTATION','REVISION'].indexOf(f.FileCategory)>=0;});
+    }else{
+      files=allWorkFiles.filter(function(f){return ['BLIND','ORIGINAL','WORD','FINAL_PRESENTATION','REVISION'].indexOf(f.FileCategory)>=0;});
+    }
+    
+    // Fetch existing scores for this assignment
+    const scores=findMany_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId});
+    const allCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId});
+    let criteria=[];
+    
+    // IF THIS ASSIGNMENT HAS EXISTING SCORES: MUST PRESERVE the exact criteria evaluated
+    if(scores && scores.length>0){
+      const scoredCritIds=scores.map(function(s){return String(s.CriteriaID).trim();});
+      criteria=allCriteria.filter(function(c){
+        return scoredCritIds.indexOf(String(c.CriteriaID).trim())>=0;
+      });
+    }
+    
+    // If no existing scores (new evaluation), match criteria by work category
+    if(!criteria || criteria.length===0){
+      const roundCriteria=findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).filter(function(c){return bool_(c.Active);});
+      const allCats=findMany_('WorkCategories',{ConferenceID:conferenceId});
+      const matched=roundCriteria.filter(function(c){
+        return matchesWorkCategory_(c,work,allCats);
+      });
+      if(matched.length>0){
+        criteria=matched;
+      }else{
+        // Fallback to active criteria with empty CategoryID or general
+        const general=roundCriteria.filter(function(c){
+          return !c.CategoryID||String(c.CategoryID).trim()===''||String(c.CategoryID).trim()==='*';
+        });
+        criteria=general.length>0?general:roundCriteria;
+      }
+    }
+    
+    criteria.sort(function(x,y){return num_(x.ItemNo||x.SortOrder)-num_(y.ItemNo||y.SortOrder);});
+    if(!a.OpenedAt)updateRecord_('ReviewAssignments',a.__row,{OpenedAt:new Date(),Status:'OPENED'});
+    return {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};
+  });
+}
+
+function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
+  return runSafely_('reviewerSaveReview',function(){
+    const ctx=requireSession_(token,['REVIEWER'],conferenceId),
+          role=findOne_('UserConferenceRoles',{ConferenceID:conferenceId,UserID:ctx.user.UserID,Role:'REVIEWER'}),
+          rid=jsonParse_(role.PermissionsJson,{}).ReviewerID,
+          a=findOne_('ReviewAssignments',{ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewerID:rid});
+    if(!a)throw new Error('ไม่มีสิทธิ์');
+    const round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID});
+    if(!round||['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว');
+    if(round.StartAt&&new Date(round.StartAt).getTime()>Date.now())throw new Error('ยังไม่ถึงวันเปิดรอบประเมิน');
+    if(round.EndAt&&new Date(round.EndAt).getTime()<Date.now())throw new Error('หมดเวลาประเมินแล้ว');
+    if(bool_(a.Locked))throw new Error('แบบประเมินถูกล็อก');
+    const scores=payload.Scores||[],criteria={};
+    findMany_('ScoringCriteria',{ConferenceID:conferenceId,ReviewRoundID:a.ReviewRoundID}).forEach(function(c){criteria[c.CriteriaID]=c;});
+    findMany_('ScoringCriteria',{ConferenceID:conferenceId}).forEach(function(c){if(!criteria[c.CriteriaID])criteria[c.CriteriaID]=c;});
+    let total=0;
+    scores.forEach(function(s){
+      const c=criteria[s.CriteriaID];
+      if(!c)throw new Error('เกณฑ์คะแนนไม่ถูกต้อง');
+      const score=num_(s.Score);
+      if(score<0||score>num_(c.MaxScore))throw new Error('คะแนนเกินเกณฑ์ '+(c.CriteriaNameTH||c.CriteriaName||('ข้อ '+c.ItemNo)));
+      let old=findOne_('ReviewScores',{ConferenceID:conferenceId,AssignmentID:assignmentId,CriteriaID:s.CriteriaID});
+      const patch={Score:score,WeightedScore:score*(num_(c.WeightPercent,100)/100),Comment:clean_(s.Comment),UpdatedAt:new Date()};
+      if(old)updateRecord_('ReviewScores',old.__row,patch);
+      else appendRecord_('ReviewScores',Object.assign({ScoreID:nextId_('SCORE'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,CriteriaID:s.CriteriaID,CreatedAt:new Date()},patch));
+      total+=score;
+    });
+    const status=submit?'COMPLETE':'DRAFT_SAVED';
+    updateRecord_('ReviewAssignments',a.__row,{Status:status,CompletedAt:submit?new Date():'',TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),Locked:submit&&!bool_(getSetting_(conferenceId,'REVIEWER_CAN_EDIT_AFTER_SUBMIT','FALSE')),UpdatedAt:new Date()});
+    if(submit)appendRecord_('ReviewSummary',{SummaryID:nextId_('SUM'),ConferenceID:conferenceId,AssignmentID:assignmentId,ReviewRoundID:a.ReviewRoundID,WorkID:a.WorkID,ReviewerID:rid,TotalScore:total,Decision:clean_(payload.Decision),RecommendationToAuthor:clean_(payload.RecommendationToAuthor),InternalComment:clean_(payload.InternalComment),CreatedAt:new Date(),UpdatedAt:new Date()});
+    return {status:status,totalScore:total};
+  });
+}
+
+function adminSetupCategoryScoringCriteria(token, conferenceId){
+  return runSafely_('adminSetupCategoryScoringCriteria', function(){
+    requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    const round = findOne_('ReviewRounds', { ConferenceID: conferenceId, RoundNo: 1 }) ||
+                  findOne_('ReviewRounds', { ConferenceID: conferenceId }) || {};
+    const roundId = round.ReviewRoundID || 'RR-2026-000001';
+    
+    // Group 1: วิจัย & นวัตกรรม (7 criteria, 100 points)
+    const researchInnovationCriteria = [
+      {
+        ItemNo: 1,
+        CriteriaNameTH: 'ชื่อเรื่อง',
+        CriteriaNameEN: 'Title',
+        DescriptionTH: 'ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
+        MaxScore: 5
+      },
+      {
+        ItemNo: 2,
+        CriteriaNameTH: 'บทคัดย่อ',
+        CriteriaNameEN: 'Abstract',
+        DescriptionTH: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
+        MaxScore: 15
+      },
+      {
+        ItemNo: 3,
+        CriteriaNameTH: 'บทนำ มีข้อมูลภูมิหลังที่ชัดเจน',
+        CriteriaNameEN: 'Introduction / Background',
+        DescriptionTH: 'ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุวัตถุประสงค์ของการวิจัยที่ชัดเจน',
+        MaxScore: 10
+      },
+      {
+        ItemNo: 4,
+        CriteriaNameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
+        CriteriaNameEN: 'Methodology / Innovation Development',
+        DescriptionTH: 'ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
+        MaxScore: 20
+      },
+      {
+        ItemNo: 5,
+        CriteriaNameTH: 'ผลการวิจัย/ผลการศึกษาสอดคล้องกับวัตถุประสงค์',
+        CriteriaNameEN: 'Results aligned with objectives',
+        DescriptionTH: 'นำเสนอผลการวิจัย/ ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้',
+        MaxScore: 20
+      },
+      {
+        ItemNo: 6,
+        CriteriaNameTH: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
+        CriteriaNameEN: 'Discussion and Recommendations',
+        DescriptionTH: 'มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัย',
+        MaxScore: 20
+      },
+      {
+        ItemNo: 7,
+        CriteriaNameTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
+        CriteriaNameEN: 'Utilization for quality & safety',
+        DescriptionTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
+        MaxScore: 10
+      }
+    ];
+
+    // Group 2: Service Excellence, CQI, Primary Care (6 criteria, 100 points)
+    const cqiServicePrimaryCriteria = [
+      {
+        ItemNo: 1,
+        CriteriaNameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
+        CriteriaNameEN: 'Situation / Problem review',
+        DescriptionTH: '• มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร (5 คะแนน)\n• มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร (5 คะแนน)',
+        MaxScore: 10
+      },
+      {
+        ItemNo: 2,
+        CriteriaNameTH: 'มีเป้าหมายที่ชัดเจน',
+        CriteriaNameEN: 'Clear objectives & targets',
+        DescriptionTH: '• มีการระบุเป้าหมายที่สอดคล้องกับปัญหา (5 คะแนน)\n• มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร (5 คะแนน)',
+        MaxScore: 10
+      },
+      {
+        ItemNo: 3,
+        CriteriaNameTH: 'กิจกรรมการพัฒนา',
+        CriteriaNameEN: 'Improvement activities & changes',
+        DescriptionTH: '• มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง (10 คะแนน)\n• มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง (20 คะแนน)',
+        MaxScore: 30
+      },
+      {
+        ItemNo: 4,
+        CriteriaNameTH: 'การประเมินผลการเปลี่ยนแปลง',
+        CriteriaNameEN: 'Evaluation of change',
+        DescriptionTH: '• มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ (10 คะแนน)\n• มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด (15 คะแนน)',
+        MaxScore: 25
+      },
+      {
+        ItemNo: 5,
+        CriteriaNameTH: 'บทเรียนที่ได้รับ',
+        CriteriaNameEN: 'Lessons learned',
+        DescriptionTH: '• มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ (10 คะแนน)\n• มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น (10 คะแนน)',
+        MaxScore: 20
+      },
+      {
+        ItemNo: 6,
+        CriteriaNameTH: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
+        CriteriaNameEN: 'Completeness & formatting',
+        DescriptionTH: '• ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ (2.5 คะแนน)\n• การเรียบเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด (2.5 คะแนน)',
+        MaxScore: 5
+      }
+    ];
+
+    let created = 0, updated = 0;
+    
+    // Add/Update Group 1: RESEARCH,INNOVATION
+    researchInnovationCriteria.forEach(function(item){
+      const existing = findOne_('ScoringCriteria', {
+        ConferenceID: conferenceId,
+        ReviewRoundID: roundId,
+        CategoryID: 'RESEARCH,INNOVATION',
+        ItemNo: item.ItemNo
+      });
+      const patch = {
+        ReviewRoundID: roundId,
+        CategoryID: 'RESEARCH,INNOVATION',
+        PresentationTypeID: '',
+        ItemNo: item.ItemNo,
+        CriteriaNameTH: item.CriteriaNameTH,
+        CriteriaNameEN: item.CriteriaNameEN,
+        DescriptionTH: item.DescriptionTH,
+        MaxScore: item.MaxScore,
+        WeightPercent: 100,
+        RequiredComment: false,
+        Active: true,
+        SortOrder: item.ItemNo
+      };
+      if (existing) {
+        updateRecord_('ScoringCriteria', existing.__row, patch);
+        updated++;
+      } else {
+        appendRecord_('ScoringCriteria', Object.assign({
+          CriteriaID: nextId_('CRIT'),
+          ConferenceID: conferenceId
+        }, patch));
+        created++;
+      }
+    });
+
+    // Add/Update Group 2: SERVICE,CQI,PRIMARY
+    cqiServicePrimaryCriteria.forEach(function(item){
+      const existing = findOne_('ScoringCriteria', {
+        ConferenceID: conferenceId,
+        ReviewRoundID: roundId,
+        CategoryID: 'SERVICE,CQI,PRIMARY',
+        ItemNo: item.ItemNo
+      });
+      const patch = {
+        ReviewRoundID: roundId,
+        CategoryID: 'SERVICE,CQI,PRIMARY',
+        PresentationTypeID: '',
+        ItemNo: item.ItemNo,
+        CriteriaNameTH: item.CriteriaNameTH,
+        CriteriaNameEN: item.CriteriaNameEN,
+        DescriptionTH: item.DescriptionTH,
+        MaxScore: item.MaxScore,
+        WeightPercent: 100,
+        RequiredComment: false,
+        Active: true,
+        SortOrder: item.ItemNo
+      };
+      if (existing) {
+        updateRecord_('ScoringCriteria', existing.__row, patch);
+        updated++;
+      } else {
+        appendRecord_('ScoringCriteria', Object.assign({
+          CriteriaID: nextId_('CRIT'),
+          ConferenceID: conferenceId
+        }, patch));
+        created++;
+      }
+    });
+
+    return {
+      success: true,
+      roundId: roundId,
+      created: created,
+      updated: updated,
+      message: 'ปรับปรุงเกณฑ์คะแนน 2 ชุด (วิจัย/นวัตกรรม 7 ข้อ และ CQI/Service/Primary 6 ข้อ) เรียบร้อยแล้ว โดยยังคงข้อมูลคะแนนเดิมในระบบอย่างปลอดภัย'
+    };
+  });
+}
 
 function ensureMealEntitlements_(conferenceId,regId){
   const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
@@ -6229,6 +6545,7 @@ const API_ACTIONS = Object.freeze({
   adminSearchDriveFiles: adminSearchDriveFiles,
   adminSendDirectEmail: adminSendDirectEmail,
   adminSendMealPasses: adminSendMealPasses,
+  adminSetupCategoryScoringCriteria: adminSetupCategoryScoringCriteria,
   adminUpdateRegistrationStatus: adminUpdateRegistrationStatus,
   adminUpdateReviewer: adminUpdateReviewer,
   adminUpdateUserStatus: adminUpdateUserStatus,

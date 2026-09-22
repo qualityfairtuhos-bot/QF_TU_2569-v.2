@@ -287,7 +287,12 @@
         </div>
       </div>
       <div class="card">
-        <h3>ตั้งค่ารอบประเมินและเกณฑ์คะแนน</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+          <h3 style="margin:0">ตั้งค่ารอบประเมินและเกณฑ์คะแนน</h3>
+          <button class="btn btn-warning" onclick="setupCategoryCriteria()" style="font-size:0.85rem; padding:8px 14px; background:#d97706; color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer;">
+            <i class="fa-solid fa-sliders"></i> ตั้งค่าเกณฑ์คะแนนแยก 2 แบบ (วิจัย/นวัตกรรม vs CQI/Service/Primary)
+          </button>
+        </div>
         <div id="reviewConfig"></div>
       </div>
     </section>
@@ -2706,40 +2711,23 @@ async function openScoreSummary(wid){
     hide();
     const {work, authors, assignments, scores, criteria} = res;
     
-    const critMap = {};
-    criteria.forEach(c => critMap[c.CriteriaID] = c);
-    
-    const MAIN_CATS = [
-      { id: 1, name: 'บทนำ/วัตถุประสงค์', maxScore: 10, items: [1, 2] },
-      { id: 2, name: 'วิธีดำเนินการ', maxScore: 30, items: [3, 4] },
-      { id: 3, name: 'ผลการศึกษา/ผลลัพธ์', maxScore: 30, items: [5] },
-      { id: 4, name: 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', maxScore: 20, items: [6, 7] },
-      { id: 5, name: 'การใช้ประโยชน์', maxScore: 10, items: [8] }
-    ];
-
-    function getCat(c) {
-      const itemNo = Number(c.ItemNo) || 0;
-      const desc = String(c.DescriptionTH || '').trim();
-      for (const cat of MAIN_CATS) {
-        if (desc && (desc.includes(cat.name) || cat.name.includes(desc))) return cat;
-        if (cat.items.includes(itemNo)) return cat;
-      }
-      return { id: 99, name: desc || 'หมวดอื่น ๆ', maxScore: Number(c.MaxScore) || 0, items: [itemNo] };
-    }
+    const criteriaList = (criteria || []).slice().sort((x, y) => (Number(x.ItemNo || x.SortOrder) || 0) - (Number(y.ItemNo || y.SortOrder) || 0));
+    const totalMax = criteriaList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
     
     const completed = assignments.filter(a => ['COMPLETE', 'LOCKED'].includes(String(a.Status).toUpperCase()));
     
     let html = `<div style="text-align:left; font-size:0.9rem;">
       <div style="margin-bottom:15px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
-        <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH)}</div>
-        <div style="margin-top:4px; color:#475569;"><small>ผู้ส่ง/ผู้แต่ง: ${authors.map(x => esc(x.FullName)).join(', ')}</small></div>
+        <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH || work.TitleEN || '')}</div>
+        <div style="margin-top:4px; color:#475569;"><small>ประเภท: <b>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</b> | ผู้ส่ง/ผู้แต่ง: ${authors.map(x => esc(x.FullName)).join(', ')}</small></div>
       </div>`;
     
     if (completed.length === 0) {
       html += `<div class="muted" style="text-align:center; padding:25px; background:#f1f5f9; border-radius:8px;">ยังไม่มีกรรมการส่งคะแนน (ประเมินแล้ว 0/${assignments.length} ท่าน)</div>`;
     } else {
       let totalSum = 0;
-      const catAvgSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      const critSums = {};
+      criteriaList.forEach(c => critSums[c.CriteriaID] = 0);
       
       completed.forEach((a, i) => {
         totalSum += Number(a.TotalScore) || 0;
@@ -2747,41 +2735,16 @@ async function openScoreSummary(wid){
         const myScoreMap = {};
         myScores.forEach(s => myScoreMap[s.CriteriaID] = s);
         
-        const catSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 99: 0 };
-        const groupedItems = {};
-        MAIN_CATS.forEach(c => groupedItems[c.id] = []);
-        groupedItems[99] = [];
-        
-        criteria.forEach(c => {
-          const cat = getCat(c);
+        const subItemsHtml = criteriaList.map(c => {
           const sc = myScoreMap[c.CriteriaID];
-          const val = sc ? (Number(sc.Score) || 0) : 0;
-          catSums[cat.id] = (catSums[cat.id] || 0) + val;
-          if (cat.id <= 5) catAvgSums[cat.id] = (catAvgSums[cat.id] || 0) + val;
-          groupedItems[cat.id].push({ criteria: c, scoreObj: sc, scoreVal: val });
-        });
-        
-        let catBlocksHtml = MAIN_CATS.map(cat => {
-          const items = groupedItems[cat.id] || [];
-          if (!items.length) return '';
-          const subItemsHtml = items.map(it => `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 8px; border-bottom:1px dashed #e2e8f0; font-size:0.85rem;">
-              <span style="color:#334155;">ข้อ ${esc(it.criteria.ItemNo)}. ${esc(it.criteria.CriteriaNameTH)}</span>
-              <span style="font-weight:600; color:#006D70;">${it.scoreVal} / ${it.criteria.MaxScore}</span>
-            </div>
-            ${it.scoreObj && it.scoreObj.Comment ? `<div style="font-size:0.8rem; color:#64748b; margin:2px 0 6px 8px; padding-left:8px; border-left:2px solid #cbd5e1;">ข้อเสนอแนะ: ${esc(it.scoreObj.Comment)}</div>` : ''}
-          `).join('');
-          
+          const val = sc && sc.Score !== undefined && sc.Score !== null && sc.Score !== '' ? Number(sc.Score) : 0;
+          critSums[c.CriteriaID] = (critSums[c.CriteriaID] || 0) + val;
           return `
-            <div style="margin-bottom:8px; background:#fafafa; border:1px solid #eef2f6; border-radius:6px; overflow:hidden;">
-              <div style="background:#f1f5f9; padding:5px 10px; display:flex; justify-content:space-between; align-items:center; font-weight:600; font-size:0.88rem; color:#1e293b;">
-                <span>หมวด ${cat.id}: ${esc(cat.name)}</span>
-                <span style="color:#006D70; background:#fff; padding:1px 8px; border-radius:999px; border:1px solid #cbd5e1; font-size:0.82rem;">${catSums[cat.id]} / ${cat.maxScore}</span>
-              </div>
-              <div style="padding:4px 8px;">
-                ${subItemsHtml}
-              </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px dashed #e2e8f0; font-size:0.85rem;">
+              <span style="color:#334155;">ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH || c.CriteriaName)}</span>
+              <span style="font-weight:600; color:#006D70;">${val} / ${c.MaxScore}</span>
             </div>
+            ${sc && sc.Comment ? `<div style="font-size:0.8rem; color:#64748b; margin:2px 0 6px 8px; padding-left:8px; border-left:2px solid #cbd5e1;">ข้อเสนอแนะ: ${esc(sc.Comment)}</div>` : ''}
           `;
         }).join('');
         
@@ -2789,11 +2752,13 @@ async function openScoreSummary(wid){
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
             <div>
               <b style="font-size:0.95rem; color:#0f172a;">กรรมการท่านที่ ${i+1}</b>
-              <span style="margin-left:8px; font-size:0.8rem; color:#64748b;">(สถานะ: ${esc(a.Decision || 'ประเมินแล้ว')})</span>
+              <span style="margin-left:8px; font-size:0.8rem; color:#64748b;">(ผลการประเมิน: <b>${esc(a.Decision || 'ประเมินแล้ว')}</b>)</span>
             </div>
-            <span style="background:#e0f2fe; color:#0369a1; padding:3px 12px; border-radius:999px; font-weight:700; font-size:0.95rem;">รวม ${Number(a.TotalScore)} / 100 คะแนน</span>
+            <span style="background:#e0f2fe; color:#0369a1; padding:3px 12px; border-radius:999px; font-weight:700; font-size:0.95rem;">รวม ${Number(a.TotalScore)} / ${totalMax} คะแนน</span>
           </div>
-          ${catBlocksHtml}
+          <div style="background:#fafafa; border:1px solid #eef2f6; border-radius:6px; padding:4px 8px; margin-bottom:8px;">
+            ${subItemsHtml}
+          </div>
           ${a.RecommendationToAuthor ? `<div style="margin-top:10px; padding:8px 12px; background:#f0fdf4; border-radius:6px; border:1px solid #bbf7d0; font-size:0.85rem; color:#166534;"><b>ข้อเสนอแนะถึงผู้ส่งผลงาน:</b><br>${esc(a.RecommendationToAuthor).replace(/\n/g, '<br>')}</div>` : ''}
           ${a.InternalComment ? `<div style="margin-top:6px; padding:8px 12px; background:#fffbeb; border-radius:6px; border:1px solid #fef3c7; font-size:0.85rem; color:#92400e;"><b>ความเห็นภายใน:</b><br>${esc(a.InternalComment).replace(/\n/g, '<br>')}</div>` : ''}
         </div>`;
@@ -2804,13 +2769,13 @@ async function openScoreSummary(wid){
         <div style="background:linear-gradient(135deg, #073552 0%, #006D70 100%); color:#fff; border-radius:12px; padding:16px; margin-top:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px;">
             <span style="font-size:1.05rem; font-weight:700;">📊 สรุปคะแนนเฉลี่ยรวม (${completed.length} ท่าน)</span>
-            <span style="font-size:1.4rem; font-weight:800; color:#ffd166;">${avg.toFixed(2)} <small style="font-size:0.9rem; font-weight:400; color:#fff;">/ 100 คะแนน</small></span>
+            <span style="font-size:1.4rem; font-weight:800; color:#ffd166;">${avg.toFixed(2)} <small style="font-size:0.9rem; font-weight:400; color:#fff;">/ ${totalMax} คะแนน</small></span>
           </div>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px; margin-top:12px;">
-            ${MAIN_CATS.map(cat => `
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-top:12px;">
+            ${criteriaList.map(c => `
               <div style="background:rgba(255,255,255,0.12); padding:8px; border-radius:8px; text-align:center;">
-                <div style="font-size:0.75rem; color:rgba(255,255,255,0.85);">${cat.id}. ${esc(cat.name)}</div>
-                <div style="font-size:1.1rem; font-weight:700; color:#fff; margin-top:2px;">${(catAvgSums[cat.id] / completed.length).toFixed(2)} <span style="font-size:0.75rem; opacity:0.8;">/${cat.maxScore}</span></div>
+                <div style="font-size:0.75rem; color:rgba(255,255,255,0.85);">ข้อ ${esc(c.ItemNo)}: ${esc(c.CriteriaNameTH || c.CriteriaName).substring(0, 15)}</div>
+                <div style="font-size:1.1rem; font-weight:700; color:#fff; margin-top:2px;">${((critSums[c.CriteriaID] || 0) / completed.length).toFixed(2)} <span style="font-size:0.75rem; opacity:0.8;">/${c.MaxScore}</span></div>
               </div>
             `).join('')}
           </div>
@@ -2821,7 +2786,7 @@ async function openScoreSummary(wid){
     html += `</div>`;
     
     Swal.fire({
-      title: 'สรุปคะแนนประเมินผลงาน (เกณฑ์ 5 หัวข้อ 100 คะแนน)',
+      title: 'สรุปคะแนนประเมินผลงาน',
       html: html,
       width: 750,
       confirmButtonColor: '#006D70',
@@ -3334,7 +3299,88 @@ async function openReviewerForm(id){
     loadReviewers();
   } catch(e) { err(e); }
 }
-async function loadReviewConfig(forceRefresh = false){if($('#reviewConfig')?.children?.length && !forceRefresh) return;const d=await rpc('adminGetReviewConfig',TOKEN,CID);$('#reviewConfig').innerHTML='<h4>รอบประเมิน</h4>'+d.rounds.map(r=>`<div class="card" style="box-shadow:none"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | ${esc(r.Status)} | Reviewer ${r.MinReviewers}-${r.MaxReviewers}</div>`).join('')+'<h4>เกณฑ์คะแนน</h4>'+d.criteria.map(c=>`<div>${c.ItemNo}. ${esc(c.CriteriaNameTH)} (${c.MaxScore})</div>`).join('')}
+async function loadReviewConfig(forceRefresh = false){
+  if($('#reviewConfig')?.children?.length && !forceRefresh) return;
+  const d = await rpc('adminGetReviewConfig', TOKEN, CID);
+  const roundsHtml = '<h4>รอบประเมิน</h4>' + (d.rounds || []).map(r=>`<div class="card" style="box-shadow:none; padding:10px; margin-bottom:8px; border:1px solid #e2e8f0; border-radius:8px;"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | สถานะ: <span class="badge" style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px;">${esc(r.Status)}</span> | Reviewer ${r.MinReviewers}-${r.MaxReviewers} ท่าน</div>`).join('');
+  
+  const critList = d.criteria || [];
+  const researchCrit = critList.filter(c => String(c.CriteriaID||'').includes('RESEARCH') || String(c.WorkCategory||'').includes('RESEARCH') || String(c.WorkCategory||'').includes('INNOVATION'));
+  const cqiCrit = critList.filter(c => String(c.CriteriaID||'').includes('CQI') || String(c.WorkCategory||'').includes('CQI') || String(c.WorkCategory||'').includes('SERVICE') || String(c.WorkCategory||'').includes('PRIMARY'));
+  const otherCrit = critList.filter(c => !researchCrit.includes(c) && !cqiCrit.includes(c));
+  
+  const renderCritGroup = (title, badgeColor, items) => {
+    if (!items.length) return '';
+    const sum = items.reduce((acc, x) => acc + (Number(x.MaxScore) || 0), 0);
+    return `
+      <div style="margin-top:14px; border:1px solid #cbd5e1; border-radius:10px; padding:14px; background:#fff;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
+          <b style="color:${badgeColor}; font-size:0.95rem;">${title} (${items.length} ข้อ)</b>
+          <span style="font-weight:700; color:#006D70; background:#e8f4f9; padding:2px 10px; border-radius:999px; font-size:0.85rem;">เต็ม ${sum} คะแนน</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${items.map(c => `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:8px 10px; background:#f8fafc; border-radius:6px; font-size:0.88rem; gap:10px;">
+              <div>
+                <span style="font-weight:600; color:#1e293b;">ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH || c.CriteriaName)}</span>
+                ${c.DescriptionTH ? `<div style="font-size:0.8rem; color:#64748b; margin-top:2px;">${esc(c.DescriptionTH).substring(0, 100)}${String(c.DescriptionTH).length > 100 ? '...' : ''}</div>` : ''}
+              </div>
+              <span style="font-weight:700; color:#006D70; white-space:nowrap;">${c.MaxScore} คะแนน</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  };
+  
+  let critHtml = '<h4 style="margin-top:18px">เกณฑ์คะแนนประเมิน</h4>';
+  if (researchCrit.length > 0 || cqiCrit.length > 0) {
+    critHtml += renderCritGroup('🔬 เกณฑ์แบบที่ 1: ผลงานวิจัย / ผลงานนวัตกรรม', '#0369a1', researchCrit);
+    critHtml += renderCritGroup('🏥 เกณฑ์แบบที่ 2: ผลงาน CQI / Service Excellence / Primary Care', '#d97706', cqiCrit);
+    if (otherCrit.length > 0) critHtml += renderCritGroup('📋 เกณฑ์ทั่วไป / เกณฑ์เดิม', '#475569', otherCrit);
+  } else {
+    critHtml += renderCritGroup('📋 เกณฑ์คะแนนที่ใช้งานอยู่', '#006D70', critList);
+  }
+  
+  $('#reviewConfig').innerHTML = roundsHtml + critHtml;
+}
+
+async function setupCategoryCriteria() {
+  const confirm = await Swal.fire({
+    title: 'ตั้งค่าเกณฑ์คะแนนแยก 2 แบบ?',
+    html: `
+      <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+        ระบบจะทำการกำหนดเกณฑ์ประเมินคะแนนแยกตามประเภทผลงาน:
+        <ul style="margin:8px 0 8px 18px;">
+          <li><b>แบบที่ 1 (วิจัย / นวัตกรรม)</b>: 7 หัวข้อ รวม 100 คะแนน</li>
+          <li><b>แบบที่ 2 (CQI / Service Excellence / Primary Care)</b>: 6 หัวข้อ รวม 100 คะแนน</li>
+        </ul>
+        <span style="color:#166534; font-weight:600;">✓ คะแนนและผลงานเดิมที่กรรมการประเมินไปแล้วจะยังคงอยู่และไม่สูญหาย</span>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'ยืนยันตั้งค่าเกณฑ์คะแนน',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70'
+  });
+  if (!confirm.isConfirmed) return;
+  
+  show('กำลังตั้งค่าเกณฑ์คะแนน...');
+  try {
+    const res = await rpc('adminSetupCategoryScoringCriteria', TOKEN, CID);
+    hide();
+    await Swal.fire({
+      icon: 'success',
+      title: 'ตั้งค่าเกณฑ์คะแนนสำเร็จ',
+      text: res.message || 'บันทึกเกณฑ์คะแนนแยกประเภทเรียบร้อยแล้ว'
+    });
+    loadReviewConfig(true);
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
 
 function switchUploadTab(t){
   if(t==='local'){

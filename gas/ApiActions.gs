@@ -32,6 +32,7 @@ const API_ACTIONS = Object.freeze({
   adminSendDirectEmail: adminSendDirectEmail,
   adminSendIncompleteProfileEmails: adminSendIncompleteProfileEmails,
   adminSendMealPasses: adminSendMealPasses,
+  adminSetupCategoryScoringCriteria: adminSetupCategoryScoringCriteria,
   adminToggleReceiptStatus: adminToggleReceiptStatus,
   adminUpdateReceiptInfo: adminUpdateReceiptInfo,
   adminUpdateRegistrationStatus: adminUpdateRegistrationStatus,
