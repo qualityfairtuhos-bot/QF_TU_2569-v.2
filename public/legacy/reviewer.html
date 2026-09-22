@@ -561,26 +561,26 @@ function renderReview() {
           </div>
         </div>
 
-        <div class="card" style="background:#f8fafc; border:1px solid var(--line); border-radius:14px; margin-top:20px; padding:18px;">
-          <h3 style="margin:0 0 14px 0; color:var(--blue)">สรุปผลการประเมินภาพรวม</h3>
-          <div class="review-grid">
-            <div class="field" style="margin:0">
-              <label>ผลการประเมินภาพรวม (Decision) *</label>
-              <select name="Decision" required style="font-weight:600">
+        <div class="card" style="background:#f8fafc; border:1px solid var(--line); border-radius:14px; margin-top:20px; padding:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:14px;">
+            <h3 style="margin:0; color:var(--blue); font-size:1.1rem; font-weight:700;">สรุปผลการประเมินภาพรวม</h3>
+            <div class="field" style="margin:0; min-width:280px; flex:0 1 350px;">
+              <label style="display:block; font-weight:700; font-size:0.9rem; margin-bottom:4px; color:var(--ink);">ผลการประเมินภาพรวม (Decision) <span style="color:var(--red)">*</span></label>
+              <select name="Decision" required style="font-weight:600; width:100%; border:2px solid var(--teal); border-radius:10px; padding:9px 12px; background:#fff;">
                 <option value="">-- กรุณาเลือกผลการประเมิน --</option>
                 <option value="PASS" ${a.Decision === 'PASS' ? 'selected' : ''}>ผ่าน (PASS)</option>
                 <option value="REVISION" ${a.Decision === 'REVISION' ? 'selected' : ''}>แก้ไขปรับปรุง (REVISION)</option>
                 <option value="REJECT" ${a.Decision === 'REJECT' ? 'selected' : ''}>ไม่ผ่าน (REJECT)</option>
               </select>
             </div>
-            <div class="field" style="margin:0">
-              <label>ข้อเสนอแนะถึงผู้ส่งผลงาน (Recommendation to Author)</label>
-              <textarea name="RecommendationToAuthor" placeholder="ข้อความนี้จะแสดงให้ผู้ส่งผลงานเห็นเพื่อนำไปปรับปรุงผลงาน">${esc(a.RecommendationToAuthor || '')}</textarea>
-            </div>
           </div>
-          <div class="field" style="margin-top:12px">
-            <label>ความเห็นภายในถึงคณะกรรมการ (Internal Comment)</label>
-            <textarea name="InternalComment" placeholder="ข้อความนี้สำหรับคณะกรรมการวิชาการเท่านั้น (ผู้ส่งผลงานจะไม่เห็น)">${esc(a.InternalComment || '')}</textarea>
+          <div class="field" style="margin:0 0 16px 0; width:100%;">
+            <label style="display:block; font-weight:600; font-size:0.9rem; margin-bottom:6px; color:var(--ink);">ข้อเสนอแนะถึงผู้ส่งผลงาน (Recommendation to Author)</label>
+            <textarea name="RecommendationToAuthor" rows="4" style="width:100%; min-height:90px; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 14px; box-sizing:border-box; background:#ffffff; font-family:inherit; resize:vertical; line-height:1.5;" placeholder="ข้อความนี้จะแสดงให้ผู้ส่งผลงานเห็นเพื่อนำไปปรับปรุงผลงาน">${esc(a.RecommendationToAuthor || '')}</textarea>
+          </div>
+          <div class="field" style="margin:0; width:100%;">
+            <label style="display:block; font-weight:600; font-size:0.9rem; margin-bottom:6px; color:var(--ink);">ความเห็นภายในถึงคณะกรรมการ (Internal Comment)</label>
+            <textarea name="InternalComment" rows="6" style="width:100%; min-height:140px; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 14px; box-sizing:border-box; background:#ffffff; font-family:inherit; resize:vertical; line-height:1.5;" placeholder="ข้อความนี้สำหรับคณะกรรมการวิชาการเท่านั้น (ผู้ส่งผลงานจะไม่เห็น)">${esc(a.InternalComment || '')}</textarea>
           </div>
         </div>
 
