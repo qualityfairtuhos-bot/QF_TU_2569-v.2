@@ -366,48 +366,7 @@ function seedReviewRounds_(cid){
 }
 
 function seedScoringCriteria_(cid){
-  const round=findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1});
-  const roundId = round ? round.ReviewRoundID : '';
-  const rows=[
-    [1, 'กำหนดที่มาและความสำคัญของปัญหาชัดเจน', 'Clear background and problem significance', 'บทนำ/วัตถุประสงค์', 5, 100],
-    [2, 'ระบุวัตถุประสงค์อย่างชัดเจน', 'Clear statement of objectives', 'บทนำ/วัตถุประสงค์', 5, 100],
-    [3, 'ระบุขั้นตอนการดำเนินงานที่ชัดเจน', 'Clear operational procedures and workflow', 'วิธีดำเนินการ', 15, 100],
-    [4, 'รูปแบบการดำเนินงานสอดคล้องกับวัตถุประสงค์', 'Methodology aligned with objectives', 'วิธีดำเนินการ', 15, 100],
-    [5, 'การนำเสนอผลการศึกษาครบถ้วนชัดเจนและตรงตามวัตถุประสงค์', 'Comprehensive and clear study results aligned with objectives', 'ผลการศึกษา/ผลลัพธ์', 30, 100],
-    [6, 'การอภิปรายผล/บทเรียนที่ได้จากการวิเคราะห์ข้อมูลสมเหตุสมผลและน่าเชื่อถือ', 'Reasonable and credible discussion and lessons learned', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
-    [7, 'การสรุปผลสอดคล้องกับผลการศึกษา', 'Conclusions consistent with study findings', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
-    [8, 'การนำไปใช้แก้ปัญหา พัฒนาวิธีการ เทคนิค หรือเครื่องมือใหม่ ๆ ที่เป็นประโยชน์', 'Practical utilization for problem-solving or method development', 'การใช้ประโยชน์', 10, 100]
-  ];
-  rows.forEach(function(r){
-    const existing = findOne_('ScoringCriteria', { ConferenceID: cid, ItemNo: r[0] });
-    if (!existing) {
-      appendRecord_('ScoringCriteria', {
-        CriteriaID: nextId_('CRIT'),
-        ConferenceID: cid,
-        ReviewRoundID: roundId,
-        ItemNo: r[0],
-        CriteriaNameTH: r[1],
-        CriteriaNameEN: r[2],
-        DescriptionTH: r[3],
-        MaxScore: r[4],
-        WeightPercent: r[5],
-        RequiredComment: false,
-        Active: true,
-        SortOrder: r[0]
-      });
-    } else {
-      updateRecord_('ScoringCriteria', existing.__row, {
-        ReviewRoundID: roundId || existing.ReviewRoundID,
-        CriteriaNameTH: r[1],
-        CriteriaNameEN: r[2],
-        DescriptionTH: r[3],
-        MaxScore: r[4],
-        WeightPercent: r[5],
-        Active: true,
-        SortOrder: r[0]
-      });
-    }
-  });
+  return setupCategoryScoringCriteriaInternal_(cid);
 }
 
 function seedEmailTemplates_(cid){
@@ -4067,187 +4026,216 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
 function adminSetupCategoryScoringCriteria(token, conferenceId){
   return runSafely_('adminSetupCategoryScoringCriteria', function(){
     requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
-    const round = findOne_('ReviewRounds', { ConferenceID: conferenceId, RoundNo: 1 }) ||
-                  findOne_('ReviewRounds', { ConferenceID: conferenceId }) || {};
-    const roundId = round.ReviewRoundID || 'RR-2026-000001';
-    
-    // Group 1: วิจัย & นวัตกรรม (7 criteria, 100 points)
-    const researchInnovationCriteria = [
-      {
-        ItemNo: 1,
-        CriteriaNameTH: 'ชื่อเรื่อง',
-        CriteriaNameEN: 'Title',
-        DescriptionTH: 'ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
-        MaxScore: 5
-      },
-      {
-        ItemNo: 2,
-        CriteriaNameTH: 'บทคัดย่อ',
-        CriteriaNameEN: 'Abstract',
-        DescriptionTH: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
-        MaxScore: 15
-      },
-      {
-        ItemNo: 3,
-        CriteriaNameTH: 'บทนำ มีข้อมูลภูมิหลังที่ชัดเจน',
-        CriteriaNameEN: 'Introduction / Background',
-        DescriptionTH: 'ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุวัตถุประสงค์ของการวิจัยที่ชัดเจน',
-        MaxScore: 10
-      },
-      {
-        ItemNo: 4,
-        CriteriaNameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
-        CriteriaNameEN: 'Methodology / Innovation Development',
-        DescriptionTH: 'ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
-        MaxScore: 20
-      },
-      {
-        ItemNo: 5,
-        CriteriaNameTH: 'ผลการวิจัย/ผลการศึกษาสอดคล้องกับวัตถุประสงค์',
-        CriteriaNameEN: 'Results aligned with objectives',
-        DescriptionTH: 'นำเสนอผลการวิจัย/ ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้',
-        MaxScore: 20
-      },
-      {
-        ItemNo: 6,
-        CriteriaNameTH: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
-        CriteriaNameEN: 'Discussion and Recommendations',
-        DescriptionTH: 'มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัย',
-        MaxScore: 20
-      },
-      {
-        ItemNo: 7,
-        CriteriaNameTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
-        CriteriaNameEN: 'Utilization for quality & safety',
-        DescriptionTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
-        MaxScore: 10
-      }
-    ];
-
-    // Group 2: Service Excellence, CQI, Primary Care (6 criteria, 100 points)
-    const cqiServicePrimaryCriteria = [
-      {
-        ItemNo: 1,
-        CriteriaNameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
-        CriteriaNameEN: 'Situation / Problem review',
-        DescriptionTH: '• มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร (5 คะแนน)\n• มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร (5 คะแนน)',
-        MaxScore: 10
-      },
-      {
-        ItemNo: 2,
-        CriteriaNameTH: 'มีเป้าหมายที่ชัดเจน',
-        CriteriaNameEN: 'Clear objectives & targets',
-        DescriptionTH: '• มีการระบุเป้าหมายที่สอดคล้องกับปัญหา (5 คะแนน)\n• มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร (5 คะแนน)',
-        MaxScore: 10
-      },
-      {
-        ItemNo: 3,
-        CriteriaNameTH: 'กิจกรรมการพัฒนา',
-        CriteriaNameEN: 'Improvement activities & changes',
-        DescriptionTH: '• มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง (10 คะแนน)\n• มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง (20 คะแนน)',
-        MaxScore: 30
-      },
-      {
-        ItemNo: 4,
-        CriteriaNameTH: 'การประเมินผลการเปลี่ยนแปลง',
-        CriteriaNameEN: 'Evaluation of change',
-        DescriptionTH: '• มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ (10 คะแนน)\n• มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด (15 คะแนน)',
-        MaxScore: 25
-      },
-      {
-        ItemNo: 5,
-        CriteriaNameTH: 'บทเรียนที่ได้รับ',
-        CriteriaNameEN: 'Lessons learned',
-        DescriptionTH: '• มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ (10 คะแนน)\n• มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น (10 คะแนน)',
-        MaxScore: 20
-      },
-      {
-        ItemNo: 6,
-        CriteriaNameTH: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
-        CriteriaNameEN: 'Completeness & formatting',
-        DescriptionTH: '• ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ (2.5 คะแนน)\n• การเรียบเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด (2.5 คะแนน)',
-        MaxScore: 5
-      }
-    ];
-
-    let created = 0, updated = 0;
-    
-    // Add/Update Group 1: RESEARCH,INNOVATION
-    researchInnovationCriteria.forEach(function(item){
-      const existing = findOne_('ScoringCriteria', {
-        ConferenceID: conferenceId,
-        ReviewRoundID: roundId,
-        CategoryID: 'RESEARCH,INNOVATION',
-        ItemNo: item.ItemNo
-      });
-      const patch = {
-        ReviewRoundID: roundId,
-        CategoryID: 'RESEARCH,INNOVATION',
-        PresentationTypeID: '',
-        ItemNo: item.ItemNo,
-        CriteriaNameTH: item.CriteriaNameTH,
-        CriteriaNameEN: item.CriteriaNameEN,
-        DescriptionTH: item.DescriptionTH,
-        MaxScore: item.MaxScore,
-        WeightPercent: 100,
-        RequiredComment: false,
-        Active: true,
-        SortOrder: item.ItemNo
-      };
-      if (existing) {
-        updateRecord_('ScoringCriteria', existing.__row, patch);
-        updated++;
-      } else {
-        appendRecord_('ScoringCriteria', Object.assign({
-          CriteriaID: nextId_('CRIT'),
-          ConferenceID: conferenceId
-        }, patch));
-        created++;
-      }
-    });
-
-    // Add/Update Group 2: SERVICE,CQI,PRIMARY
-    cqiServicePrimaryCriteria.forEach(function(item){
-      const existing = findOne_('ScoringCriteria', {
-        ConferenceID: conferenceId,
-        ReviewRoundID: roundId,
-        CategoryID: 'SERVICE,CQI,PRIMARY',
-        ItemNo: item.ItemNo
-      });
-      const patch = {
-        ReviewRoundID: roundId,
-        CategoryID: 'SERVICE,CQI,PRIMARY',
-        PresentationTypeID: '',
-        ItemNo: item.ItemNo,
-        CriteriaNameTH: item.CriteriaNameTH,
-        CriteriaNameEN: item.CriteriaNameEN,
-        DescriptionTH: item.DescriptionTH,
-        MaxScore: item.MaxScore,
-        WeightPercent: 100,
-        RequiredComment: false,
-        Active: true,
-        SortOrder: item.ItemNo
-      };
-      if (existing) {
-        updateRecord_('ScoringCriteria', existing.__row, patch);
-        updated++;
-      } else {
-        appendRecord_('ScoringCriteria', Object.assign({
-          CriteriaID: nextId_('CRIT'),
-          ConferenceID: conferenceId
-        }, patch));
-        created++;
-      }
-    });
-
-    return {
-      success: true,
-      roundId: roundId,
-      created: created,
-      updated: updated,
-      message: 'ปรับปรุงเกณฑ์คะแนน 2 ชุด (วิจัย/นวัตกรรม 7 ข้อ และ CQI/Service/Primary 6 ข้อ) เรียบร้อยแล้ว โดยยังคงข้อมูลคะแนนเดิมในระบบอย่างปลอดภัย'
-    };
+    return setupCategoryScoringCriteriaInternal_(conferenceId);
   });
+}
+
+/**
+ * ฟังก์ชันสำหรับกด Run ใน Google Apps Script Editor ได้โดยตรงทันที
+ * เพื่อปรับปรุงข้อมูลเกณฑ์การให้คะแนนลงใน Google Sheet (แผ่นงาน ScoringCriteria)
+ */
+function runSetupScoringCriteriaInSheet(){
+  const conf = findOne_('Conferences', {}) || {};
+  const cid = conf.ConferenceID || APP.DEFAULT_CONFERENCE_ID || 'CONF-TUH-QF-2569';
+  Logger.log('>>> เริ่มต้นปรับปรุงเกณฑ์การให้คะแนนใน Google Sheet สำหรับการประชุม: ' + cid);
+  const result = setupCategoryScoringCriteriaInternal_(cid);
+  Logger.log('==================================================');
+  Logger.log(' ผลการปรับปรุงแผ่นงาน ScoringCriteria ใน Google Sheet');
+  Logger.log('==================================================');
+  Logger.log('สถานะ: สำเร็จ (Success)');
+  Logger.log('รอบประเมิน (ReviewRoundID): ' + result.roundId);
+  Logger.log('เพิ่มเกณฑ์ใหม่: ' + result.created + ' รายการ');
+  Logger.log('อัปเดตเกณฑ์เดิม: ' + result.updated + ' รายการ');
+  Logger.log('ข้อความ: ' + result.message);
+  Logger.log('==================================================');
+  return result;
+}
+
+function setupScoringCriteria(){
+  return runSetupScoringCriteriaInSheet();
+}
+
+function setupCategoryScoringCriteriaInternal_(conferenceId){
+  const round = findOne_('ReviewRounds', { ConferenceID: conferenceId, RoundNo: 1 }) ||
+                findOne_('ReviewRounds', { ConferenceID: conferenceId }) || {};
+  const roundId = round.ReviewRoundID || 'RR-2026-000001';
+  
+  // Group 1: วิจัย & นวัตกรรม (7 criteria, 100 points)
+  const researchInnovationCriteria = [
+    {
+      ItemNo: 1,
+      CriteriaNameTH: 'ชื่อเรื่อง',
+      CriteriaNameEN: 'Title',
+      DescriptionTH: 'ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
+      MaxScore: 5
+    },
+    {
+      ItemNo: 2,
+      CriteriaNameTH: 'บทคัดย่อ',
+      CriteriaNameEN: 'Abstract',
+      DescriptionTH: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
+      MaxScore: 15
+    },
+    {
+      ItemNo: 3,
+      CriteriaNameTH: 'บทนำ มีข้อมูลภูมิหลังที่ชัดเจน',
+      CriteriaNameEN: 'Introduction / Background',
+      DescriptionTH: 'ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุวัตถุประสงค์ของการวิจัยที่ชัดเจน',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 4,
+      CriteriaNameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
+      CriteriaNameEN: 'Methodology / Innovation Development',
+      DescriptionTH: 'ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 5,
+      CriteriaNameTH: 'ผลการวิจัย/ผลการศึกษาสอดคล้องกับวัตถุประสงค์',
+      CriteriaNameEN: 'Results aligned with objectives',
+      DescriptionTH: 'นำเสนอผลการวิจัย/ ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 6,
+      CriteriaNameTH: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
+      CriteriaNameEN: 'Discussion and Recommendations',
+      DescriptionTH: 'มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัย',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 7,
+      CriteriaNameTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
+      CriteriaNameEN: 'Utilization for quality & safety',
+      DescriptionTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
+      MaxScore: 10
+    }
+  ];
+
+  // Group 2: Service Excellence, CQI, Primary Care (6 criteria, 100 points)
+  const cqiServicePrimaryCriteria = [
+    {
+      ItemNo: 1,
+      CriteriaNameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
+      CriteriaNameEN: 'Situation / Problem review',
+      DescriptionTH: '• มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร (5 คะแนน)\n• มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร (5 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 2,
+      CriteriaNameTH: 'มีเป้าหมายที่ชัดเจน',
+      CriteriaNameEN: 'Clear objectives & targets',
+      DescriptionTH: '• มีการระบุเป้าหมายที่สอดคล้องกับปัญหา (5 คะแนน)\n• มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร (5 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 3,
+      CriteriaNameTH: 'กิจกรรมการพัฒนา',
+      CriteriaNameEN: 'Improvement activities & changes',
+      DescriptionTH: '• มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง (10 คะแนน)\n• มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง (20 คะแนน)',
+      MaxScore: 30
+    },
+    {
+      ItemNo: 4,
+      CriteriaNameTH: 'การประเมินผลการเปลี่ยนแปลง',
+      CriteriaNameEN: 'Evaluation of change',
+      DescriptionTH: '• มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ (10 คะแนน)\n• มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด (15 คะแนน)',
+      MaxScore: 25
+    },
+    {
+      ItemNo: 5,
+      CriteriaNameTH: 'บทเรียนที่ได้รับ',
+      CriteriaNameEN: 'Lessons learned',
+      DescriptionTH: '• มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ (10 คะแนน)\n• มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น (10 คะแนน)',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 6,
+      CriteriaNameTH: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
+      CriteriaNameEN: 'Completeness & formatting',
+      DescriptionTH: '• ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ (2.5 คะแนน)\n• การเรียบเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด (2.5 คะแนน)',
+      MaxScore: 5
+    }
+  ];
+
+  let created = 0, updated = 0;
+  
+  // Add/Update Group 1: RESEARCH,INNOVATION
+  researchInnovationCriteria.forEach(function(item){
+    const existing = findOne_('ScoringCriteria', {
+      ConferenceID: conferenceId,
+      ReviewRoundID: roundId,
+      CategoryID: 'RESEARCH,INNOVATION',
+      ItemNo: item.ItemNo
+    });
+    const patch = {
+      ReviewRoundID: roundId,
+      CategoryID: 'RESEARCH,INNOVATION',
+      PresentationTypeID: '',
+      ItemNo: item.ItemNo,
+      CriteriaNameTH: item.CriteriaNameTH,
+      CriteriaNameEN: item.CriteriaNameEN,
+      DescriptionTH: item.DescriptionTH,
+      MaxScore: item.MaxScore,
+      WeightPercent: 100,
+      RequiredComment: false,
+      Active: true,
+      SortOrder: item.ItemNo
+    };
+    if (existing) {
+      updateRecord_('ScoringCriteria', existing.__row, patch);
+      updated++;
+    } else {
+      appendRecord_('ScoringCriteria', Object.assign({
+        CriteriaID: nextId_('CRIT'),
+        ConferenceID: conferenceId
+      }, patch));
+      created++;
+    }
+  });
+
+  // Add/Update Group 2: SERVICE,CQI,PRIMARY
+  cqiServicePrimaryCriteria.forEach(function(item){
+    const existing = findOne_('ScoringCriteria', {
+      ConferenceID: conferenceId,
+      ReviewRoundID: roundId,
+      CategoryID: 'SERVICE,CQI,PRIMARY',
+      ItemNo: item.ItemNo
+    });
+    const patch = {
+      ReviewRoundID: roundId,
+      CategoryID: 'SERVICE,CQI,PRIMARY',
+      PresentationTypeID: '',
+      ItemNo: item.ItemNo,
+      CriteriaNameTH: item.CriteriaNameTH,
+      CriteriaNameEN: item.CriteriaNameEN,
+      DescriptionTH: item.DescriptionTH,
+      MaxScore: item.MaxScore,
+      WeightPercent: 100,
+      RequiredComment: false,
+      Active: true,
+      SortOrder: item.ItemNo
+    };
+    if (existing) {
+      updateRecord_('ScoringCriteria', existing.__row, patch);
+      updated++;
+    } else {
+      appendRecord_('ScoringCriteria', Object.assign({
+        CriteriaID: nextId_('CRIT'),
+        ConferenceID: conferenceId
+      }, patch));
+      created++;
+    }
+  });
+
+  return {
+    success: true,
+    roundId: roundId,
+    created: created,
+    updated: updated,
+    message: 'ปรับปรุงเกณฑ์คะแนน 2 ชุด (วิจัย/นวัตกรรม 7 ข้อ และ CQI/Service/Primary 6 ข้อ) เรียบร้อยแล้ว โดยยังคงข้อมูลคะแนนเดิมในระบบอย่างปลอดภัย'
+  };
 }
 
 function ensureMealEntitlements_(conferenceId,regId){
