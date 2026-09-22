@@ -27,6 +27,9 @@ const API_ACTIONS = Object.freeze({
   adminPreviewMealPass: adminPreviewMealPass,
   adminResendReviewerCreds: adminResendReviewerCreds,
   adminSaveRegistration: adminSaveRegistration,
+  adminSaveRegistrationType: adminSaveRegistrationType,
+  adminSaveReviewRound: adminSaveReviewRound,
+  adminSaveScoringCriterion: adminSaveScoringCriterion,
   adminSearchDriveFiles: adminSearchDriveFiles,
   adminSendBatchImportEmails: adminSendBatchImportEmails,
   adminSendDirectEmail: adminSendDirectEmail,
@@ -77,7 +80,9 @@ const API_ACTIONS = Object.freeze({
 
 const API_WRITE_ACTIONS = Object.freeze({
   adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminDeleteFinanceDocument:1, adminDeleteReviewer:1, adminDeleteWork:1, adminDeleteWorkFile:1,
-  adminImportFromGoogleSheet:1, adminResendReviewerCreds:1, adminSaveRegistration:1, adminSendBatchImportEmails:1, adminSendDirectEmail:1,
+  adminImportFromGoogleSheet:1, adminResendReviewerCreds:1, adminSaveRegistration:1,
+  adminSaveRegistrationType:1, adminSaveReviewRound:1, adminSaveScoringCriterion:1, adminSetupCategoryScoringCriteria:1,
+  adminSendBatchImportEmails:1, adminSendDirectEmail:1,
   adminSendIncompleteProfileEmails:1, adminSendMealPasses:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1, adminUpdateRegistrationStatus:1,
   adminUpdateReviewer:1, adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadBanner:1, adminUploadFinanceDocument:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, commitImportBatch:1, confirmEventScanner:1,

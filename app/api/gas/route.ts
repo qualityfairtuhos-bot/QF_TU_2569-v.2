@@ -101,6 +101,11 @@ memoryCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', { data: preseededBoot
 memoryCache.set('getPublicBootstrap:[]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
 
 function getCacheKey(action:string,args:unknown[]){
+  if(action.startsWith("reviewer") && args.length>0){
+    const tokenPart = typeof args[0] === "string" ? args[0].slice(0, 24) : "__REV__";
+    const userArgs = [tokenPart, ...args.slice(1)];
+    return `${action}:${JSON.stringify(userArgs)}`;
+  }
   if(SESSION_ACTIONS.has(action)&&args.length>0){
     const sessionlessArgs=["__SESSION__",...args.slice(1)];
     return `${action}:${JSON.stringify(sessionlessArgs)}`;
@@ -175,8 +180,7 @@ async function callGas(payload:RpcRequest&{secret:string},attempts:number){
       if(attempt>0){
         await new Promise((r)=>setTimeout(r,attempt*600));
       }
-      const isAuthOrBoot = /login|Bootstrap|Dashboard|getPublic|verify/i.test(payload.action);
-      const timeoutMs = isAuthOrBoot ? 35_000 : Math.min(GAS_TIMEOUT_MS, 50_000);
+      const timeoutMs = Math.max(GAS_TIMEOUT_MS, 90_000);
       const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
       try{
         const currentPayload = attempt > 0 ? { ...payload, requestId: `${payload.requestId || randomUUID()}_r${attempt}` } : payload;
