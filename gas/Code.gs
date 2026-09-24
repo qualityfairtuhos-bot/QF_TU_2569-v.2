@@ -4272,6 +4272,28 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
     if (c.CategoryCode) catMap[c.CategoryCode] = c.CategoryNameTH || c.CategoryNameEN;
   });
 
+  function canonicalCategoryName_(rawName, catId, catCode) {
+    const allText = [String(rawName || ''), String(catId || ''), String(catCode || '')].join(' ').toUpperCase();
+    if (/SERVICE|CAT-SERVICE|CAT-3|บริการ/i.test(allText) && !/CQI|BEST\s*PRACTICE/i.test(allText)) {
+      return 'Service Excellence';
+    }
+    if (/CQI|BEST\s*PRACTICE|CAT-CQI|CAT-4/i.test(allText)) {
+      return 'CQI / Best Practice';
+    }
+    if (/RESEARCH|วิจัย|R2R|CAT-RESEARCH|CAT-1/i.test(allText)) {
+      return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+    }
+    if (/INNOVAT|นวัตกรรม|สิ่งประดิษฐ์|CAT-INNOVAT|CAT-2/i.test(allText)) {
+      return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+    }
+    if (/PRIMARY|ปฐมภูมิ|COMMUNITY|CAT-PRIMARY|CAT-5/i.test(allText)) {
+      return 'Primary Care & Community Network Development';
+    }
+    const s = String(rawName || '').trim();
+    if (s && !/^CAT-/i.test(s) && s !== 'ผลงานทั่วไป') return s;
+    return s || 'ผลงานทั่วไป';
+  }
+
   assignments.forEach(function(a){
     const w = workMap[a.WorkID];
     if (w) {
@@ -4281,9 +4303,10 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
       a.WorkCode = a.WorkCode || w.WorkCode || w.WorkID;
       a.CategoryID = w.CategoryID || a.CategoryID || '';
       a.CategoryCode = w.CategoryCode || a.CategoryCode || '';
-      a.CategoryName = w.CategoryName || catMap[w.CategoryID] || catMap[w.CategoryCode] || a.CategoryName || 'ผลงานทั่วไป';
+      const rawCat = w.CategoryName || catMap[w.CategoryID] || catMap[w.CategoryCode] || a.CategoryName || w.CategoryID || w.CategoryCode || '';
+      a.CategoryName = canonicalCategoryName_(rawCat, a.CategoryID, a.CategoryCode);
     } else {
-      a.CategoryName = a.CategoryName || 'ผลงานทั่วไป';
+      a.CategoryName = canonicalCategoryName_(a.CategoryName, a.CategoryID, a.CategoryCode);
     }
     a.AssignedAt = a.AssignedAt || a.CreatedAt || '';
   });
