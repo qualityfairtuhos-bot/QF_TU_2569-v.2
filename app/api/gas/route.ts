@@ -23,6 +23,8 @@ const CACHE_TTLS:Record<string,number>={
   adminListPayments: 180_000,
   adminListWorks: 180_000,
   adminListReviewers: 300_000,
+  adminGetReviewerEvaluationReport: 180_000,
+  adminGetWorkScoreSummary: 180_000,
   adminListUsers: 300_000,
   adminListMealPasses: 180_000,
   adminListFinanceDocuments: 300_000,
