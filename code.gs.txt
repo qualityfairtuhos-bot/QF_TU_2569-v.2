@@ -1383,7 +1383,7 @@ function cacheSessionContext_(tokenHash,ctx){
   try{CacheService.getScriptCache().put(sessionCacheKey_(tokenHash),safeJson_({session:serialize_(ctx.session),user:serialize_(ctx.user),role:ctx.role,conferenceId:ctx.conferenceId}),Math.min(num_(APP.SESSION_CACHE_SECONDS,300),21600));}catch(ignore){}
 }
 function clearSessionCache_(tokenHash){try{CacheService.getScriptCache().remove(sessionCacheKey_(tokenHash));}catch(ignore){}}
-function loginUser(username,password,conferenceId,clientInfo){
+function loginUser(username,password,conferenceId,clientInfo,options){
   return runSafely_('loginUser',function(){
     const u=normalizeEmail_(username), users=getRecords_('Users'), user=users.find(function(x){return normalizeEmail_(x.Username)===u||normalizeEmail_(x.Email)===u;});
     if(!user||hashPassword_(password,user.Salt)!==String(user.PasswordHash))throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
@@ -1398,7 +1398,7 @@ function loginUser(username,password,conferenceId,clientInfo){
     cacheSessionContext_(tokenHash,{session:sessionRec,user:user,role:resolvedRole,conferenceId:cid});
     const conf = findOne_('Conferences', {ConferenceID: cid});
     const settings = settingsMap_(cid);
-    return {
+    const result = {
       token: token,
       conferenceId: cid,
       role: resolvedRole,
@@ -1407,6 +1407,14 @@ function loginUser(username,password,conferenceId,clientInfo){
       settings: settings,
       optionConfig: getRegistrationOptionMap_(cid)
     };
+
+    const opt = options && typeof options === 'object' ? options : {};
+    if (opt.portal === 'reviewer' || resolvedRole === 'REVIEWER') {
+      try {
+        result.reviewerBoot = reviewerBootstrapInternal_(user, resolvedRole, cid);
+      } catch(e) {}
+    }
+    return result;
   });
 }
 function requireSession_(token,roles,conferenceId){
@@ -4137,135 +4145,147 @@ function adminAssignReviewers(token,conferenceId,workId,reviewRoundId,reviewerId
   return runSafely_('adminAssignReviewers',function(){const ctx=requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId),w=findOne_('Works',{ConferenceID:conferenceId,WorkID:workId}),round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:reviewRoundId});if(!w||!round)throw new Error('ไม่พบผลงานหรือรอบประเมิน');if(['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว');let created=0,skipped=[];(reviewerIds||[]).forEach(function(rid){const rev=findOne_('Reviewers',{ReviewerID:rid}),pool=findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});if(!rev||!pool||upper_(pool.Status)!=='ACTIVE'){skipped.push({ReviewerID:rid,reason:'Reviewer inactive'});return;}if(findOne_('ReviewAssignments',{ConferenceID:conferenceId,ReviewRoundID:reviewRoundId,WorkID:workId,ReviewerID:rid})){skipped.push({ReviewerID:rid,reason:'Already assigned'});return;}if(num_(pool.CurrentAssignedCount)>=num_(pool.MaxWorkload,10)){skipped.push({ReviewerID:rid,reason:'Workload full'});return;}const aid=nextId_('ASN');appendRecord_('ReviewAssignments',{AssignmentID:aid,ConferenceID:conferenceId,ReviewRoundID:reviewRoundId,WorkID:workId,WorkCode:w.WorkCode,ReviewerID:rid,ReviewerName:rev.FullName,ReviewerEmail:rev.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',Locked:false,UpdatedAt:new Date()});updateRecord_('ReviewerPool',pool.__row,{CurrentAssignedCount:num_(pool.CurrentAssignedCount)+1});sendReviewAssignmentEmail_(conferenceId,w,rev,aid);created++;});if(created)updateRecord_('Works',w.__row,{Status:'UNDER_REVIEW',UpdatedAt:new Date()});return {created:created,skipped:skipped};});
 }
 function sendReviewAssignmentEmail_(cid,w,rev,assignmentId){const portal=buildWebAppRouteUrl_('reviewer',cid);sendEmailLogged_(cid,rev.Email,'แจ้งมอบหมายประเมินผลงาน '+w.WorkCode,'<p>เรียน '+rev.FullName+'</p><p>ท่านได้รับมอบหมายให้ประเมินผลงาน <b>'+w.WorkCode+'</b></p><p><a href="'+portal+'">เข้าสู่ระบบ Reviewer</a></p>','ASSIGNMENT',assignmentId,null);}
-function reviewerBootstrap(token,conferenceId){
-  return runSafely_('reviewerBootstrap',function(){
-    const ctx=requireSession_(token,['REVIEWER','SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
-    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
-    
-    // Find reviewer ID with resilient multi-step resolution
-    const role=findOne_('UserConferenceRoles',{ConferenceID:cid,UserID:ctx.user.UserID,Role:'REVIEWER'}) ||
-               findOne_('UserConferenceRoles',{ConferenceID:cid,UserID:ctx.user.UserID});
-    const perm=jsonParse_(role&&role.PermissionsJson,'{}');
-    let reviewerId=perm.ReviewerID;
-    
-    let reviewer = null;
-    if (reviewerId) {
-      reviewer = findOne_('Reviewers', {ReviewerID: reviewerId});
+function reviewerBootstrapInternal_(user, userRole, cid) {
+  const earlyCacheKey = 'REV_BOOT_' + cid + '_' + (user.UserID || user.Email);
+  try {
+    const cached = cacheGetLarge_(earlyCacheKey);
+    if (cached) return cached;
+  } catch(e) {}
+
+  // Find reviewer ID with resilient multi-step resolution
+  const role = findOne_('UserConferenceRoles', {ConferenceID: cid, UserID: user.UserID, Role: 'REVIEWER'}) ||
+               findOne_('UserConferenceRoles', {ConferenceID: cid, UserID: user.UserID});
+  const perm = jsonParse_(role && role.PermissionsJson, '{}');
+  let reviewerId = perm.ReviewerID;
+  
+  let reviewer = null;
+  if (reviewerId) {
+    reviewer = findOne_('Reviewers', {ReviewerID: reviewerId});
+  }
+  if (!reviewer && user.Email) {
+    const email = normalizeEmail_(user.Email);
+    reviewer = findOne_('Reviewers', {Email: email}) ||
+               getRecords_('Reviewers').find(function(r){ return normalizeEmail_(r.Email) === email; });
+    if (reviewer) {
+      reviewerId = reviewer.ReviewerID;
     }
-    if (!reviewer && ctx.user.Email) {
-      const email = normalizeEmail_(ctx.user.Email);
-      reviewer = findOne_('Reviewers', {Email: email}) ||
-                 getRecords_('Reviewers').find(function(r){ return normalizeEmail_(r.Email) === email; });
-      if (reviewer) {
-        reviewerId = reviewer.ReviewerID;
-      }
-    }
-    if (!reviewer && ctx.user.UserID) {
-      reviewer = findOne_('Reviewers', {UserID: ctx.user.UserID});
-      if (reviewer) reviewerId = reviewer.ReviewerID;
-    }
-    
-    // Auto-provision Reviewer record if missing so user is never locked out
-    if (!reviewer) {
-      reviewerId = nextId_('REV');
-      reviewer = {
+  }
+  if (!reviewer && user.UserID) {
+    reviewer = findOne_('Reviewers', {UserID: user.UserID});
+    if (reviewer) reviewerId = reviewer.ReviewerID;
+  }
+  
+  // Auto-provision Reviewer record if missing so user is never locked out
+  if (!reviewer) {
+    reviewerId = nextId_('REV');
+    reviewer = {
+      ReviewerID: reviewerId,
+      Prefix: user.Prefix || '',
+      FirstName: user.FirstName || '',
+      LastName: user.LastName || '',
+      FullName: user.FullName || [user.Prefix, user.FirstName, user.LastName].filter(Boolean).join(' ') || user.Username,
+      Email: normalizeEmail_(user.Email),
+      Phone: user.Phone || '',
+      Institution: user.Organization || '',
+      Status: 'ACTIVE',
+      CreatedAt: new Date(),
+      UpdatedAt: new Date()
+    };
+    try { appendRecord_('Reviewers', reviewer); } catch(e) {}
+    try {
+      appendRecord_('ReviewerPool', {
+        PoolID: nextId_('POOL'),
+        ConferenceID: cid,
         ReviewerID: reviewerId,
-        Prefix: ctx.user.Prefix || '',
-        FirstName: ctx.user.FirstName || '',
-        LastName: ctx.user.LastName || '',
-        FullName: ctx.user.FullName || [ctx.user.Prefix, ctx.user.FirstName, ctx.user.LastName].filter(Boolean).join(' ') || ctx.user.Username,
-        Email: normalizeEmail_(ctx.user.Email),
-        Phone: ctx.user.Phone || '',
-        Institution: ctx.user.Organization || '',
+        MaxWorkload: 10,
+        CurrentAssignedCount: 0,
         Status: 'ACTIVE',
-        CreatedAt: new Date(),
-        UpdatedAt: new Date()
-      };
-      try { appendRecord_('Reviewers', reviewer); } catch(e) {}
-      try {
-        appendRecord_('ReviewerPool', {
-          PoolID: nextId_('POOL'),
+        AssignedAt: new Date(),
+        AssignedBy: 'SYSTEM'
+      });
+    } catch(e) {}
+  }
+
+  if (!role || !perm.ReviewerID) {
+    try {
+      if (!role) {
+        appendRecord_('UserConferenceRoles', {
+          UserConferenceRoleID: nextId_('UCR'),
           ConferenceID: cid,
-          ReviewerID: reviewerId,
-          MaxWorkload: 10,
-          CurrentAssignedCount: 0,
+          UserID: user.UserID,
+          Role: 'REVIEWER',
+          PermissionsJson: safeJson_({ReviewerID: reviewerId}),
           Status: 'ACTIVE',
           AssignedAt: new Date(),
           AssignedBy: 'SYSTEM'
         });
-      } catch(e) {}
-    }
-
-    if (!role || !perm.ReviewerID) {
-      try {
-        if (!role) {
-          appendRecord_('UserConferenceRoles', {
-            UserConferenceRoleID: nextId_('UCR'),
-            ConferenceID: cid,
-            UserID: ctx.user.UserID,
-            Role: 'REVIEWER',
-            PermissionsJson: safeJson_({ReviewerID: reviewerId}),
-            Status: 'ACTIVE',
-            AssignedAt: new Date(),
-            AssignedBy: 'SYSTEM'
-          });
-        } else {
-          perm.ReviewerID = reviewerId;
-          updateRecord_('UserConferenceRoles', role.__row, {
-            PermissionsJson: safeJson_(perm),
-            UpdatedAt: new Date()
-          });
-        }
-      } catch(e) {}
-    }
-
-    const cacheKey = 'REV_BOOT_' + cid + '_' + reviewerId;
-    try {
-      const cached = cacheGetLarge_(cacheKey);
-      if (cached) return cached;
-    } catch(e) {}
-
-    // Find assignments matching either reviewerId OR reviewerEmail
-    const userEmail = normalizeEmail_(ctx.user.Email);
-    const allAssignments = findMany_('ReviewAssignments', {ConferenceID: cid});
-    const assignments = allAssignments.filter(function(x) {
-      if (upper_(x.Status) === 'CANCELLED') return false;
-      const matchId = reviewerId && String(x.ReviewerID).trim() === String(reviewerId).trim();
-      const matchEmail = x.ReviewerEmail && normalizeEmail_(x.ReviewerEmail) === userEmail;
-      return matchId || matchEmail;
-    });
-
-    // Targeted lookup: only fetch the specific works needed for these assignments
-    const neededWorkIds = {};
-    assignments.forEach(function(a) { if (a.WorkID) neededWorkIds[a.WorkID] = true; });
-    
-    let worksList = [];
-    if (Object.keys(neededWorkIds).length > 0) {
-      const allWorks = getRecords_('Works');
-      worksList = allWorks.filter(function(w) { return !!neededWorkIds[w.WorkID]; });
-    }
-    const workMap = {};
-    worksList.forEach(function(w){ workMap[w.WorkID] = w; });
-
-    assignments.forEach(function(a){
-      const w = workMap[a.WorkID];
-      if (w) {
-        a.TitleTH = a.TitleTH || w.TitleTH || w.TitleEN || w.ThaiTitle || w.EnglishTitle;
-        a.WorkStatus = a.WorkStatus || w.Status;
-        a.WorkCode = a.WorkCode || w.WorkCode || w.WorkID;
+      } else {
+        perm.ReviewerID = reviewerId;
+        updateRecord_('UserConferenceRoles', role.__row, {
+          PermissionsJson: safeJson_(perm),
+          UpdatedAt: new Date()
+        });
       }
-      a.AssignedAt = a.AssignedAt || a.CreatedAt || '';
-    });
-
-    const bootData = {
-      reviewer: serialize_(reviewer),
-      assignments: serialize_(assignments),
-      conference: serialize_(findOne_('Conferences', {ConferenceID: cid}))
-    };
-    try {
-      cachePutLarge_(cacheKey, bootData, 180);
     } catch(e) {}
-    return bootData;
+  }
+
+  const reviewerCacheKey = 'REV_BOOT_' + cid + '_' + reviewerId;
+  try {
+    const cached = cacheGetLarge_(reviewerCacheKey);
+    if (cached) return cached;
+  } catch(e) {}
+
+  // Find assignments matching either reviewerId OR reviewerEmail
+  const userEmail = normalizeEmail_(user.Email);
+  const allAssignments = findMany_('ReviewAssignments', {ConferenceID: cid});
+  const assignments = allAssignments.filter(function(x) {
+    if (upper_(x.Status) === 'CANCELLED') return false;
+    const matchId = reviewerId && String(x.ReviewerID).trim() === String(reviewerId).trim();
+    const matchEmail = x.ReviewerEmail && normalizeEmail_(x.ReviewerEmail) === userEmail;
+    return matchId || matchEmail;
+  });
+
+  // Targeted lookup: only fetch the specific works needed for these assignments
+  const neededWorkIds = {};
+  assignments.forEach(function(a) { if (a.WorkID) neededWorkIds[a.WorkID] = true; });
+  
+  let worksList = [];
+  if (Object.keys(neededWorkIds).length > 0) {
+    const allWorks = getRecords_('Works');
+    worksList = allWorks.filter(function(w) { return !!neededWorkIds[w.WorkID]; });
+  }
+  const workMap = {};
+  worksList.forEach(function(w){ workMap[w.WorkID] = w; });
+
+  assignments.forEach(function(a){
+    const w = workMap[a.WorkID];
+    if (w) {
+      a.TitleTH = a.TitleTH || w.TitleTH || w.TitleEN || w.ThaiTitle || w.EnglishTitle;
+      a.WorkStatus = a.WorkStatus || w.Status;
+      a.WorkCode = a.WorkCode || w.WorkCode || w.WorkID;
+    }
+    a.AssignedAt = a.AssignedAt || a.CreatedAt || '';
+  });
+
+  const bootData = {
+    reviewer: serialize_(reviewer),
+    assignments: serialize_(assignments),
+    conference: serialize_(findOne_('Conferences', {ConferenceID: cid}))
+  };
+  try {
+    cachePutLarge_(earlyCacheKey, bootData, 180);
+    if (reviewerId) {
+      cachePutLarge_(reviewerCacheKey, bootData, 180);
+    }
+  } catch(e) {}
+  return bootData;
+}
+
+function reviewerBootstrap(token,conferenceId){
+  return runSafely_('reviewerBootstrap',function(){
+    const ctx=requireSession_(token,['REVIEWER','SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    return reviewerBootstrapInternal_(ctx.user, ctx.role, cid);
   });
 }
 function resolveWorkCategoryInfo_(work) {

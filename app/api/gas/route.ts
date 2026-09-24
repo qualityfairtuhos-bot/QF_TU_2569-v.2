@@ -289,6 +289,14 @@ export async function POST(request:NextRequest){
       const data={...(result.data as Record<string,unknown>)};
       const token=typeof data.token==="string"?data.token:"";
       if(!token)return failure("Backend ไม่ได้คืน Session ที่ถูกต้อง","INVALID_SESSION",502,requestId);
+      if(data.reviewerBoot && typeof data.reviewerBoot === "object"){
+        const cid = typeof data.conferenceId === "string" ? data.conferenceId : "CONF-TUH-QF-2569";
+        const revResponse: ApiResponse<unknown> = { success: true, data: data.reviewerBoot };
+        setCachedResponse("reviewerBootstrap", [token, cid], revResponse);
+        setCachedResponse("reviewerBootstrap", ["__COOKIE__", cid], revResponse);
+        setCachedResponse("reviewerBootstrap", [token], revResponse);
+        setCachedResponse("reviewerBootstrap", ["__COOKIE__"], revResponse);
+      }
       const response=NextResponse.json({...result,data});
       setSessionCookie(response,token);
       return response;
