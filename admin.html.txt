@@ -214,13 +214,24 @@
         <div class="actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between">
           <h3 style="margin:0">จัดการผลงานวิชาการ</h3>
           <div style="display:flex; gap:10px">
-            <button class="btn btn-blue" onclick="openAssignReviewerModal()"><i class="fa-solid fa-users-gear"></i> Assign ตามสาขา</button>
+            <button class="btn btn-blue" onclick="openAssignByCategoryModal()"><i class="fa-solid fa-users-gear"></i> Assign ตามสาขา</button>
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
           <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="renderWorksTable()">
-          <select id="workPresentationType" class="field" style="width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
+          <select id="workCategory" class="field" style="width:230px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
+            <option value="">ทุกประเภทผลงาน</option>
+            <option value="Service Excellence">Service Excellence</option>
+            <option value="CQI/ Best Practice">CQI/ Best Practice</option>
+            <option value="Primary Care & Community Network Development">Primary Care & Community Network</option>
+            <option value="ผลงานวิจัยด้านคุณภาพและความปลอดภัย">ผลงานวิจัยด้านคุณภาพและความปลอดภัย</option>
+            <option value="ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย">ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย</option>
+            <option value="การพัฒนางานประจำสู่งานวิจัย (R2R)">การพัฒนางานประจำสู่งานวิจัย (R2R)</option>
+            <option value="นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร">นโยบาย/ระบบงาน/การพัฒนาคุณภาพ</option>
+            <option value="เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์">เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจ</option>
+          </select>
+          <select id="workPresentationType" class="field" style="width:190px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
             <option value="">ทุกรูปแบบการนำเสนอ</option>
             <option value="แบบบรรยาย">แบบบรรยาย</option>
             <option value="แบบโปสเตอร์">แบบโปสเตอร์ (e-poster)</option>
@@ -2481,20 +2492,54 @@ function formatWorkCategory(v) {
   if (!v || v === '-') return '-';
   const s = String(v).trim();
   const up = s.toUpperCase();
-  if (up === 'CAT-SERVICE' || up === 'SERVICE' || /service\s*excellence/i.test(s)) return 'Service Excellence';
-  if (up === 'CAT-CQI' || up === 'CQI' || /cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
-  if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || /primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
-  if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || /วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
-  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || /นวัตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-SERVICE' || up === 'SERVICE' || up === 'CAT-3' || /service\s*excellence/i.test(s)) return 'Service Excellence';
+  if (up === 'CAT-CQI' || up === 'CQI' || up === 'CAT-4' || /cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
+  if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || up === 'CAT-PRIMARY_CARE' || up === 'CAT-5' || /primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
+  if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || up === 'CAT-1' || /วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || up === 'CAT-2' || /นวัตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
   if (up === 'CAT-R2R' || up === 'R2R') return 'การพัฒนางานประจำสู่งานวิจัย (R2R)';
   if (up === 'CAT-POLICY' || up === 'POLICY') return 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร';
   if (up === 'CAT-STORYTELLING' || up === 'STORYTELLING') return 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์';
   return s;
 }
 
+function updateWorkCategoryDropdown(rows){
+  const sel = $('#workCategory');
+  if(!sel) return;
+  const currentVal = sel.value;
+  const counts = {};
+  (rows || []).forEach(w => {
+    const cat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+    counts[cat] = (counts[cat] || 0) + 1;
+  });
+
+  const standardCats = [
+    'Service Excellence',
+    'CQI/ Best Practice',
+    'Primary Care & Community Network Development',
+    'ผลงานวิจัยด้านคุณภาพและความปลอดภัย',
+    'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย',
+    'การพัฒนางานประจำสู่งานวิจัย (R2R)',
+    'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร',
+    'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์'
+  ];
+
+  const allCatKeys = Array.from(new Set([...standardCats, ...Object.keys(counts)])).filter(c => c && c !== '-');
+  
+  let html = `<option value="">ทุกประเภทผลงาน (${(rows||[]).length} เรื่อง)</option>`;
+  allCatKeys.forEach(cat => {
+    const count = counts[cat] || 0;
+    if (count > 0 || standardCats.includes(cat)) {
+      html += `<option value="${esc(cat)}" ${cat === currentVal ? 'selected' : ''}>${esc(cat)} ${count > 0 ? `(${count})` : ''}</option>`;
+    }
+  });
+  sel.innerHTML = html;
+}
+
 function renderWorksTable(){
   const rows = window.WORK_ROWS || [];
   const searchVal = ($('#workSearch')?.value || '').trim().toLowerCase();
+  const catVal = ($('#workCategory')?.value || '').trim();
   const statusVal = ($('#workStatus')?.value || '').trim();
   const ptVal = ($('#workPresentationType')?.value || '').trim();
 
@@ -2515,6 +2560,30 @@ function renderWorksTable(){
       const titleEN = String(w.TitleEN || w.EnglishTitle || '').toLowerCase();
       const presenter = String(w.PresenterName || '').toLowerCase();
       return code.includes(searchVal) || titleTH.includes(searchVal) || titleEN.includes(searchVal) || presenter.includes(searchVal);
+    });
+  }
+  if(catVal){
+    const cf = catVal.toLowerCase();
+    filteredRows = filteredRows.filter(w => {
+      const rawCat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '');
+      const rawAll = [
+        rawCat,
+        w.CategoryName,
+        w.CategoryNameTH,
+        w.Category,
+        w.CategoryID,
+        w.WorkType
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      if (cf.includes('service')) return /service|cat-service|cat-3/i.test(rawAll);
+      if (cf.includes('cqi')) return /cqi|best\s*practice|cat-cqi|cat-4/i.test(rawAll);
+      if (cf.includes('primary') || cf.includes('community')) return /primary|community|cat-primary|cat-5/i.test(rawAll);
+      if (cf.includes('วิจัย') || cf.includes('research')) return /วิจัย|research|cat-research|cat-1/i.test(rawAll);
+      if (cf.includes('นวัตกรรม') || cf.includes('innovation')) return /นวัตกรรม|innovation|cat-innovation|cat-2/i.test(rawAll);
+      if (cf.includes('r2r')) return /r2r/i.test(rawAll);
+      if (cf.includes('นโยบาย') || cf.includes('policy')) return /policy|นโยบาย/i.test(rawAll);
+      if (cf.includes('เรื่องเล่า') || cf.includes('story')) return /เรื่องเล่า|story/i.test(rawAll);
+      return rawAll.includes(cf);
     });
   }
   if(statusVal){
@@ -2613,13 +2682,354 @@ async function loadWorks(forceRefresh = false){
   try{
     const rows = await rpc('adminListWorks', TOKEN, CID, {});
     window.WORK_ROWS = rows || [];
+    updateWorkCategoryDropdown(window.WORK_ROWS);
     renderWorksTable();
   }finally{
     if(!hasRows && !forceRefresh) hide();
   }
 }
 function num(v){return Number(v)||0;}
+
+async function openAssignByCategoryModal(){
+  const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
+  if(!hasRows){
+    show('กำลังโหลดข้อมูลผลงาน...');
+    try{
+      const rows = await rpc('adminListWorks', TOKEN, CID, {});
+      window.WORK_ROWS = rows || [];
+      updateWorkCategoryDropdown(window.WORK_ROWS);
+      renderWorksTable();
+    }finally{
+      hide();
+    }
+  }
+
+  show('กำลังเปิดหน้าต่างจ่ายงานตามสาขา');
+  try{
+    const d = await rpc('adminGetReviewConfig', TOKEN, CID);
+    const revs = await rpc('adminListReviewers', TOKEN, CID);
+    hide();
+
+    const allWorks = window.WORK_ROWS || [];
+
+    const categoryStats = {};
+    const standardCats = [
+      'Service Excellence',
+      'CQI/ Best Practice',
+      'Primary Care & Community Network Development',
+      'ผลงานวิจัยด้านคุณภาพและความปลอดภัย',
+      'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย',
+      'การพัฒนางานประจำสู่งานวิจัย (R2R)',
+      'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร',
+      'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์'
+    ];
+
+    allWorks.forEach(w => {
+      const cat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+      if(!categoryStats[cat]) {
+        categoryStats[cat] = { total: 0, unassigned: 0, assigned: 0 };
+      }
+      categoryStats[cat].total++;
+      const assignedCount = num(w.ReviewerAssignedCount);
+      if(assignedCount === 0) {
+        categoryStats[cat].unassigned++;
+      } else {
+        categoryStats[cat].assigned++;
+      }
+    });
+
+    const activeCatList = Array.from(new Set([...standardCats, ...Object.keys(categoryStats)])).filter(c => c && c !== '-');
+
+    let defaultCat = '';
+    const catOptionsHtml = activeCatList.map(cat => {
+      const stats = categoryStats[cat] || { total: 0, unassigned: 0, assigned: 0 };
+      if (!defaultCat && stats.unassigned > 0) defaultCat = cat;
+      const label = `${cat} (ยังไม่ Assign: ${stats.unassigned} / ทั้งหมด ${stats.total} เรื่อง)`;
+      return `<option value="${esc(cat)}">${esc(label)}</option>`;
+    }).join('');
+    if (!defaultCat && activeCatList.length > 0) defaultCat = activeCatList[0];
+
+    const roundsHtml = (d.rounds || []).map(rd => `<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH || rd.RoundNameEN || rd.ReviewRoundID)}</option>`).join('');
+
+    const modalHtml = `
+      <div style="text-align:left; font-size:0.88rem;">
+        <!-- Step 1: Select Category -->
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+          <label style="font-weight:700; color:#166534; display:block; margin-bottom:6px; font-size:0.92rem;">
+            <i class="fa-solid fa-folder-tree"></i> 1. เลือกสาขา / ประเภทผลงาน:
+          </label>
+          <select id="batchCategorySelect" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #86efac; background:#fff; font-size:0.88rem; font-weight:600; color:#0f172a;">
+            ${catOptionsHtml}
+            <option value="__ALL__">-- แสดงทุกสาขา --</option>
+          </select>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.8rem;">
+            <label style="cursor:pointer; display:flex; align-items:center; gap:6px; color:#1e293b; user-select:none;">
+              <input type="checkbox" id="batchOnlyUnassigned" checked style="width:16px; height:16px; cursor:pointer;">
+              <span>แสดงเฉพาะผลงานที่<b>ยังไม่ได้รับ Assign</b> (0 คน)</span>
+            </label>
+            <span id="batchWorksCountBadge" class="badge" style="background:#dcfce7; color:#15803d; font-size:0.75rem; padding:3px 8px;">0 เรื่อง</span>
+          </div>
+        </div>
+
+        <!-- Step 2: Works list in selected category -->
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label style="font-weight:700; color:#0C385B; font-size:0.9rem;">
+              <i class="fa-solid fa-list-check"></i> 2. เลือกผลงานที่จะจ่ายงาน:
+            </label>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-sm btn-soft" id="btnBatchSelectAllWorks" style="font-size:0.72rem; padding:2px 8px;"><i class="fa-solid fa-check-double"></i> เลือกทั้งหมด</button>
+              <button type="button" class="btn btn-sm btn-soft" id="btnBatchDeselectAllWorks" style="font-size:0.72rem; padding:2px 8px;"><i class="fa-solid fa-xmark"></i> ไม่เลือก</button>
+            </div>
+          </div>
+          <div id="batchWorksListWrap" style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; padding:6px; background:#fff;">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Step 3: Reviewers List -->
+        <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label style="font-weight:700; color:#0C385B; font-size:0.9rem;">
+              <i class="fa-solid fa-user-tie"></i> 3. เลือก Reviewer ที่ต้องการมอบหมาย:
+            </label>
+            <span id="batchRevsCountBadge" class="badge" style="background:#fef3c7; color:#92400e; font-size:0.75rem; padding:3px 8px;">เลือก 0 ท่าน</span>
+          </div>
+          <div id="batchRevsListWrap" style="max-height:180px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; padding:6px; background:#fff;">
+            ${(revs || []).map(r => {
+              const revId = esc(r.reviewer.ReviewerID);
+              const name = esc(r.reviewer.FullName || (r.reviewer.FirstName + ' ' + r.reviewer.LastName));
+              const inst = esc(r.reviewer.Institution || r.reviewer.Organization || '-');
+              const assigned = num(r.CurrentAssignedCount);
+              const max = num(r.MaxWorkload) || 10;
+              const exp = esc(r.ExpertiseCategories || '');
+              return `
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border-bottom:1px solid #f1f5f9; cursor:pointer; margin:0;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                  <input type="checkbox" class="batch-rev-item" value="${revId}" style="margin-top:3px; cursor:pointer; width:16px; height:16px;">
+                  <div style="flex:1;">
+                    <div style="font-weight:600; color:#0f172a; font-size:0.86rem;">${name} <span class="muted" style="font-weight:400; font-size:0.78rem;">(${inst})</span></div>
+                    <div style="font-size:0.75rem; color:#64748b;">
+                      งานปัจจุบัน: <b>${assigned}/${max}</b> เรื่อง
+                      ${exp ? `<span style="margin-left:6px; color:#0284c7;">🎯 เชี่ยวชาญ: ${exp}</span>` : ''}
+                    </div>
+                  </div>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Step 4: Round & Summary -->
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+          <div style="flex:1;">
+            <label style="font-weight:600; font-size:0.82rem; color:#475569; display:block; margin-bottom:2px;">รอบการประเมิน:</label>
+            <select id="batchRoundSelect" class="field" style="width:100%; padding:6px 8px; font-size:0.84rem; border:1px solid #ccc; border-radius:6px;">
+              ${roundsHtml}
+            </select>
+          </div>
+        </div>
+
+        <div id="batchSummaryNotice" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 12px; font-size:0.82rem; color:#1e40af; text-align:left;">
+          💡 กรุณาเลือกผลงานและ Reviewer เพื่อดำเนินการ Assign
+        </div>
+      </div>
+    `;
+
+    const result = await Swal.fire({
+      title: '<span style="font-size:1.2rem; color:#0C385B;"><i class="fa-solid fa-users-gear" style="color:#006D70;"></i> มอบหมายผู้ประเมินตามสาขา (Batch Assign)</span>',
+      html: modalHtml,
+      width: '720px',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fa-solid fa-check"></i> ยืนยันการจ่ายงาน',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#006D70',
+      cancelButtonColor: '#94a3b8',
+      didOpen: () => {
+        const catSelect = document.getElementById('batchCategorySelect');
+        const onlyUnassignedCb = document.getElementById('batchOnlyUnassigned');
+        const worksContainer = document.getElementById('batchWorksListWrap');
+        const worksBadge = document.getElementById('batchWorksCountBadge');
+        const revsBadge = document.getElementById('batchRevsCountBadge');
+        const summaryNotice = document.getElementById('batchSummaryNotice');
+
+        if (defaultCat && catSelect) {
+          catSelect.value = defaultCat;
+        }
+
+        function updateWorksList() {
+          const selectedCat = catSelect ? catSelect.value : '';
+          const onlyUn = onlyUnassignedCb ? onlyUnassignedCb.checked : true;
+
+          const matchingWorks = allWorks.filter(w => {
+            const rawCat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+            if (selectedCat !== '__ALL__' && selectedCat) {
+              if (rawCat !== selectedCat && !String(w.CategoryName||'').includes(selectedCat)) {
+                return false;
+              }
+            }
+            const assignedCount = num(w.ReviewerAssignedCount);
+            if (onlyUn && assignedCount > 0) {
+              return false;
+            }
+            return true;
+          });
+
+          if (worksBadge) worksBadge.textContent = `${matchingWorks.length} เรื่อง`;
+
+          if (matchingWorks.length === 0) {
+            worksContainer.innerHTML = `
+              <div style="padding:20px; text-align:center; color:#64748b; font-size:0.85rem;">
+                <i class="fa-solid fa-circle-check" style="font-size:1.8rem; color:#10b981; margin-bottom:8px; display:block;"></i>
+                ไม่พบผลงานที่ตรงตามเงื่อนไข (อาจได้รับการมอบหมายครบแล้ว หรือลองปลดติ๊ก "เฉพาะที่ยังไม่ได้รับ Assign")
+              </div>
+            `;
+          } else {
+            worksContainer.innerHTML = matchingWorks.map(w => {
+              const wid = esc(w.WorkID);
+              const code = esc(w.WorkCode || w.WorkID);
+              const title = esc(w.TitleTH || w.TitleEN || w.ThaiTitle || '-');
+              const presenter = esc(w.PresenterName || ((w.authors||[]).find(a=>a.IsPresenter)?.FullName||'-'));
+              const assigned = num(w.ReviewerAssignedCount);
+              const rawPt = String(w.PresentationTypeName || w.PresentationType || '').trim();
+              let ptBadge = '';
+              if (/oral|บรรยาย/i.test(rawPt)) ptBadge = '<span class="badge ok" style="font-size:0.7rem; padding:1px 6px;">บรรยาย</span>';
+              else if (/poster|โปสเตอร์/i.test(rawPt)) ptBadge = '<span class="badge warn" style="font-size:0.7rem; padding:1px 6px;">โปสเตอร์</span>';
+
+              const stBadge = assigned === 0 
+                ? '<span class="badge" style="background:#fee2e2; color:#b91c1c; font-size:0.7rem; padding:1px 6px;">ยังไม่มี Reviewer (0)</span>'
+                : `<span class="badge" style="background:#fef3c7; color:#92400e; font-size:0.7rem; padding:1px 6px;">มี Reviewer แล้ว (${assigned})</span>`;
+
+              return `
+                <label style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border-bottom:1px solid #f1f5f9; cursor:pointer; margin:0;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                  <input type="checkbox" class="batch-work-item" value="${wid}" checked style="margin-top:3px; cursor:pointer; width:16px; height:16px;">
+                  <div style="flex:1;">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <b style="color:#0C385B; font-size:0.86rem;"># ${code}</b>
+                      ${ptBadge}
+                      ${stBadge}
+                    </div>
+                    <div style="font-size:0.82rem; color:#1e293b; margin-top:2px; font-weight:500;">${title}</div>
+                    <div style="font-size:0.74rem; color:#64748b;">ผู้นำเสนอ: ${presenter}</div>
+                  </div>
+                </label>
+              `;
+            }).join('');
+          }
+          updateSummary();
+        }
+
+        function updateSummary() {
+          const checkedWorks = Array.from(document.querySelectorAll('.batch-work-item:checked'));
+          const checkedRevs = Array.from(document.querySelectorAll('.batch-rev-item:checked'));
+          const wCount = checkedWorks.length;
+          const rCount = checkedRevs.length;
+
+          if (revsBadge) {
+            revsBadge.textContent = `เลือก ${rCount} ท่าน`;
+            revsBadge.style.background = rCount > 0 ? '#dcfce7' : '#fef3c7';
+            revsBadge.style.color = rCount > 0 ? '#15803d' : '#92400e';
+          }
+
+          if (summaryNotice) {
+            if (wCount > 0 && rCount > 0) {
+              const totalAssignments = wCount * rCount;
+              summaryNotice.style.background = '#dcfce7';
+              summaryNotice.style.borderColor = '#86efac';
+              summaryNotice.style.color = '#166534';
+              summaryNotice.innerHTML = `🚀 พร้อมมอบหมาย! Reviewer <b>${rCount} ท่าน</b> ให้กับผลงาน <b>${wCount} เรื่อง</b> (จะสร้างทั้งหมด <b>${totalAssignments}</b> รายการ Assignment)`;
+            } else {
+              summaryNotice.style.background = '#eff6ff';
+              summaryNotice.style.borderColor = '#bfdbfe';
+              summaryNotice.style.color = '#1e40af';
+              summaryNotice.innerHTML = `💡 เลือกผลงานแล้ว <b>${wCount}</b> เรื่อง | เลือก Reviewer แล้ว <b>${rCount}</b> ท่าน`;
+            }
+          }
+        }
+
+        if (catSelect) catSelect.addEventListener('change', updateWorksList);
+        if (onlyUnassignedCb) onlyUnassignedCb.addEventListener('change', updateWorksList);
+
+        const btnSelectAll = document.getElementById('btnBatchSelectAllWorks');
+        if (btnSelectAll) {
+          btnSelectAll.addEventListener('click', () => {
+            document.querySelectorAll('.batch-work-item').forEach(cb => cb.checked = true);
+            updateSummary();
+          });
+        }
+
+        const btnDeselectAll = document.getElementById('btnBatchDeselectAllWorks');
+        if (btnDeselectAll) {
+          btnDeselectAll.addEventListener('click', () => {
+            document.querySelectorAll('.batch-work-item').forEach(cb => cb.checked = false);
+            updateSummary();
+          });
+        }
+
+        if (worksContainer) {
+          worksContainer.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('batch-work-item')) updateSummary();
+          });
+        }
+
+        const revsWrap = document.getElementById('batchRevsListWrap');
+        if (revsWrap) {
+          revsWrap.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('batch-rev-item')) updateSummary();
+          });
+        }
+
+        updateWorksList();
+      },
+      preConfirm: () => {
+        const checkedWorks = Array.from(document.querySelectorAll('.batch-work-item:checked')).map(el => el.value);
+        const checkedRevs = Array.from(document.querySelectorAll('.batch-rev-item:checked')).map(el => el.value);
+        const roundId = document.getElementById('batchRoundSelect')?.value;
+
+        if (!checkedWorks.length) {
+          Swal.showValidationMessage('กรุณาเลือกผลงานอย่างน้อย 1 เรื่อง');
+          return false;
+        }
+        if (!checkedRevs.length) {
+          Swal.showValidationMessage('กรุณาเลือก Reviewer อย่างน้อย 1 ท่าน');
+          return false;
+        }
+        if (!roundId) {
+          Swal.showValidationMessage('กรุณาเลือกรอบการประเมิน');
+          return false;
+        }
+
+        return { workIds: checkedWorks, reviewerIds: checkedRevs, roundId };
+      }
+    });
+
+    if (result.isConfirmed && result.value) {
+      const { workIds, reviewerIds, roundId } = result.value;
+      show(`กำลังมอบหมาย Reviewer (${reviewerIds.length} ท่าน) ให้กับผลงาน (${workIds.length} เรื่อง)...`);
+      try {
+        const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, workIds, roundId, reviewerIds);
+        hide();
+        await Swal.fire({
+          icon: 'success',
+          title: 'มอบหมายงานสำเร็จ',
+          html: `สร้าง Assignment <b>${res.created}</b> รายการ${res.skipped > 0 ? `<br><span class="muted" style="font-size:0.85rem">ข้าม ${res.skipped} รายการ (เนื่องจากมีอยู่แล้วหรือสถานะไม่พร้อม)</span>` : ''}`,
+          confirmButtonColor: '#006D70'
+        });
+        loadWorks(true);
+      } catch (err) {
+        hide();
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาดในการจ่ายงาน', text: err.message });
+      }
+    }
+  }catch(e){
+    hide();
+    err(e);
+  }
+}
+
 async function openAssignReviewerModal(wid){
+  if(!wid){
+    return openAssignByCategoryModal();
+  }
   show('กำลังเปิดหน้าต่างจ่ายงาน');
   try{
     const d=await rpc('adminGetReviewConfig',TOKEN,CID);

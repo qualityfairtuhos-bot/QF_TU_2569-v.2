@@ -5518,8 +5518,10 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     }
     if(!reviewerIds||!reviewerIds.length)throw new Error('No reviewers provided');
     let created=0,skipped=0;
+    const revCountAdd = {};
     workIds.forEach(function(wid){
       const w = findOne_('Works',{ConferenceID:conferenceId,WorkID:wid});
+      let assignedForThisWork = 0;
       reviewerIds.forEach(function(rid){
         const exist = findOne_('ReviewAssignments',{ConferenceID:conferenceId,WorkID:wid,ReviewerID:rid,ReviewRoundID:roundId});
         if(exist) { skipped++; return; }
@@ -5527,10 +5529,40 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
         if(!rvw || String(rvw.Status).toUpperCase() === 'INACTIVE') { skipped++; return; }
         const pool = findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});
         if(pool && String(pool.Status).toUpperCase() === 'INACTIVE') { skipped++; return; }
-        appendRecord_('ReviewAssignments',{AssignmentID:nextId_('ASN'),ConferenceID:conferenceId,ReviewRoundID:roundId,WorkID:wid,WorkCode:w?w.WorkCode:wid,ReviewerID:rid,ReviewerName:rvw.FullName||(rvw.FirstName+' '+rvw.LastName),ReviewerEmail:rvw.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',CreatedAt:new Date(),UpdatedAt:new Date()});
+        const aid = nextId_('ASN');
+        appendRecord_('ReviewAssignments',{AssignmentID:aid,ConferenceID:conferenceId,ReviewRoundID:roundId,WorkID:wid,WorkCode:w?w.WorkCode:wid,ReviewerID:rid,ReviewerName:rvw.FullName||(rvw.FirstName+' '+rvw.LastName),ReviewerEmail:rvw.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',CreatedAt:new Date(),UpdatedAt:new Date()});
         created++;
+        assignedForThisWork++;
+        revCountAdd[rid] = (revCountAdd[rid] || 0) + 1;
+        try { sendReviewAssignmentEmail_(conferenceId, w, rvw, aid); } catch(e){}
       });
+      if (assignedForThisWork > 0 && w && ['WAITING_REVIEWER_ASSIGN','ACADEMIC_SCREENING','DRAFT','SUBMITTED'].indexOf(upper_(w.Status)) >= 0) {
+        try {
+          updateRecord_('Works', w.__row, {Status: 'UNDER_REVIEW', UpdatedAt: new Date()});
+        } catch(e){}
+      }
     });
+
+    Object.keys(revCountAdd).forEach(function(rid){
+      const add = revCountAdd[rid];
+      if (add > 0) {
+        const pool = findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});
+        if (pool) {
+          try {
+            updateRecord_('ReviewerPool', pool.__row, {
+              CurrentAssignedCount: num_(pool.CurrentAssignedCount, 0) + add,
+              UpdatedAt: new Date()
+            });
+          } catch(e){}
+        }
+      }
+    });
+
+    clearTableCache_('ReviewAssignments');
+    clearTableCache_('Works');
+    clearTableCache_('ReviewerPool');
+    try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e){}
+
     return {created:created,skipped:skipped};
   });
 }
