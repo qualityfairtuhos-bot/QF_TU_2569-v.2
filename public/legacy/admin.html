@@ -2585,6 +2585,55 @@ function updateWorkCategoryDropdown(rows){
   sel.innerHTML = html;
 }
 
+function getWorkPresenterDisplay(w){
+  if(!w) return { name: '-', email: '', regId: '', inst: '' };
+  let name = String(w.PresenterName || w.RegistrationFullName || w.AuthorFullName || w.AuthorName || w.FirstAuthorName || '').trim();
+  let email = String(w.PresenterEmail || w.RegistrationEmail || '').trim();
+  let regId = String(w.RegID || '').trim();
+  let inst = String(w.Institution || w.Organization || '').trim();
+
+  if(!name && Array.isArray(w.authors) && w.authors.length > 0){
+    const p = w.authors.find(a => a.IsPresenter) || w.authors[0];
+    if(p){
+      const pParts = [p.Prefix, p.FirstName, p.LastName].filter(Boolean).map(x => String(x).trim());
+      name = String(p.FullName || p.AuthorFullName || pParts.join(' ') || p.FirstName || '').trim();
+      if(!email) email = String(p.Email || '').trim();
+      if(!inst) inst = String(p.Organization || p.Institution || '').trim();
+      if(!regId && p.RegID) regId = String(p.RegID).trim();
+    }
+  }
+
+  // Cross-reference with window.REGISTRATION_ROWS or window.PAYMENT_ROWS
+  if((!name || !email || !inst) && regId){
+    const regList = Array.isArray(window.REGISTRATION_ROWS) ? window.REGISTRATION_ROWS : [];
+    const matchedReg = regList.find(r => {
+      const rId = String(r.RegID || '').trim();
+      return rId.toUpperCase() === regId.toUpperCase() || (rId && regId && (rId.endsWith(regId) || regId.endsWith(rId)));
+    });
+    if(matchedReg){
+      if(!name){
+        const rParts = [matchedReg.Prefix, matchedReg.FirstName, matchedReg.LastName].filter(Boolean).map(x => String(x).trim());
+        name = String(matchedReg.FullName || rParts.join(' ') || matchedReg.FirstName || '').trim();
+      }
+      if(!email) email = String(matchedReg.Email || '').trim();
+      if(!inst) inst = String(matchedReg.Institution || matchedReg.OrganizationUnit || matchedReg.OrganizationGroup || '').trim();
+    } else if(Array.isArray(window.PAYMENT_ROWS)){
+      const matchedPay = window.PAYMENT_ROWS.find(p => String(p.RegID || '').trim().toUpperCase() === regId.toUpperCase());
+      if(matchedPay){
+        if(!name) name = String(matchedPay.FullName || matchedPay.ReceiptName || '').trim();
+        if(!email) email = String(matchedPay.Email || '').trim();
+      }
+    }
+  }
+
+  return {
+    name: name || '-',
+    email: email || '',
+    regId: regId || '',
+    inst: inst || ''
+  };
+}
+
 function renderWorksTable(){
   const rows = window.WORK_ROWS || [];
   const searchVal = ($('#workSearch')?.value || '').trim().toLowerCase();
@@ -2605,12 +2654,16 @@ function renderWorksTable(){
   if(searchVal){
     filteredRows = filteredRows.filter(w => {
       const code = String(w.WorkCode || w.WorkID || '').toLowerCase();
+      const regId = String(w.RegID || '').toLowerCase();
       const titleTH = String(w.TitleTH || w.ThaiTitle || '').toLowerCase();
       const titleEN = String(w.TitleEN || w.EnglishTitle || '').toLowerCase();
-      const presenter = String(w.PresenterName || '').toLowerCase();
+      const pInfo = getWorkPresenterDisplay(w);
+      const presenter = String(pInfo.name || '').toLowerCase();
+      const presenterEmail = String(pInfo.email || '').toLowerCase();
+      const presenterInst = String(pInfo.inst || '').toLowerCase();
       const authorsStr = (w.authors || []).map(a => `${a.FirstName||""} ${a.LastName||""} ${a.FullName||""}`).join(" ").toLowerCase();
-      const allAuthors = (presenter + " " + authorsStr + " " + String(w.AuthorFullName || "") + " " + String(w.FirstAuthorName || "")).toLowerCase();
-      return code.includes(searchVal) || titleTH.includes(searchVal) || titleEN.includes(searchVal) || allAuthors.includes(searchVal);
+      const allAuthors = (presenter + " " + presenterEmail + " " + presenterInst + " " + authorsStr + " " + String(w.AuthorFullName || "") + " " + String(w.FirstAuthorName || "")).toLowerCase();
+      return code.includes(searchVal) || regId.includes(searchVal) || titleTH.includes(searchVal) || titleEN.includes(searchVal) || allAuthors.includes(searchVal);
     });
   }
   if(catVal){
@@ -2663,6 +2716,7 @@ function renderWorksTable(){
   }
 
   $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
+    const pInfo = getWorkPresenterDisplay(w);
     let rawPt = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeFinal || w.PresentationTypeRequested || w['รูปแบบการนำเสนอ'] || w['รูปแบบ'] || '').trim();
     let ptDisplay = rawPt;
     let badgeClass = '';
@@ -2699,7 +2753,11 @@ function renderWorksTable(){
     </td>
     <td>${esc(catDisplay)}</td>
     <td><span class="badge ${badgeClass}">${esc(ptDisplay)}</span></td>
-    <td>${esc(w.PresenterName||((w.authors||[]).find(a=>a.IsPresenter)?.FullName||''))}<div class="muted" style="font-size:0.75rem">${esc(w.PresenterEmail||'')}</div></td>
+    <td>
+      <div style="font-weight:600; color:#1e293b;">${esc(pInfo.name)}</div>
+      ${pInfo.regId ? `<div class="muted" style="font-size:0.75rem"><i class="fa-solid fa-id-card"></i> ${esc(pInfo.regId)}</div>` : ''}
+      ${pInfo.email ? `<div class="muted" style="font-size:0.75rem"><i class="fa-regular fa-envelope"></i> ${esc(pInfo.email)}</div>` : ''}
+    </td>
     <td>${num(w.ReviewerCompletedCount)}/${num(w.ReviewerAssignedCount)}</td>
     <td><b>${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</b></td>
     <td><div style="margin-bottom:4px">งาน: ${statusBadge(w.Status||w.CurrentStatus)}</div><div>ลงทะเบียน: ${statusBadge(w.RegistrationStatus||'ไม่พบข้อมูล')}</div></td>
@@ -2707,7 +2765,7 @@ function renderWorksTable(){
       <button class="btn btn-primary btn-sm" title="จ่ายผู้ประเมิน" onclick="openAssignReviewerModal('${esc(w.WorkID)}')"><i class="fa-solid fa-user-plus"></i></button>
       <button class="btn btn-blue btn-sm" title="คะแนนประเมิน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple"></i></button>
       <button class="btn btn-gold btn-sm" title="ปรับสถานะ/ประเภท" onclick="openUpdateWorkStatus('${esc(w.WorkID)}', '${esc(w.Status||w.CurrentStatus)}')"><i class="fa-solid fa-pen-to-square"></i></button>
-      <button class="btn btn-soft btn-sm" title="ส่งอีเมล" onclick="openEmail('${esc(w.PresenterEmail||'')}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(w.PresenterName||'')}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
+      <button class="btn btn-soft btn-sm" title="ส่งอีเมล" onclick="openEmail('${esc(pInfo.email)}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(pInfo.name)}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
       <button class="btn btn-gold btn-sm" title="แนบ/จัดการไฟล์" onclick="openUploadModal('${esc(w.WorkID)}','${esc(w.RegID||'')}')"><i class="fa-solid fa-cloud-arrow-up"></i></button>
       <button class="btn btn-sm" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="ลบผลงานนี้ (รวมไฟล์แนบ)" onclick="deleteWorkItem('${esc(w.WorkID)}', '${esc(w.WorkCode||w.WorkID)}', '${esc((w.TitleTH||w.TitleEN||'').replace(/['\"\\`]/g, ' '))}')"><i class="fa-solid fa-trash-can"></i></button>
       ${(w.files||[]).sort((a,b)=>{
@@ -2733,6 +2791,14 @@ async function loadWorks(forceRefresh = false){
   const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
   show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผลงานจาก Google Sheets...' : 'กำลังโหลดผลงาน');
   try{
+    if(!window.REGISTRATION_ROWS || !window.REGISTRATION_ROWS.length){
+      rpc('adminListRegistrations', TOKEN, CID, {}).then(regs => {
+        if(regs && Array.isArray(regs)){
+          window.REGISTRATION_ROWS = regs;
+          renderWorksTable();
+        }
+      }).catch(()=>{});
+    }
     const rows = await rpc('adminListWorks', TOKEN, CID, { forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.WORK_ROWS = rows || [];
     updateWorkCategoryDropdown(window.WORK_ROWS);
@@ -2961,7 +3027,7 @@ async function openAssignByCategoryModal(){
               const wid = esc(w.WorkID);
               const code = esc(w.WorkCode || w.WorkID);
               const title = esc(w.TitleTH || w.TitleEN || w.ThaiTitle || '-');
-              const presenter = esc(w.PresenterName || ((w.authors||[]).find(a=>a.IsPresenter)?.FullName||'-'));
+              const presenter = esc(getWorkPresenterDisplay(w).name);
               const assigned = num(w.ReviewerAssignedCount);
               const rawPt = String(w.PresentationTypeName || w.PresentationType || '').trim();
               let ptBadge = '';
@@ -3200,10 +3266,12 @@ async function openScoreSummary(wid){
     
     const completed = assignments.filter(a => ['COMPLETE', 'LOCKED'].includes(String(a.Status).toUpperCase()));
     
+    const authorNames = (authors || []).map(x => esc(x.FullName || [x.Prefix, x.FirstName, x.LastName].filter(Boolean).join(' ') || x.FirstName)).filter(Boolean).join(', ') || esc(getWorkPresenterDisplay(work).name);
+    
     let html = `<div style="text-align:left; font-size:0.9rem;">
       <div style="margin-bottom:15px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
         <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH || work.TitleEN || '')}</div>
-        <div style="margin-top:4px; color:#475569;"><small>ประเภท: <b>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</b> | ผู้ส่ง/ผู้แต่ง: ${authors.map(x => esc(x.FullName)).join(', ')}</small></div>
+        <div style="margin-top:4px; color:#475569;"><small>ประเภท: <b>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</b> | ผู้ส่ง/ผู้แต่ง: <b>${authorNames}</b></small></div>
       </div>`;
     
     if (completed.length === 0) {
@@ -3626,11 +3694,12 @@ async function openUploadModal(wid, regId) {
       `;
     }
 
+    const pInfo = getWorkPresenterDisplay(w);
     const html = `
       <div style="text-align:left; font-size:0.9rem;">
         <div style="background:#f1f5f9; padding:10px 14px; border-radius:8px; margin-bottom:16px;">
           <div style="font-weight:700; color:#006D70; font-size:0.95rem;">${esc(w.WorkCode || wid)}: ${esc(w.TitleTH || w.ThaiTitle || '-')}</div>
-          <div style="color:#475569; font-size:0.82rem; margin-top:2px;">ผู้ส่ง/นำเสนอ: ${esc(w.PresenterName || '-')} (${esc(w.PresenterEmail || '-')})</div>
+          <div style="color:#475569; font-size:0.82rem; margin-top:2px;">ผู้ส่ง/นำเสนอ: <b>${esc(pInfo.name)}</b> ${pInfo.email ? `(${esc(pInfo.email)})` : ''}</div>
         </div>
 
         <div style="margin-bottom:18px;">
