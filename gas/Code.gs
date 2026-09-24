@@ -4265,12 +4265,25 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
   const workMap = {};
   worksList.forEach(function(w){ workMap[w.WorkID] = w; });
 
+  const allCategories = getRecords_('WorkCategories') || [];
+  const catMap = {};
+  allCategories.forEach(function(c){
+    catMap[c.CategoryID] = c.CategoryNameTH || c.CategoryNameEN || c.CategoryCode;
+    if (c.CategoryCode) catMap[c.CategoryCode] = c.CategoryNameTH || c.CategoryNameEN;
+  });
+
   assignments.forEach(function(a){
     const w = workMap[a.WorkID];
     if (w) {
       a.TitleTH = a.TitleTH || w.TitleTH || w.TitleEN || w.ThaiTitle || w.EnglishTitle;
+      a.TitleEN = a.TitleEN || w.TitleEN;
       a.WorkStatus = a.WorkStatus || w.Status;
       a.WorkCode = a.WorkCode || w.WorkCode || w.WorkID;
+      a.CategoryID = w.CategoryID || a.CategoryID || '';
+      a.CategoryCode = w.CategoryCode || a.CategoryCode || '';
+      a.CategoryName = w.CategoryName || catMap[w.CategoryID] || catMap[w.CategoryCode] || a.CategoryName || 'ผลงานทั่วไป';
+    } else {
+      a.CategoryName = a.CategoryName || 'ผลงานทั่วไป';
     }
     a.AssignedAt = a.AssignedAt || a.CreatedAt || '';
   });

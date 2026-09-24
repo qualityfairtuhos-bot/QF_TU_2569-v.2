@@ -28,11 +28,48 @@
     .kanban-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed var(--line);padding-bottom:12px}
     .kanban-code{font-weight:700;color:var(--blue);font-size:0.95rem;display:flex;align-items:center;gap:6px}
     .kanban-score{background:#e8f4f9;color:var(--teal);font-weight:700;min-width:38px;height:38px;padding:0 10px;display:flex;align-items:center;justify-content:center;border-radius:999px;font-size:1.1rem}
-    .kanban-title{font-weight:600;font-size:1rem;line-height:1.5;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}
+    .kanban-score-pill{background:#f1f5f9;color:#475569;font-weight:700;padding:4px 12px;border-radius:999px;font-size:0.92rem;display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;}
+    .kanban-score-pill.scored{background:#ecfdf5;color:#047857;border-color:#a7f3d0;}
+    .kanban-score-pill.scored .score-num{font-weight:800;font-size:1.05rem;}
+    .kanban-score-pill .score-denom{font-size:0.75rem;color:#64748b;}
+    .kanban-card.is-complete{border-color:#a7f3d0;background:linear-gradient(180deg,#ffffff 0%,#f0fdf4 100%);}
+    .kanban-title{font-weight:700;font-size:1.02rem;line-height:1.5;color:#0f172a;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}
     .kanban-meta{display:flex;flex-direction:column;gap:8px;font-size:0.8rem;color:#667a88}
     .kanban-meta span{display:flex;align-items:center;gap:6px}
     .kanban-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
     .kanban-empty{grid-column:1 / -1;text-align:center;padding:50px 20px;background:#fff;border-radius:18px;border:1px dashed var(--line);color:#667a88;font-size:0.95rem}
+
+    /* Category Grouping in Assignments List */
+    .assignment-category-section{margin-bottom:28px;background:#ffffff;border:1.5px solid #e2e8f0;border-radius:18px;padding:22px;box-shadow:0 4px 14px rgba(12,56,91,0.03);}
+    .assignment-category-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #f1f5f9;flex-wrap:wrap;gap:12px;}
+    .assignment-category-title{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+    .category-name-text{font-size:1.18rem;font-weight:800;color:#0C385B;}
+    .category-count-badge{background:#e0f2fe;color:#0369a1;border:1.5px solid #7dd3fc;font-weight:800;font-size:0.88rem;padding:3px 12px;border-radius:999px;}
+    .assignment-category-stats{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .stat-pill{font-size:0.82rem;font-weight:700;padding:4px 10px;border-radius:999px;}
+    .stat-pill.complete{background:#dcfce7;color:#15803d;border:1px solid #86efac;}
+    .stat-pill.pending{background:#fef3c7;color:#b45309;border:1px solid #fde68a;}
+
+    /* Prominent Work Hero Card in Review Page */
+    .review-work-hero-card{background:#ffffff;border:1.5px solid #cbd5e1;border-radius:18px;padding:22px 26px;margin-top:14px;margin-bottom:20px;box-shadow:0 4px 16px rgba(12,56,91,0.05);}
+    .review-work-hero-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;}
+    .review-work-info-col{flex:1 1 500px;min-width:280px;}
+    .review-work-badge-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+    .work-code-pill{background:#0C385B;color:#ffffff;font-weight:800;font-size:0.95rem;padding:5px 14px;border-radius:8px;letter-spacing:0.5px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(12,56,91,0.2);}
+    .work-category-pill{background:#f0fdf4;color:#166534;border:1.5px solid #86efac;font-weight:700;font-size:0.9rem;padding:4px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;}
+    .work-rubric-pill{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:0.85rem;font-weight:600;padding:4px 10px;border-radius:8px;display:inline-flex;align-items:center;gap:4px;}
+    .review-work-title{margin:0 0 6px 0;font-size:1.45rem;font-weight:800;line-height:1.45;color:#0f172a;letter-spacing:-0.2px;}
+    .review-work-subtitle-en{font-size:0.95rem;font-style:italic;color:#475569;margin-bottom:8px;line-height:1.4;}
+    .review-work-docs-col{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:260px;}
+    .review-work-docs-label{font-size:0.85rem;font-weight:700;color:#334155;letter-spacing:0.3px;}
+    .review-work-docs-btns{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%;}
+    .btn-doc-open-prominent{display:inline-flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.98rem;text-decoration:none;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);border:none;cursor:pointer;}
+    .btn-doc-open-prominent:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.25) !important;filter:brightness(1.05);}
+    .btn-doc-icon{font-size:1.25rem;line-height:1;}
+    .btn-doc-text{flex:1;text-align:left;}
+    .btn-doc-arrow{font-size:1.15rem;font-weight:800;opacity:0.85;}
+    .review-work-docs-hint{font-size:0.76rem;color:#64748b;text-align:right;}
+    @media(max-width:768px){.review-work-docs-col{align-items:stretch;width:100%;}.review-work-docs-hint{text-align:left;}}
     .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .dash-kpi-card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:20px; position:relative; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.02); }
     .dash-kpi-title { font-size:0.9rem; color:#667a88; margin-bottom:10px; font-weight:600; }
@@ -164,7 +201,7 @@
           <input type="text" id="searchAssignment" placeholder="🔍 ค้นหารหัส / ชื่อเรื่อง" oninput="renderAssignmentsGrid()">
         </div>
       </div>
-      <div class="kanban-grid" id="assignmentGrid"></div>
+      <div id="assignmentGrid"></div>
       <div id="reviewHost"></div>
     </div>
     <div id="page-report" class="page-view hidden">
@@ -232,7 +269,118 @@ let currentFilter = 'all';
 const ASSIGNMENT_CACHE = {};
 
 function renderAssignments(){const a=(BOOT&&BOOT.assignments)||[],complete=a.filter(x=>x.Status==='COMPLETE').length,pending=a.length-complete;const kh=[['ได้รับมอบหมาย',a.length],['ประเมินเสร็จ',complete],['รอดำเนินการ',pending],['ความคืบหน้า',a.length?Math.round(complete*100/a.length)+'%':'0%']].map(x=>`<div class="kpi"><span>${x[0]}</span><br><b>${x[1]}</b></div>`).join('');const dk=$('#kpis');if(dk)dk.innerHTML=kh;const ak=$('#assignments-kpis');if(ak)ak.innerHTML=kh;const elAll=$('#count-all');if(elAll)elAll.textContent=a.length;const elPen=$('#count-pending');if(elPen)elPen.textContent=pending;const elCom=$('#count-completed');if(elCom)elCom.textContent=complete;renderAssignmentsGrid();}
-function renderAssignmentsGrid(){const grid=$('#assignmentGrid');if(!grid)return;if(!BOOT){grid.innerHTML=`<div class="kanban-empty"><span class="spin"></span> กำลังโหลดผลงานที่ได้รับมอบหมาย...</div>`;return}const a=BOOT.assignments||[],search=($('#searchAssignment').value||'').toLowerCase();const filtered=a.filter(x=>{if(currentFilter==='pending'&&x.Status==='COMPLETE')return false;if(currentFilter==='completed'&&x.Status!=='COMPLETE')return false;if(search){const txt=`${x.WorkCode||''} ${x.TitleTH||''} ${x.TitleEN||''} ${x.AuthorName||''} ${x.PresenterName||''} ${x.CategoryName||''}`.toLowerCase();if(!txt.includes(search))return false}return true});if(filtered.length===0){grid.innerHTML=`<div class="kanban-empty">ไม่พบผลงานที่ตรงกับเงื่อนไข</div>`;return}grid.innerHTML=filtered.map(x=>`<div class="kanban-card" onclick="openAssignment('${esc(x.AssignmentID)}')"><div class="kanban-header"><div class="kanban-code"># ${esc(x.WorkCode)}</div><div class="kanban-score">${esc(x.TotalScore||'-')}</div></div><div class="kanban-title">${esc(x.TitleTH||'-')}</div><div class="kanban-meta"><span>📅 มอบหมาย: ${esc(formatDate(x.AssignedAt))}</span></div><div class="kanban-badges">${statusBadge(x.Status)}${x.Decision?statusBadge(x.Decision):''}${x.WorkStatus?statusBadge(x.WorkStatus):''}</div></div>`).join('');}
+function getAssignmentCategory(x) {
+  if (x.CategoryName && String(x.CategoryName).trim() && x.CategoryName !== 'ผลงานทั่วไป') return String(x.CategoryName).trim();
+  const catId = String(x.CategoryID || x.CategoryCode || '').toUpperCase();
+  if (/CAT-1|RESEARCH|วิจัย/i.test(catId)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+  if (/CAT-2|INNOVAT|นวัตกรรม/i.test(catId)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  if (/CAT-3|SERVICE|บริการ/i.test(catId)) return 'Service Excellence';
+  if (/CAT-4|CQI|BEST\s*PRACTICE/i.test(catId)) return 'CQI / Best Practice';
+  if (/CAT-5|PRIMARY|ปฐมภูมิ/i.test(catId)) return 'Primary Care & Community Network Development';
+  return (x.CategoryName && String(x.CategoryName).trim()) || 'ผลงานทั่วไป';
+}
+
+function renderAssignmentsGrid(){
+  const container = $('#assignmentGrid');
+  if(!container) return;
+  if(!BOOT){
+    container.innerHTML = `<div class="kanban-empty"><span class="spin"></span> กำลังโหลดผลงานที่ได้รับมอบหมาย...</div>`;
+    return;
+  }
+  const a = BOOT.assignments || [];
+  const search = ($('#searchAssignment').value || '').toLowerCase().trim();
+  const filtered = a.filter(x => {
+    if(currentFilter === 'pending' && x.Status === 'COMPLETE') return false;
+    if(currentFilter === 'completed' && x.Status !== 'COMPLETE') return false;
+    if(search){
+      const cat = getAssignmentCategory(x);
+      const txt = `${x.WorkCode||''} ${x.TitleTH||''} ${x.TitleEN||''} ${x.AuthorName||''} ${x.PresenterName||''} ${cat} ${x.CategoryName||''}`.toLowerCase();
+      if(!txt.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if(filtered.length === 0){
+    container.innerHTML = `<div class="kanban-empty" style="background:#fff; border-radius:16px; padding:40px 20px; border:1px dashed var(--line); color:#64748b;">ไม่พบผลงานที่ตรงกับเงื่อนไขการค้นหาหรือตัวกรอง</div>`;
+    return;
+  }
+
+  // Group filtered assignments by category
+  const groups = {};
+  const groupOrder = [];
+  filtered.forEach(x => {
+    const cat = getAssignmentCategory(x);
+    if(!groups[cat]){
+      groups[cat] = [];
+      groupOrder.push(cat);
+    }
+    groups[cat].push(x);
+  });
+
+  // Render each category group with clear headers
+  container.innerHTML = groupOrder.map(cat => {
+    const list = groups[cat];
+    const completedCount = list.filter(item => item.Status === 'COMPLETE').length;
+    const pendingCount = list.length - completedCount;
+
+    let catIcon = '📂';
+    let catThemeColor = '#006D70';
+    if (/วิจัย|RESEARCH/i.test(cat)) { catIcon = '🔬'; catThemeColor = '#0C385B'; }
+    else if (/นวัตกรรม|INNOVAT/i.test(cat)) { catIcon = '💡'; catThemeColor = '#b45309'; }
+    else if (/SERVICE|บริการ/i.test(cat)) { catIcon = '🏥'; catThemeColor = '#0284c7'; }
+    else if (/CQI|BEST\s*PRACTICE/i.test(cat)) { catIcon = '📈'; catThemeColor = '#15803d'; }
+    else if (/ปฐมภูมิ|PRIMARY/i.test(cat)) { catIcon = '🌱'; catThemeColor = '#047857'; }
+
+    const cardsHtml = list.map(x => {
+      const isComplete = x.Status === 'COMPLETE';
+      const scoreVal = (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '') ? x.TotalScore : '-';
+      return `
+        <div class="kanban-card ${isComplete ? 'is-complete' : ''}" onclick="openAssignment('${esc(x.AssignmentID)}')">
+          <div class="kanban-header">
+            <div class="kanban-code" style="color:${catThemeColor}; font-weight:800;">
+              <span># ${esc(x.WorkCode)}</span>
+            </div>
+            <div class="kanban-score-pill ${isComplete ? 'scored' : 'empty'}">
+              <span class="score-num">${esc(scoreVal)}</span>
+              <span class="score-denom">/ 100</span>
+            </div>
+          </div>
+          <div class="kanban-title" title="${esc(x.TitleTH || x.TitleEN || '-')}">
+            ${esc(x.TitleTH || x.TitleEN || '-')}
+          </div>
+          <div class="kanban-meta">
+            <span>📅 มอบหมาย: ${esc(formatDate(x.AssignedAt))}</span>
+            ${x.PresenterName ? `<span>👤 ผู้นำเสนอ: ${esc(x.PresenterName)}</span>` : ''}
+          </div>
+          <div class="kanban-badges">
+            ${statusBadge(x.Status)}
+            ${x.Decision ? statusBadge(x.Decision) : ''}
+            <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:600;">${esc(cat)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="assignment-category-section">
+        <div class="assignment-category-header">
+          <div class="assignment-category-title">
+            <span style="font-size:1.35rem;">${catIcon}</span>
+            <span class="category-name-text">ประเภท: ${esc(cat)}</span>
+            <span class="category-count-badge">${list.length} เรื่อง</span>
+          </div>
+          <div class="assignment-category-stats">
+            <span class="stat-pill complete">ประเมินแล้ว ${completedCount} เรื่อง</span>
+            <span class="stat-pill pending">รอประเมิน ${pendingCount} เรื่อง</span>
+          </div>
+        </div>
+        <div class="kanban-grid">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 document.addEventListener('click',e=>{const tab=e.target.closest('.filter-tab');if(tab){document.querySelectorAll('.filter-tab').forEach(el=>el.classList.remove('active'));tab.classList.add('active');currentFilter=tab.dataset.filter;renderAssignmentsGrid()}});
 
 async function openAssignment(id){
@@ -604,26 +752,87 @@ function renderReview() {
     `;
   }
   
+  const filesList = (d.files || []).sort((x,y) => new Date(x.UploadedAt||x.CreatedAt||0) - new Date(y.UploadedAt||y.CreatedAt||0));
+  let blindIdx = 0;
+  const docButtonsHtml = filesList.length > 0 ? filesList.map(f => {
+    let catLabel = 'เปิดอ่านเอกสาร';
+    let btnStyle = 'background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color:#ffffff; box-shadow:0 4px 14px rgba(2,132,199,0.35);';
+    let icon = '📄';
+    
+    if (f.FileCategory === 'BLIND') {
+      blindIdx++;
+      const vText = blindIdx > 1 ? ` (แก้ไข V${blindIdx})` : '';
+      catLabel = `เปิดอ่านเอกสารผลงาน (Blind Review${vText})`;
+      btnStyle = 'background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color:#ffffff; box-shadow:0 4px 14px rgba(2,132,199,0.35);';
+      icon = '📑';
+    } else if (f.FileCategory === 'ORIGINAL') {
+      catLabel = 'เปิดอ่านเอกสารผลงานต้นฉบับ';
+      btnStyle = 'background:linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color:#ffffff; box-shadow:0 4px 14px rgba(13,148,136,0.35);';
+      icon = '📄';
+    } else if (f.FileCategory === 'WORD') {
+      catLabel = 'ดาวน์โหลดไฟล์ Word ต้นฉบับ';
+      btnStyle = 'background:linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color:#ffffff; box-shadow:0 4px 14px rgba(37,99,235,0.35);';
+      icon = '📝';
+    } else if (f.FileCategory === 'FINAL_PRESENTATION') {
+      catLabel = 'เปิดไฟล์นำเสนอ (Presentation)';
+      btnStyle = 'background:linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color:#ffffff; box-shadow:0 4px 14px rgba(124,58,237,0.35);';
+      icon = '📽️';
+    } else {
+      catLabel = `เปิดเอกสาร ${esc(f.FileCategory || 'แนบ')}`;
+    }
+
+    return `
+      <a class="btn-doc-open-prominent" target="_blank" href="${esc(f.FileUrl)}" style="${btnStyle}">
+        <span class="btn-doc-icon">${icon}</span>
+        <span class="btn-doc-text">${catLabel}</span>
+        <span class="btn-doc-arrow">↗</span>
+      </a>
+    `;
+  }).join('') : `
+    <div style="padding:10px 16px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px; color:#64748b; font-size:0.88rem; text-align:center;">
+      ⚠️ ไม่พบไฟล์เอกสารแนบในระบบ
+    </div>
+  `;
+
   $('#reviewHost').innerHTML = `
-    <div class="card" style="margin-top:14px">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-        <div>
-          <h2 style="margin:0 0 6px 0">${esc(w.WorkCode)} — ${esc(w.TitleTH || w.TitleEN || '')}</h2>
-          <div style="font-size:0.88rem; color:#667a88">
-            ประเภทผลงาน: <b style="color:var(--teal)">${workCategoryName}</b> • เกณฑ์การให้คะแนน ${criteriaList.length} ข้อ รวมเต็ม ${totalMax} คะแนน
+    <!-- Top Work Hero Header Card -->
+    <div class="review-work-hero-card">
+      <div class="review-work-hero-top">
+        <div class="review-work-info-col">
+          <div class="review-work-badge-row">
+            <span class="work-code-pill">📌 รหัสผลงาน: ${esc(w.WorkCode || '-')}</span>
+            <span class="work-category-pill">🏷️ ประเภท: <b>${workCategoryName}</b></span>
+            <span class="work-rubric-pill">⚖️ เกณฑ์ประเมิน ${criteriaList.length} ข้อ (คะแนนเต็ม ${totalMax} คะแนน)</span>
+          </div>
+          <h1 class="review-work-title">
+            ${esc(w.TitleTH || w.TitleEN || '-')}
+          </h1>
+          ${w.TitleEN && w.TitleTH ? `<div class="review-work-subtitle-en">${esc(w.TitleEN)}</div>` : ''}
+          ${(w.PresenterName || w.Institution) ? `
+            <div style="font-size:0.85rem; color:#64748b; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px;">
+              ${w.PresenterName ? `<span>👤 <b>ผู้นำเสนอ:</b> ${esc(w.PresenterName)}</span>` : ''}
+              ${w.Institution ? `<span>🏛️ <b>หน่วยงาน:</b> ${esc(w.Institution)}</span>` : ''}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="review-work-docs-col">
+          <div class="review-work-docs-label">
+            <span>📄 เอกสารผลงานสำหรับเปิดอ่าน</span>
+          </div>
+          <div class="review-work-docs-btns">
+            ${docButtonsHtml}
+          </div>
+          <div class="review-work-docs-hint">
+            (คลิกเพื่อเปิดอ่านเอกสาร PDF ในแท็บใหม่)
           </div>
         </div>
-        <div class="actions" style="margin:0">
-          ${(() => {
-            let b = 0;
-            return (d.files || []).sort((x,y) => new Date(x.UploadedAt||x.CreatedAt||0) - new Date(y.UploadedAt||y.CreatedAt||0)).map(f => {
-              let l = esc(f.FileCategory);
-              if (f.FileCategory === 'BLIND') { b++; if (b > 1) l += ' (แก้ไข V' + b + ')'; }
-              return `<a class="btn soft" target="_blank" href="${esc(f.FileUrl)}">📄 เปิดไฟล์ ${l}</a>`;
-            }).join('');
-          })()}
-        </div>
       </div>
+    </div>
+
+    ${oldEvaluationHtml}
+
+    <div class="card" style="margin-top:0">
 
       <!-- Live Score Summary Banner -->
       <div class="live-summary-card">
