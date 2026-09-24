@@ -16,22 +16,22 @@ const CACHE_TTLS:Record<string,number>={
   getPublicBootstrap: 300_000,
   getPublicAnnouncement: 300_000,
   getPublicFinanceDocuments: 300_000,
-  adminBootstrap: 180_000,
-  adminDashboard: 120_000,
+  adminBootstrap: 300_000,
+  adminDashboard: 180_000,
   getAdminSettings: 300_000,
-  adminListRegistrations: 90_000,
-  adminListPayments: 90_000,
-  adminListWorks: 90_000,
-  adminListReviewers: 180_000,
-  adminListUsers: 180_000,
-  adminListMealPasses: 90_000,
-  adminListFinanceDocuments: 180_000,
+  adminListRegistrations: 180_000,
+  adminListPayments: 180_000,
+  adminListWorks: 180_000,
+  adminListReviewers: 300_000,
+  adminListUsers: 300_000,
+  adminListMealPasses: 180_000,
+  adminListFinanceDocuments: 300_000,
   adminGetReviewConfig: 300_000,
-  reviewerBootstrap: 120_000,
-  reviewerGetAssignment: 60_000,
-  verifyWorkAccess: 60_000,
-  getEventScannerBootstrap: 120_000,
-  listImportBatches: 180_000
+  reviewerBootstrap: 180_000,
+  reviewerGetAssignment: 180_000,
+  verifyWorkAccess: 120_000,
+  getEventScannerBootstrap: 180_000,
+  listImportBatches: 300_000
 };
 
 const inFlightRequests = new Map<string, Promise<ApiResponse<unknown>>>();
@@ -138,7 +138,40 @@ function setCachedResponse(action:string,args:unknown[],data:ApiResponse<unknown
 function invalidateServerCache(action:string){
   // Do NOT invalidate cache on read actions!
   if(READ_ACTIONS.has(action)) return;
-  // If an actual write occurs, clear memory cache
+  // Targeted invalidation to protect unrelated cached data
+  if(/reviewerSaveReview|reviewer/i.test(action)){
+    for(const key of Array.from(memoryCache.keys())){
+      if(key.startsWith('reviewer') || key.startsWith('adminListWorks') || key.startsWith('adminDashboard')) {
+        memoryCache.delete(key);
+      }
+    }
+    return;
+  }
+  if(/Registration|Participant/i.test(action)){
+    for(const key of Array.from(memoryCache.keys())){
+      if(key.startsWith('adminListRegistrations') || key.startsWith('adminDashboard') || key.startsWith('adminListMealPasses') || key.startsWith('lookupRegistration')) {
+        memoryCache.delete(key);
+      }
+    }
+    return;
+  }
+  if(/Payment|Receipt|Invoice/i.test(action)){
+    for(const key of Array.from(memoryCache.keys())){
+      if(key.startsWith('adminListPayments') || key.startsWith('adminDashboard') || key.startsWith('adminListFinanceDocuments')) {
+        memoryCache.delete(key);
+      }
+    }
+    return;
+  }
+  if(/Work|File|Author|Criteria|Score/i.test(action)){
+    for(const key of Array.from(memoryCache.keys())){
+      if(key.startsWith('adminListWorks') || key.startsWith('adminDashboard') || key.startsWith('reviewer') || key.startsWith('verifyWorkAccess')) {
+        memoryCache.delete(key);
+      }
+    }
+    return;
+  }
+  // Generic write fallback
   if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(action)){
     memoryCache.clear();
   }
@@ -296,11 +329,32 @@ export async function POST(request:NextRequest){
         setCachedResponse("reviewerBootstrap", [token], revResponse);
         setCachedResponse("reviewerBootstrap", ["__COOKIE__"], revResponse);
       }
+      if(data.user && data.conference && data.settings){
+        const cid = typeof data.conferenceId === "string" ? data.conferenceId : "CONF-TUH-QF-2569";
+        const adminBootData = {
+          user: data.user,
+          role: data.role,
+          conference: data.conference,
+          settings: data.settings,
+          workCategories: DEFAULT_CONFERENCE_BOOT.workCategories,
+          presentationTypes: DEFAULT_CONFERENCE_BOOT.presentationTypes,
+          optionConfig: data.optionConfig
+        };
+        const admResponse: ApiResponse<unknown> = { success: true, data: adminBootData };
+        setCachedResponse("adminBootstrap", [token, cid], admResponse);
+        setCachedResponse("adminBootstrap", ["__COOKIE__", cid], admResponse);
+        setCachedResponse("adminBootstrap", [token], admResponse);
+        setCachedResponse("adminBootstrap", ["__COOKIE__"], admResponse);
+      }
       const response=NextResponse.json({...result,data});
       setSessionCookie(response,token);
       return response;
     }
-    const response=NextResponse.json(result,{status:result.success?200:400});
+    const headers: Record<string, string> = {};
+    if(result.success && READ_ACTIONS.has(action)){
+      headers["Cache-Control"] = "private, max-age=15, stale-while-revalidate=60";
+    }
+    const response=NextResponse.json(result,{status:result.success?200:400,headers});
     if(action==="logoutUser")clearSessionCookie(response);
     return response;
   }catch(err:unknown){
