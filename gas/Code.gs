@@ -7292,6 +7292,21 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
         } catch(e) {}
       }
     });
+
+    var allRevs = getRecords_('Reviewers') || [];
+    var revMap = {};
+    allRevs.forEach(function(r){
+      if (r && r.ReviewerID) revMap[String(r.ReviewerID).trim()] = r;
+    });
+    assignments.forEach(function(a){
+      var r = revMap[String(a.ReviewerID || '').trim()];
+      if (r) {
+        a.ReviewerName = r.FullName || [r.Prefix, r.FirstName, r.LastName].filter(Boolean).join(' ') || a.ReviewerName || a.ReviewerID;
+        a.ReviewerPosition = r.Position || '';
+        a.ReviewerInstitution = r.Institution || '';
+        a.ReviewerDepartment = r.Department || '';
+      }
+    });
     
     return {
       work: serialize_(work),
@@ -7299,6 +7314,106 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
       assignments: serialize_(assignments),
       scores: serialize_(scores),
       criteria: serialize_(criteria)
+    };
+  });
+}
+
+function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
+  return runSafely_('adminGetReviewerEvaluationReport', function() {
+    requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    
+    var allRevs = getRecords_('Reviewers') || [];
+    var rev = allRevs.find(function(r){ return String(r.ReviewerID || '').trim() === String(reviewerId || '').trim(); });
+    if (!rev) {
+      var pool = findOne_('ReviewerPool', { ConferenceID: cid, ReviewerID: reviewerId });
+      if (pool) {
+        rev = {
+          ReviewerID: reviewerId,
+          FullName: pool.FullName || reviewerId,
+          Institution: pool.Institution || '',
+          Department: pool.Department || '',
+          Position: pool.Position || '',
+          Email: pool.Email || '',
+          Phone: pool.Phone || '',
+          ExpertiseCategories: pool.ExpertiseCategories || ''
+        };
+      } else {
+        throw new Error('ไม่พบข้อมูล Reviewer: ' + reviewerId);
+      }
+    }
+    
+    var revEmail = normalizeEmail_(rev.Email || '');
+    var allAssignments = findMany_('ReviewAssignments', { ConferenceID: cid });
+    var assignments = allAssignments.filter(function(a) {
+      if (upper_(a.Status) === 'CANCELLED') return false;
+      var matchId = String(a.ReviewerID || '').trim() === String(reviewerId || '').trim();
+      var matchEmail = revEmail && a.ReviewerEmail && normalizeEmail_(a.ReviewerEmail) === revEmail;
+      return matchId || matchEmail;
+    });
+
+    var neededWorkIds = {};
+    assignments.forEach(function(a) { if (a.WorkID) neededWorkIds[a.WorkID] = true; });
+    var allWorks = getRecords_('Works') || [];
+    var worksList = allWorks.filter(function(w) { return !!neededWorkIds[w.WorkID]; });
+    var workMap = {};
+    worksList.forEach(function(w){ workMap[w.WorkID] = w; });
+
+    var allAuthors = getRecords_('WorkAuthors') || [];
+    var authorMap = {};
+    allAuthors.forEach(function(auth){
+      if (!authorMap[auth.WorkID]) authorMap[auth.WorkID] = [];
+      authorMap[auth.WorkID].push(auth);
+    });
+
+    var allScores = getRecords_('ReviewScores') || [];
+    var asgnIds = {};
+    assignments.forEach(function(a){ asgnIds[a.AssignmentID] = true; });
+    var relevantScores = allScores.filter(function(s){
+      return (s.AssignmentID && asgnIds[s.AssignmentID]) || (String(s.ReviewerID || '').trim() === String(reviewerId || '').trim());
+    });
+
+    var allCriteria = findMany_('ScoringCriteria', { ConferenceID: cid }).filter(function(c){ return bool_(c.Active); });
+
+    var enrichedAssignments = assignments.map(function(a){
+      var w = workMap[a.WorkID] || {};
+      var auths = authorMap[a.WorkID] || [];
+      var presenter = auths.find(function(x){ return bool_(x.IsPresenter); }) || auths[0];
+      var presenterName = presenter ? (clean_(presenter.FullName) || [presenter.Prefix, presenter.FirstName, presenter.LastName].filter(Boolean).map(clean_).join(' ')) : '';
+      if (!presenterName && w.RegID) {
+        var reg = findOne_('Registrations', { ConferenceID: cid, RegID: w.RegID });
+        if (reg) presenterName = clean_(reg.FullName) || [reg.Prefix, reg.FirstName, reg.LastName].filter(Boolean).map(clean_).join(' ');
+      }
+      var myScores = relevantScores.filter(function(s){
+        return s.AssignmentID === a.AssignmentID || (s.WorkID === a.WorkID && String(s.ReviewerID || '').trim() === String(reviewerId || '').trim());
+      });
+
+      return {
+        AssignmentID: a.AssignmentID,
+        WorkID: a.WorkID,
+        WorkCode: a.WorkCode || w.WorkCode || a.WorkID,
+        TitleTH: a.TitleTH || w.TitleTH || w.ThaiTitle || w.TitleEN || '',
+        TitleEN: a.TitleEN || w.TitleEN || w.EnglishTitle || '',
+        CategoryID: w.CategoryID || a.CategoryID || '',
+        CategoryName: resolveCategoryName_(w.CategoryName || w.CategoryNameTH || a.CategoryName || ''),
+        PresentationTypeID: w.PresentationTypeID || '',
+        PresentationTypeName: w.PresentationTypeID === 'PRES-POSTER' ? 'โปสเตอร์ (Poster)' : 'บรรยาย (Oral)',
+        PresenterName: presenterName,
+        Status: a.Status,
+        TotalScore: Number(a.TotalScore) || 0,
+        Decision: a.Decision || '',
+        RecommendationToAuthor: a.RecommendationToAuthor || '',
+        InternalComment: a.InternalComment || '',
+        CompletedAt: a.CompletedAt || a.UpdatedAt || '',
+        scores: serialize_(myScores)
+      };
+    });
+
+    return {
+      reviewer: serialize_(rev),
+      assignments: serialize_(enrichedAssignments),
+      criteria: serialize_(allCriteria),
+      conference: serialize_(findOne_('Conferences', { ConferenceID: cid }))
     };
   });
 }
@@ -7732,6 +7847,7 @@ const API_ACTIONS = Object.freeze({
   adminSaveRegistrationType: adminSaveRegistrationType,
   adminSetupCategoryScoringCriteria: adminSetupCategoryScoringCriteria,
   adminGetReviewer: adminGetReviewer,
+  adminGetReviewerEvaluationReport: adminGetReviewerEvaluationReport,
   adminGetUserScanHistory: adminGetUserScanHistory,
   adminGetWorkScoreSummary: adminGetWorkScoreSummary,
   adminListMealPasses: adminListMealPasses,

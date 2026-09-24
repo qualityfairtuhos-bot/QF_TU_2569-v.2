@@ -14,6 +14,7 @@ const API_ACTIONS = Object.freeze({
   adminGetRegistrationSignSheet: adminGetRegistrationSignSheet,
   adminGetReviewConfig: adminGetReviewConfig,
   adminGetReviewer: adminGetReviewer,
+  adminGetReviewerEvaluationReport: adminGetReviewerEvaluationReport,
   adminGetUserScanHistory: adminGetUserScanHistory,
   adminGetWorkScoreSummary: adminGetWorkScoreSummary,
   adminImportFromGoogleSheet: adminImportFromGoogleSheet,
