@@ -258,7 +258,6 @@ export async function POST(request:NextRequest){
     }
   } else {
     memoryCache.delete(cacheKey);
-    lastKnownGood.delete(cacheKey);
   }
 
   const secret=getGasSecret();

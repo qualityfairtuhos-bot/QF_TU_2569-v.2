@@ -3572,9 +3572,17 @@ function adminListPayments(token,conferenceId,filters){
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
     const cacheKey = 'ADM_PAYMENTS_' + cid;
     let baseRows = null;
-    try {
-      baseRows = cacheGetLarge_(cacheKey);
-    } catch(e) {}
+    if (filters.forceRefresh || filters.refresh) {
+      clearTableCache_('Payments');
+      clearTableCache_('Registrations');
+      clearTableCache_('RegistrationTypes');
+      clearTableCache_('FinanceDocuments');
+      try { cacheRemoveLarge_(cacheKey); } catch(e){}
+    } else {
+      try {
+        baseRows = cacheGetLarge_(cacheKey);
+      } catch(e) {}
+    }
 
     if (!baseRows || !Array.isArray(baseRows)) {
       const types={};findMany_('RegistrationTypes',{ConferenceID:cid}).forEach(function(t){types[t.TypeCode]=t;});
@@ -6320,8 +6328,13 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
     const cacheKey = 'DASH_' + cid + (filters && filters.type ? '_' + filters.type : '');
 
-    // ถ้ามี cache ใช้ก่อน
-    if (!forceRefresh) {
+    if (forceRefresh || (filters && (filters.forceRefresh || filters.refresh))) {
+      clearTableCache_('Registrations');
+      clearTableCache_('Works');
+      clearTableCache_('Payments');
+      clearTableCache_('ReviewAssignments');
+      try { cacheRemoveLarge_(cacheKey); } catch(e){}
+    } else {
       const cached = cacheGetLarge_(cacheKey);
       if (cached) return cached;
     }
@@ -6474,9 +6487,16 @@ function adminListRegistrations(token, conferenceId, filters) {
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
     const cacheKey = 'ADM_REGS_' + cid;
     let baseRows = null;
-    try {
-      baseRows = cacheGetLarge_(cacheKey);
-    } catch(e) {}
+    if (filters.forceRefresh || filters.refresh) {
+      clearTableCache_('Registrations');
+      clearTableCache_('Payments');
+      clearTableCache_('RegistrationTypes');
+      try { cacheRemoveLarge_(cacheKey); } catch(e){}
+    } else {
+      try {
+        baseRows = cacheGetLarge_(cacheKey);
+      } catch(e) {}
+    }
 
     if (!baseRows || !Array.isArray(baseRows)) {
       const fullRows = findMany_('Registrations', { ConferenceID: cid });
@@ -6588,9 +6608,20 @@ function adminListWorks(token, conferenceId, filters) {
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
     const cacheKey = 'ADM_WORKS_' + cid;
     let baseRows = null;
-    try {
-      baseRows = cacheGetLarge_(cacheKey);
-    } catch(e) {}
+    if (filters.forceRefresh || filters.refresh) {
+      clearTableCache_('Works');
+      clearTableCache_('WorkAuthors');
+      clearTableCache_('ReviewAssignments');
+      clearTableCache_('WorkFiles');
+      clearTableCache_('WorkCategories');
+      clearTableCache_('PresentationTypes');
+      clearTableCache_('Registrations');
+      try { cacheRemoveLarge_(cacheKey); } catch(e){}
+    } else {
+      try {
+        baseRows = cacheGetLarge_(cacheKey);
+      } catch(e) {}
+    }
 
     if (!baseRows || !Array.isArray(baseRows)) {
       var works = findMany_('Works', { ConferenceID: cid });

@@ -24,7 +24,7 @@
     .app{display:none}.sidebar{position:fixed;inset:0 auto 0 0;width:250px;background:linear-gradient(180deg,#071A2D,#0B2941 62%,#073942);color:#fff;overflow:auto;border-right:1px solid rgba(255,255,255,.08);transition:transform 0.25s ease;z-index:90}.sidebar.open{transform:translateX(0)!important}.hamburger{display:none;background:transparent;border:0;font-size:1.4rem;cursor:pointer;color:var(--ink);padding:5px 12px 5px 0;margin-right:8px}.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:80;opacity:0;transition:opacity 0.25s ease}.overlay.show{display:block;opacity:1}
     .brand{padding:14px 12px;border-bottom:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:108px;background:linear-gradient(135deg,rgba(0,109,112,.38),rgba(12,56,91,.1))}.brand-logos{display:flex;align-items:center;justify-content:center;gap:9px}.brand img{width:92px;height:52px;object-fit:contain;filter:drop-shadow(0 5px 10px rgba(0,0,0,.25))}.brand img:last-child{width:58px}.brand-label{font-size:.78rem;font-weight:600;color:#fff;text-align:center;white-space:nowrap}.user{padding:16px;border-bottom:1px solid rgba(255,255,255,.12)}.menu{padding:10px}.menu button{width:100%;text-align:left;border:0;background:transparent;color:#C7D2DC;padding:12px;border-radius:10px;margin:2px 0}.menu button.active,.menu button:hover{background:#0D6670;color:#fff}
     .main{margin-left:250px}.top{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:10}.content{padding:22px;max-width:1600px;margin:auto}.page{display:none}.page.active{display:block}.card{background:#fff;border:1px solid var(--border);border-radius:17px;padding:18px;margin-bottom:16px;box-shadow:0 8px 22px rgba(12,56,91,.05)}
-    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.kpi{padding:17px;border-radius:15px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;gap:16px;position:relative;overflow:hidden}.kpi-icon{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:12px;font-size:1.6rem}.kpi-content{flex:1}.kpi-content span{font-size:0.88rem;color:#555;display:block;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kpi-content b{font-size:1.7rem;line-height:1;color:#111;margin:0;display:block}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.grid6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:.84rem}.table th,.table td{padding:9px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}.table th{background:#F7FAFB;white-space:nowrap;position:sticky;top:0}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#E6EEF2;font-size:.72rem}.badge.ok{background:#DDF5E9;color:#126B45}.badge.warn{background:#FFF1C7;color:#795800}.badge.bad{background:#FEE4E2;color:#9A221A}.actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.warning-box{padding:12px 14px;border-radius:12px;background:#FFF7DB;border:1px solid #E8D28B;margin:12px 0;color:#684f00}.info-box{padding:12px 14px;border-radius:12px;background:#EAF5F7;border:1px solid #BBDDE1;margin:12px 0;color:#164B55}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.kpi{padding:17px;border-radius:15px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;gap:16px;position:relative;overflow:hidden}.kpi-icon{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:12px;font-size:1.6rem}.kpi-content{flex:1}.kpi-content span{font-size:0.88rem;color:#555;display:block;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kpi-content b{font-size:1.7rem;line-height:1;color:#111;margin:0;display:block}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.grid6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:.84rem}.table th,.table td{padding:9px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}.table th{background:#F7FAFB;white-space:nowrap;position:sticky;top:0}.table th.sortable-th{cursor:pointer!important;user-select:none;transition:background-color .15s ease,color .15s ease}.table th.sortable-th:hover{background-color:#e2e8f0!important;color:#006D70!important}.table th.no-sort{cursor:default!important}.sort-indicator{display:inline-flex;align-items:center;margin-left:4px}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#E6EEF2;font-size:.72rem}.badge.ok{background:#DDF5E9;color:#126B45}.badge.warn{background:#FFF1C7;color:#795800}.badge.bad{background:#FEE4E2;color:#9A221A}.actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.warning-box{padding:12px 14px;border-radius:12px;background:#FFF7DB;border:1px solid #E8D28B;margin:12px 0;color:#684f00}.info-box{padding:12px 14px;border-radius:12px;background:#EAF5F7;border:1px solid #BBDDE1;margin:12px 0;color:#164B55}
     .toolbar{display:grid;grid-template-columns:2fr repeat(3,minmax(140px,1fr)) auto;gap:8px;align-items:end;margin-bottom:12px}.toolbar input,.toolbar select{width:100%;padding:9px 11px;border:1px solid #BFCBD3;border-radius:10px}.count-pill{padding:8px 11px;border-radius:999px;background:#EAF2F5;font-size:.8rem}.coupon-preview{max-width:430px;margin:auto;background:linear-gradient(145deg,#0b1730,#12172b 72%,#281232);color:#fff;border-radius:18px;padding:24px;text-align:center;box-shadow:0 18px 48px rgba(11,23,48,.25);font-family:Arial,'Noto Sans Thai',sans-serif}.coupon-preview .head{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:14px}.coupon-preview .head b{color:#d7ad2d;font-size:16px}.coupon-preview .head span{font-size:12px;color:#9ba8bd}.coupon-preview .welcome{color:#d7ad2d;font-weight:700;font-size:15px;margin-top:16px}.coupon-preview h2{margin:14px 0 4px;font-size:22px;color:#fff}.coupon-preview .reg-id{color:#9ba8bd;font-size:14px}.coupon-preview .qr-wrap{background:#fff;border-radius:14px;padding:10px;width:210px;margin:20px auto;box-sizing:border-box}.coupon-preview .qr-wrap img{width:190px;height:190px;display:block;margin:0 auto}.coupon-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:rgba(255,255,255,.06);padding:13px;border-radius:12px;text-align:left}.coupon-meta small{color:#9ba8bd;font-size:12px}.coupon-meta b.type-name{color:#f0c53b;font-size:13px;display:block;margin-top:2px}.coupon-meta b.fee-val{color:#fff;font-size:13px;display:block;margin-top:2px}.coupon-preview .days{margin-top:14px;color:#c9d0dd;font-size:13px;text-align:left}.coupon-preview .note{margin-top:16px;color:#d7a7ba;font-size:12px;text-align:center}
     .loading{position:fixed;inset:0;background:rgba(244,247,248,.88);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;z-index:100}.loading.show{display:flex}.loading-box{background:#fff;padding:22px 28px;border-radius:18px;box-shadow:0 18px 45px rgba(0,0,0,.16)}.spin{display:inline-block;width:24px;height:24px;border:3px solid #DCE5EA;border-top-color:var(--teal);border-radius:50%;animation:s .8s linear infinite;margin-right:10px}@keyframes s{to{transform:rotate(360deg)}}
     .swal-wide{width:min(1050px,96vw)!important}.edit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;text-align:left}.edit-grid label{font-size:.78rem;font-weight:600}.edit-grid input,.edit-grid select{width:100%;padding:8px;border:1px solid #c5d0d7;border-radius:8px;margin-top:3px}.attendance-edit{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;text-align:left}
@@ -222,14 +222,6 @@
           <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="renderWorksTable()">
           <select id="workCategory" class="field" style="width:230px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
             <option value="">ทุกประเภทผลงาน</option>
-            <option value="Service Excellence">Service Excellence</option>
-            <option value="CQI/ Best Practice">CQI/ Best Practice</option>
-            <option value="Primary Care & Community Network Development">Primary Care & Community Network</option>
-            <option value="ผลงานวิจัยด้านคุณภาพและความปลอดภัย">ผลงานวิจัยด้านคุณภาพและความปลอดภัย</option>
-            <option value="ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย">ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย</option>
-            <option value="การพัฒนางานประจำสู่งานวิจัย (R2R)">การพัฒนางานประจำสู่งานวิจัย (R2R)</option>
-            <option value="นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร">นโยบาย/ระบบงาน/การพัฒนาคุณภาพ</option>
-            <option value="เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์">เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจ</option>
           </select>
           <select id="workPresentationType" class="field" style="width:190px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
             <option value="">ทุกรูปแบบการนำเสนอ</option>
@@ -358,7 +350,7 @@ const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','Registratio
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?15000:45000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
+window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const lastArg=a.length>0?a[a.length-1]:null;const isForceRefresh=!!((lastArg&&typeof lastArg==='object'&&(lastArg.forceRefresh||lastArg.refresh||lastArg.bypassCache))||(n==='adminDashboard'&&(a[2]===true||(lastArg&&lastArg.forceRefresh))));const cacheKey=n+':'+JSON.stringify(a);if(!isForceRefresh&&isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(isForceRefresh&&window._rpcCache){window._rpcCache.delete(cacheKey)}if(!isForceRefresh&&window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const fetchHeaders={'Content-Type':'application/json'};if(isForceRefresh){fetchHeaders['x-bypass-cache']='1'}const response=await fetch('/api/gas',{method:'POST',headers:fetchHeaders,credentials:'include',body:JSON.stringify({action:n,args:a,bypassCache:isForceRefresh,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(!isForceRefresh&&isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?15000:45000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(!isForceRefresh&&window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
@@ -374,6 +366,12 @@ function listTextToJson(v){return JSON.stringify([...new Set(String(v||'').split
 function optionHtml(arr,current='',blank=true){return (blank?'<option value="">-- เลือก --</option>':'')+(arr||[]).map(x=>`<option value="${esc(x)}" ${String(x)===String(current)?'selected':''}>${esc(x)}</option>`).join('')}
 function dataList(id,arr){return `<datalist id="${id}">${(arr||[]).map(x=>`<option value="${esc(x)}"></option>`).join('')}</datalist>`}
 function statusBadge(v){const s=String(v||'');const c=/APPROVED|COMPLETE|VERIFIED|READY|SENT|NOT_REQUIRED/.test(s)?'ok':/RETURN|REJECT|CANCEL|INCOMPLETE|ERROR/.test(s)?'bad':'warn';return `<span class="badge ${c}">${esc(s)}</span>`}
+function getCellSortValue(td){if(!td)return '';if(td.dataset&&td.dataset.sort)return td.dataset.sort.trim();const inp=td.querySelector('input:not([type="checkbox"]), select');if(inp)return (inp.value||'').trim();return (td.textContent||'').replace(/\s+/g,' ').trim()}
+function parseThaiDateToTimestamp(str){if(!str)return null;const m1=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);if(m1){let day=parseInt(m1[1],10);let month=parseInt(m1[2],10)-1;let year=parseInt(m1[3],10);if(year>2400)year-=543;let hour=m1[4]?parseInt(m1[4],10):0;let min=m1[5]?parseInt(m1[5],10):0;const d=new Date(year,month,day,hour,min);return isNaN(d.getTime())?null:d.getTime()}const m2=str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m2){const d=new Date(str);return isNaN(d.getTime())?null:d.getTime()}return null}
+function sortTableByColumn(table,colIndex,forcedDir){if(!table)return;const tbody=table.querySelector('tbody');if(!tbody)return;const thead=table.querySelector('thead');if(!thead)return;const ths=thead.querySelectorAll('th');const targetTh=ths[colIndex];if(!targetTh)return;const currentDir=targetTh.dataset.sortDir;const newDir=forcedDir||(currentDir==='asc'?'desc':'asc');ths.forEach((th,idx)=>{if(idx!==colIndex){delete th.dataset.sortDir;const ic=th.querySelector('.sort-indicator');if(ic)ic.innerHTML='<i class="fa-solid fa-sort" style="opacity:0.3;font-size:0.75rem;margin-left:4px;"></i>';if(!th.classList.contains('no-sort'))th.title='คลิกเพื่อเรียงลำดับคอลัมน์นี้'}});targetTh.dataset.sortDir=newDir;targetTh.title=newDir==='asc'?'เรียงจากน้อยไปมาก (คลิกเพื่อเรียงจากมากไปน้อย)':'เรียงจากมากไปน้อย (คลิกเพื่อเรียงจากน้อยไปมาก)';let icon=targetTh.querySelector('.sort-indicator');if(!icon){icon=document.createElement('span');icon.className='sort-indicator';targetTh.appendChild(icon)}icon.innerHTML=newDir==='asc'?'<i class="fa-solid fa-arrow-down-short-wide" style="color:#006D70;font-size:0.8rem;margin-left:5px;"></i>':'<i class="fa-solid fa-arrow-down-wide-short" style="color:#d97706;font-size:0.8rem;margin-left:5px;"></i>';table._activeSort={colIndex,dir:newDir};const rows=Array.from(tbody.querySelectorAll('tr'));const validRows=rows.filter(r=>!r.querySelector('td.muted')&&r.querySelectorAll('td').length>1);if(validRows.length<=1)return;const isAsc=newDir==='asc';validRows.sort((trA,trB)=>{const tdA=trA.children[colIndex];const tdB=trB.children[colIndex];const valA=getCellSortValue(tdA);const valB=getCellSortValue(tdB);const emptyA=!valA||valA==='-';const emptyB=!valB||valB==='-';if(emptyA&&emptyB)return 0;if(emptyA)return 1;if(emptyB)return -1;const dateA=parseThaiDateToTimestamp(valA);const dateB=parseThaiDateToTimestamp(valB);if(dateA!==null&&dateB!==null){return isAsc?(dateA-dateB):(dateB-dateA)}const ratioA=valA.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);const ratioB=valB.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);if(ratioA&&ratioB){const numA1=parseFloat(ratioA[1]);const numB1=parseFloat(ratioB[1]);if(numA1!==numB1)return isAsc?(numA1-numB1):(numB1-numA1);const numA2=parseFloat(ratioA[2]);const numB2=parseFloat(ratioB[2]);return isAsc?(numA2-numB2):(numB2-numA2)}const cleanNumA=valA.replace(/[, บาทครั้งเรื่อง%]/g,'').trim();const cleanNumB=valB.replace(/[, บาทครั้งเรื่อง%]/g,'').trim();const nA=parseFloat(cleanNumA);const nB=parseFloat(cleanNumB);if(!isNaN(nA)&&!isNaN(nB)&&/^\d+(\.\d+)?$/.test(cleanNumA)&&/^\d+(\.\d+)?$/.test(cleanNumB)){return isAsc?(nA-nB):(nB-nA)}return isAsc?valA.localeCompare(valB,'th',{numeric:true,sensitivity:'base'}):valB.localeCompare(valA,'th',{numeric:true,sensitivity:'base'})});const fragment=document.createDocumentFragment();validRows.forEach(r=>fragment.appendChild(r));tbody.appendChild(fragment)}
+function reapplyTableSort(table){if(!table||!table._activeSort)return;const{colIndex,dir}=table._activeSort;sortTableByColumn(table,colIndex,dir)}
+function refreshTableSortHeaders(){document.querySelectorAll('table.table, table').forEach(table=>{const thead=table.querySelector('thead');if(!thead)return;const ths=thead.querySelectorAll('th');ths.forEach((th)=>{const isCheckbox=!!th.querySelector('input[type="checkbox"]');const text=(th.textContent||'').trim();const isAction=text==='จัดการ'||text==='Actions'||text==='';if(isCheckbox||isAction||th.classList.contains('no-sort')||th.dataset.noSort){th.classList.add('no-sort');th.style.cursor='default';return}th.classList.add('sortable-th');th.style.cursor='pointer';if(!th.querySelector('.sort-indicator')){const span=document.createElement('span');span.className='sort-indicator';span.innerHTML='<i class="fa-solid fa-sort" style="opacity:0.3;font-size:0.75rem;margin-left:4px;"></i>';th.appendChild(span);th.title='คลิกเพื่อเรียงลำดับคอลัมน์นี้ (น้อยไปมาก / มากไปน้อย)'}})});setTimeout(()=>{document.querySelectorAll('table.table').forEach(tbl=>{if(!tbl._activeSort){const firstSortable=tbl.querySelector('thead th.sortable-th');if(firstSortable&&!firstSortable.dataset.sortDir){firstSortable.title='คลิกเพื่อเรียงลำดับคอลัมน์นี้'}}})},100)}
+document.addEventListener('click',function(e){const th=e.target.closest('th');if(!th)return;const table=th.closest('table');if(!table)return;if(e.target.tagName==='INPUT'||th.querySelector('input[type="checkbox"]'))return;const thText=(th.textContent||'').trim();if(thText==='จัดการ'||thText==='Actions'||thText===''||th.classList.contains('no-sort')||th.dataset.noSort)return;const tr=th.parentElement;if(!tr)return;const ths=Array.from(tr.children);const colIndex=ths.indexOf(th);if(colIndex<0)return;sortTableByColumn(table,colIndex)});
 
 const ADMIN_CRED_KEY='tuhAdminRememberedCredentials';
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
@@ -472,7 +470,20 @@ async function nav(p, forceRefresh = false){
 function toggleSidebar(){const sidebar=$('#sidebar'),overlay=$('#sidebarOverlay');if(!sidebar||!overlay)return;const isOpen=sidebar.classList.contains('open');if(isOpen){sidebar.classList.remove('open');overlay.classList.remove('show')}else{sidebar.classList.add('open');overlay.classList.add('show')}}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
 async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
-async function refreshPage(){if(window._rpcCache)window._rpcCache.clear();if(CURRENT&&window.TAB_STATE&&window.TAB_STATE.loaded)delete window.TAB_STATE.loaded[CURRENT];return nav(CURRENT,true)}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
+async function refreshPage(){
+  if(window._rpcCache) window._rpcCache.clear();
+  try{
+    Object.keys(sessionStorage).forEach(k => {
+      if(k.startsWith('tuhDashCache_') || k.startsWith('tuhBootCache_')) sessionStorage.removeItem(k);
+    });
+  }catch(e){}
+  if(window.TAB_STATE && window.TAB_STATE.loaded){
+    if(CURRENT) delete window.TAB_STATE.loaded[CURRENT];
+  }
+  await nav(CURRENT, true);
+  refreshTableSortHeaders();
+  toast('รีเฟรชข้อมูลหน้าเรียบร้อยแล้ว');
+}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
 let chartRegByType, chartWorksIntent, chartWorksByStatus, chartWorksByCategory, chartDailyQuota;
 if (window.ChartDataLabels) Chart.register(ChartDataLabels);
 function renderDashboardUi(d, filterType){
@@ -1377,13 +1388,15 @@ async function sendBatchEmails(batchId, emailTarget){
 }
 async function loadRegistrations(forceRefresh = false){
   const hasRows = !!(window.REGISTRATION_ROWS && window.REGISTRATION_ROWS.length);
-  if(!hasRows && !forceRefresh) show('กำลังโหลดผู้ลงทะเบียน');
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผู้ลงทะเบียนจาก Google Sheets...' : 'กำลังโหลดผู้ลงทะเบียน');
   try{
     const rows=await rpc('adminListRegistrations',TOKEN,CID,{
       q:$('#regSearch')?$('#regSearch').value:'',
       status:$('#regStatus')?$('#regStatus').value:'',
       participantGroup:$('#regParticipantType')?$('#regParticipantType').value:'',
-      attendanceDay:$('#regAttendanceDay')?$('#regAttendanceDay').value:''
+      attendanceDay:$('#regAttendanceDay')?$('#regAttendanceDay').value:'',
+      forceRefresh: !!forceRefresh,
+      refresh: !!forceRefresh
     });
     if ($('#regCountBadge')) {
       $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
@@ -1392,8 +1405,14 @@ async function loadRegistrations(forceRefresh = false){
     $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
     initRegScrollSync();
     setTimeout(updateRegTopScrollbar, 50);
-  }finally{if(!hasRows && !forceRefresh) hide()}
+    reapplyTableSort($('#regRows')?.closest('table'));
+    refreshTableSortHeaders();
+    if(forceRefresh) toast(`รีเฟรชข้อมูลผู้ลงทะเบียนสำเร็จ (${rows.length} คน)`);
+  }finally{
+    hide();
+  }
 }
+
 async function setRegStatus(id,status){const returning=status==='REGISTRATION_RETURNED';const x=await Swal.fire({icon:returning?'warning':'question',title:returning?'ส่งคืนข้อมูลให้ผู้สมัคร':'ยืนยันตรวจผ่าน',input:'textarea',inputLabel:returning?'ระบุเหตุผลที่ต้องแก้ไข':'หมายเหตุ (ถ้ามี)',inputPlaceholder:returning?'กรุณาระบุให้ชัดเจนเพื่อส่งไปทาง Email':'',inputValidator:v=>returning&&!String(v||'').trim()?'กรุณาระบุเหตุผล':undefined,showCancelButton:true,confirmButtonText:returning?'ส่งคืนและแจ้ง Email':'ตรวจผ่าน',confirmButtonColor:returning?'#C8B278':'#006D70'});if(!x.isConfirmed)return;show('กำลังอัปเดตสถานะ');try{const r=await rpc('adminUpdateRegistrationStatus',TOKEN,CID,id,status,x.value||'');hide();await Swal.fire({icon:'success',title:'ดำเนินการเรียบร้อย',html:`สถานะใหม่: <b>${esc(r.newStatus)}</b>${r.mealPass?.sent?'<br>ส่งคูปองอาหารอัตโนมัติแล้ว':''}`,confirmButtonColor:'#006D70'});if(window.TAB_STATE&&window.TAB_STATE.loaded)delete window.TAB_STATE.loaded['registrations'];loadRegistrations(true)}catch(e){err(e)}}
 async function openRegistrationView(id){
   show('กำลังเปิดข้อมูล');
@@ -2265,7 +2284,35 @@ function renderSignSheetWindow(win,d,filters){
 
 window.PAYMENT_ROWS = [];
 
-async function loadPayments(forceRefresh = false){const hasRows=!!(window.PAYMENT_ROWS&&window.PAYMENT_ROWS.length);if(!hasRows&&!forceRefresh)show('กำลังโหลดการเงิน');try{const q=($('#paySearch')?.value||'').trim();const status=($('#payStatus')?.value||'').trim();const needInvoice=($('#payInvoiceRequirement')?.value||'').trim();const receiptStatus=($('#payReceiptStatus')?.value||'').trim();let rows=await rpc('adminListPayments',TOKEN,CID,{q,status,needInvoice,receiptStatus});if(!rows||!Array.isArray(rows))rows=[];if(needInvoice==='NEED'){rows=rows.filter(p=>p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice);}else if(needInvoice==='NO'){rows=rows.filter(p=>!(p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice));}if(receiptStatus==='ISSUED'){rows=rows.filter(p=>p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued);}else if(receiptStatus==='NOT_ISSUED'){rows=rows.filter(p=>!(p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued));}window.PAYMENT_ROWS=rows;$('#payRows').innerHTML=rows.length?rows.map(p=>{const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>'}finally{if(!hasRows&&!forceRefresh)hide()}}
+async function loadPayments(forceRefresh = false){
+  const hasRows=!!(window.PAYMENT_ROWS&&window.PAYMENT_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลการเงินจาก Google Sheets...' : 'กำลังโหลดการเงิน');
+  try{
+    const q=($('#paySearch')?.value||'').trim();
+    const status=($('#payStatus')?.value||'').trim();
+    const needInvoice=($('#payInvoiceRequirement')?.value||'').trim();
+    const receiptStatus=($('#payReceiptStatus')?.value||'').trim();
+    let rows=await rpc('adminListPayments',TOKEN,CID,{q,status,needInvoice,receiptStatus,forceRefresh:!!forceRefresh,refresh:!!forceRefresh});
+    if(!rows||!Array.isArray(rows))rows=[];
+    if(needInvoice==='NEED'){rows=rows.filter(p=>p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice);}
+    else if(needInvoice==='NO'){rows=rows.filter(p=>!(p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice));}
+    if(receiptStatus==='ISSUED'){rows=rows.filter(p=>p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued);}
+    else if(receiptStatus==='NOT_ISSUED'){rows=rows.filter(p=>!(p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued));}
+    window.PAYMENT_ROWS=rows;
+    $('#payRows').innerHTML=rows.length?rows.map(p=>{
+      const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);
+      const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;
+      const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;
+      const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;
+      return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`
+    }).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    reapplyTableSort($('#payRows')?.closest('table'));
+    refreshTableSortHeaders();
+    if(forceRefresh) toast(`รีเฟรชข้อมูลการเงินสำเร็จ (${rows.length} รายการ)`);
+  }finally{
+    hide();
+  }
+}
 
 function openEditReceiptModal(regId){const p=(window.PAYMENT_ROWS||[]).find(x=>x.RegID===regId)||{};const name=p.ReceiptName||p.FullName||p.Registration?.FullName||'';const taxId=p.ReceiptTaxID||p.ReceiptTaxId||'';const address=p.ReceiptAddress||'';const postalCode=p.ReceiptPostalCode||'';const phone=p.ReceiptPhone||p.Phone||p.Registration?.Phone||'';const needInvoice=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;const invoiceStatus=p.InvoiceStatus||p.ReceiptStatus||'NOT_ISSUED';const receiptNo=p.ReceiptNo||'';editReceiptInfoModal(regId,name,taxId,address,postalCode,phone,needInvoice,invoiceStatus,receiptNo);}
 
@@ -2510,7 +2557,9 @@ function updateWorkCategoryDropdown(rows){
   const counts = {};
   (rows || []).forEach(w => {
     const cat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
-    counts[cat] = (counts[cat] || 0) + 1;
+    if (cat && cat !== '-') {
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
   });
 
   const standardCats = [
@@ -2524,14 +2573,14 @@ function updateWorkCategoryDropdown(rows){
     'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์'
   ];
 
-  const allCatKeys = Array.from(new Set([...standardCats, ...Object.keys(counts)])).filter(c => c && c !== '-');
+  // Only show categories with at least 1 submission
+  const allCatKeys = Array.from(new Set([...standardCats, ...Object.keys(counts)]))
+    .filter(cat => cat && cat !== '-' && (counts[cat] || 0) > 0);
   
   let html = `<option value="">ทุกประเภทผลงาน (${(rows||[]).length} เรื่อง)</option>`;
   allCatKeys.forEach(cat => {
     const count = counts[cat] || 0;
-    if (count > 0 || standardCats.includes(cat)) {
-      html += `<option value="${esc(cat)}" ${cat === currentVal ? 'selected' : ''}>${esc(cat)} ${count > 0 ? `(${count})` : ''}</option>`;
-    }
+    html += `<option value="${esc(cat)}" ${cat === currentVal ? 'selected' : ''}>${esc(cat)} (${count})</option>`;
   });
   sel.innerHTML = html;
 }
@@ -2674,18 +2723,21 @@ function renderWorksTable(){
     </td>
   </tr>`;
   }).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+  reapplyTableSort($('#workRows')?.closest('table'));
+  refreshTableSortHeaders();
 }
 
 async function loadWorks(forceRefresh = false){
   const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
-  if(!hasRows && !forceRefresh) show('กำลังโหลดผลงาน');
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผลงานจาก Google Sheets...' : 'กำลังโหลดผลงาน');
   try{
-    const rows = await rpc('adminListWorks', TOKEN, CID, {});
+    const rows = await rpc('adminListWorks', TOKEN, CID, { forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.WORK_ROWS = rows || [];
     updateWorkCategoryDropdown(window.WORK_ROWS);
     renderWorksTable();
+    if(forceRefresh) toast(`รีเฟรชข้อมูลผลงานสำเร็จ (${window.WORK_ROWS.length} เรื่อง)`);
   }finally{
-    if(!hasRows && !forceRefresh) hide();
+    hide();
   }
 }
 function num(v){return Number(v)||0;}
@@ -2738,15 +2790,17 @@ async function openAssignByCategoryModal(){
       }
     });
 
-    const activeCatList = Array.from(new Set([...standardCats, ...Object.keys(categoryStats)])).filter(c => c && c !== '-');
+    // Only include categories that have at least 1 submitted work in the system
+    const activeCatList = Array.from(new Set([...standardCats, ...Object.keys(categoryStats)]))
+      .filter(c => c && c !== '-' && categoryStats[c] && categoryStats[c].total > 0);
 
     let defaultCat = '';
-    const catOptionsHtml = activeCatList.map(cat => {
+    const catOptionsHtml = activeCatList.length ? activeCatList.map(cat => {
       const stats = categoryStats[cat] || { total: 0, unassigned: 0, assigned: 0 };
       if (!defaultCat && stats.unassigned > 0) defaultCat = cat;
       const label = `${cat} (ยังไม่ Assign: ${stats.unassigned} / ทั้งหมด ${stats.total} เรื่อง)`;
       return `<option value="${esc(cat)}">${esc(label)}</option>`;
-    }).join('');
+    }).join('') : '<option value="">ไม่มีผลงานในระบบ</option>';
     if (!defaultCat && activeCatList.length > 0) defaultCat = activeCatList[0];
 
     const roundsHtml = (d.rounds || []).map(rd => `<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH || rd.RoundNameEN || rd.ReviewRoundID)}</option>`).join('');
@@ -3714,13 +3768,14 @@ function renderReviewersTable(){
 
 async function loadReviewers(forceRefresh = false){
   const hasRows = !!(window.REVIEWER_ROWS && window.REVIEWER_ROWS.length);
-  if(!hasRows && !forceRefresh) show('กำลังโหลด Reviewer');
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูล Reviewer จาก Google Sheets...' : 'กำลังโหลด Reviewer');
   try{
-    const rows=await rpc('adminListReviewers',TOKEN,CID);
+    const rows=await rpc('adminListReviewers',TOKEN,CID,{ forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.REVIEWER_ROWS = rows || [];
     renderReviewersTable();
+    if(forceRefresh) toast(`รีเฟรชข้อมูล Reviewer สำเร็จ (${window.REVIEWER_ROWS.length} ท่าน)`);
   }finally{
-    if(!hasRows && !forceRefresh) hide();
+    hide();
   }
 }
 async function resendReviewerCreds(id){
@@ -3989,9 +4044,9 @@ async function promptReplaceWorkFile(workId, regId, existingFilesHtml) {
 // Users Management
 async function loadUsers(forceRefresh = false){
   const hasRows = !!(window.USERS_LIST_CACHE && window.USERS_LIST_CACHE.length);
-  if(!hasRows && !forceRefresh) show('กำลังโหลดผู้ใช้งาน');
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผู้ใช้งาน...' : 'กำลังโหลดผู้ใช้งาน');
   try{
-    const rows=await rpc('adminListUsers',TOKEN,CID);
+    const rows=await rpc('adminListUsers',TOKEN,CID,{ forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.USERS_LIST_CACHE = rows || [];
     $('#userRows').innerHTML=rows.length ? rows.map(x=>`<tr>
       <td><b>${esc(x.UserID)}</b></td>
@@ -4004,12 +4059,15 @@ async function loadUsers(forceRefresh = false){
         ${x.Status === 'ACTIVE' && x.Role !== 'SUPERADMIN' ? `<button class="btn btn-gold btn-sm" onclick="adminRevokeUser('${esc(x.UserID)}')"><i class="fa-solid fa-ban"></i> พักสิทธิ์</button>` : ''}
       </td>
     </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
+    reapplyTableSort($('#userRows')?.closest('table'));
+    refreshTableSortHeaders();
+    if(forceRefresh) toast(`รีเฟรชข้อมูลผู้ใช้งานสำเร็จ (${rows.length} คน)`);
   }finally{
-    if(!hasRows && !forceRefresh) hide();
+    hide();
   }
 }
 
-async function openUserEditModal(uid){
+function openUserEditModal(uid){
   const u = (window.USERS_LIST_CACHE || []).find(x => x.UserID === uid);
   if(!u) return;
   const roles = [
@@ -4100,7 +4158,23 @@ async function adminRevokeUser(uid){
 }
 
 function foodFilters(){return {q:$('#foodSearch').value,eligibility:$('#foodEligibility').value,paymentStatus:$('#foodPayment').value,sentStatus:$('#foodSent').value}}
-async function loadFood(forceRefresh = false){const hasRows = !!(typeof FOOD_ROWS !== 'undefined' && FOOD_ROWS && FOOD_ROWS.length);if(!hasRows && !forceRefresh) show('กำลังโหลดคูปองอาหาร');try{FOOD_ROWS=await rpc('adminListMealPasses',TOKEN,CID,foodFilters());$('#foodRows').innerHTML=FOOD_ROWS.length?FOOD_ROWS.map(r=>`<tr><td><input class="food-check" type="checkbox" value="${esc(r.RegID)}" ${r.Eligible?'':'disabled'} onchange="updateFoodCount()"></td><td><b>${esc(r.FullName)}</b><br><span class="muted">${esc(r.RegID)}<br>${esc(r.Email)}</span></td><td>${esc(r.ParticipantTypeName)}</td><td>${statusBadge(r.DataCompletenessStatus)}<br>${statusBadge(r.RegistrationStatus)}</td><td>${statusBadge(r.PaymentStatus)}</td><td>${r.Eligible?'<span class="badge ok">พร้อมออกคูปอง</span>':`<span class="badge bad">${esc(r.EligibilityReason)}</span>`}<br><span class="muted">${esc(r.MealPassStatus||'NOT_READY')}</span></td><td><b>${r.DispatchCount}</b> ครั้ง</td><td>${r.LastSentAt?formatBeDateTime(r.LastSentAt):'-'}</td><td class="actions"><button class="btn btn-blue btn-sm" onclick="viewUserScanHistory('${esc(r.RegID)}')">ประวัติ</button> <button class="btn btn-soft btn-sm" ${r.Eligible?'':'disabled'} onclick="previewFood('${esc(r.RegID)}')">ดู QR</button><button class="btn btn-gold btn-sm" ${r.Eligible?'':'disabled'} onclick="sendFood('${esc(r.RegID)}')">สร้างและส่ง</button></td></tr>`).join(''):'<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';$('#foodAll').checked=false;updateFoodCount()}finally{if(!hasRows && !forceRefresh) hide()}}
+async function loadFood(forceRefresh = false){
+  const hasRows = !!(typeof FOOD_ROWS !== 'undefined' && FOOD_ROWS && FOOD_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลคูปองอาหาร...' : 'กำลังโหลดคูปองอาหาร');
+  try{
+    const filters = Object.assign({}, foodFilters(), { forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
+    FOOD_ROWS = await rpc('adminListMealPasses', TOKEN, CID, filters);
+    $('#foodRows').innerHTML = FOOD_ROWS.length ? FOOD_ROWS.map(r=>`<tr><td><input class="food-check" type="checkbox" value="${esc(r.RegID)}" ${r.Eligible?'':'disabled'} onchange="updateFoodCount()"></td><td><b>${esc(r.FullName)}</b><br><span class="muted">${esc(r.RegID)}<br>${esc(r.Email)}</span></td><td>${esc(r.ParticipantTypeName)}</td><td>${statusBadge(r.DataCompletenessStatus)}<br>${statusBadge(r.RegistrationStatus)}</td><td>${statusBadge(r.PaymentStatus)}</td><td>${r.Eligible?'<span class="badge ok">พร้อมออกคูปอง</span>':`<span class="badge bad">${esc(r.EligibilityReason)}</span>`}<br><span class="muted">${esc(r.MealPassStatus||'NOT_READY')}</span></td><td><b>${r.DispatchCount}</b> ครั้ง</td><td>${r.LastSentAt?formatBeDateTime(r.LastSentAt):'-'}</td><td class="actions"><button class="btn btn-blue btn-sm" onclick="viewUserScanHistory('${esc(r.RegID)}')">ประวัติ</button> <button class="btn btn-soft btn-sm" ${r.Eligible?'':'disabled'} onclick="previewFood('${esc(r.RegID)}')">ดู QR</button><button class="btn btn-gold btn-sm" ${r.Eligible?'':'disabled'} onclick="sendFood('${esc(r.RegID)}')">สร้างและส่ง</button></td></tr>`).join('') : '<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+    $('#foodAll').checked=false;
+    updateFoodCount();
+    reapplyTableSort($('#foodRows')?.closest('table'));
+    refreshTableSortHeaders();
+    if(forceRefresh) toast(`รีเฟรชข้อมูลคูปองอาหารสำเร็จ (${FOOD_ROWS.length} รายการ)`);
+  }finally{
+    hide();
+  }
+}
+
 function toggleAllFood(on){$$('.food-check:not(:disabled)').forEach(x=>x.checked=!!on);$('#foodAll').checked=!!on;updateFoodCount()}function selectedFood(){return $$('.food-check:checked').map(x=>x.value)}function updateFoodCount(){$('#foodSelectedCount').textContent=`เลือก ${selectedFood().length} คน`}
 async function previewFood(id){
   show('กำลังสร้างตัวอย่าง QR');
