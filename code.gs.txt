@@ -4297,7 +4297,7 @@ function reviewerBootstrap(token,conferenceId){
   });
 }
 function resolveWorkCategoryInfo_(work) {
-  if (!work) return { categoryId: '', categoryCode: '', categoryNameTH: '', isServiceGroup: true };
+  if (!work) return { categoryId: '', categoryCode: '', categoryNameTH: '', isServiceGroup: true, isResearch: false, isInnovation: false, isCQI: false, isService: false, isPrimary: false };
   var cid = work.ConferenceID || APP.DEFAULT_CONFERENCE_ID;
   var catId = String(work.CategoryID || '').trim();
   var catName = String(work.CategoryName || work.CategoryNameTH || work.CategoryCode || '').trim();
@@ -4317,23 +4317,31 @@ function resolveWorkCategoryInfo_(work) {
   var code = (cat ? (cat.CategoryCode || '') : (work.CategoryCode || catId)).toUpperCase();
   var nameTH = (cat ? (cat.CategoryNameTH || cat.CategoryNameEN || '') : catName) || '';
   
-  // Case-insensitive test if it belongs to Service / CQI / Primary group
-  var isService = /SERVICE|CQI|PRIMARY|บริการ|ปฐมภูมิ/i.test(code + ' ' + nameTH);
-  var isResearch = /RESEARCH|INNOVAT|R2R|วิจัย|นวัตกรรม|สิ่งประดิษฐ์/i.test(code + ' ' + nameTH);
-  
-  // Explicit check for CAT-1 / CAT-2 vs CAT-3 / CAT-4 / CAT-5 if category code wasn't clear
-  if (!isService && !isResearch && catId) {
-    if (/CAT-3|CAT-4|CAT-5/i.test(catId)) isService = true;
-    else if (/CAT-1|CAT-2/i.test(catId)) isResearch = true;
+  var isResearch = /RESEARCH|วิจัย|R2R/i.test(code + ' ' + nameTH);
+  var isInnovation = /INNOVAT|นวัตกรรม|สิ่งประดิษฐ์/i.test(code + ' ' + nameTH);
+  var isCQI = /CQI|BEST\s*PRACTICE/i.test(code + ' ' + nameTH);
+  var isService = (/SERVICE|บริการ/i.test(code + ' ' + nameTH)) && !isCQI;
+  var isPrimary = /PRIMARY|ปฐมภูมิ/i.test(code + ' ' + nameTH);
+
+  if (!isService && !isCQI && !isPrimary && !isResearch && !isInnovation && catId) {
+    if (/CAT-1/i.test(catId)) isResearch = true;
+    else if (/CAT-2/i.test(catId)) isInnovation = true;
+    else if (/CAT-3/i.test(catId)) isService = true;
+    else if (/CAT-4/i.test(catId)) isCQI = true;
+    else if (/CAT-5/i.test(catId)) isPrimary = true;
   }
 
-  // Default to Service/CQI/Primary group if not explicitly research
-  var isServiceGroup = isService || (!isResearch);
+  var isServiceGroup = !isResearch && !isInnovation;
   return {
     categoryId: cat ? cat.CategoryID : catId,
     categoryCode: code,
     categoryNameTH: nameTH,
-    isServiceGroup: isServiceGroup
+    isServiceGroup: isServiceGroup,
+    isResearch: isResearch,
+    isInnovation: isInnovation,
+    isCQI: isCQI,
+    isService: isService,
+    isPrimary: isPrimary
   };
 }
 
@@ -4353,7 +4361,7 @@ function getCriterionGroup_(c) {
 
   // 1. Direct CategoryID / code check
   if (catVal === 'SERVICE_CQI_PRIMARY' || /CAT-3|CAT-4|CAT-5|SERVICE|CQI|PRIMARY/i.test(catVal)) return 'SERVICE_CQI_PRIMARY';
-  if (catVal === 'RESEARCH_INNOVATION' || /RESEARCH|INNOVAT|R2R/i.test(catVal)) return 'RESEARCH_INNOVATION';
+  if (catVal === 'RESEARCH_INNOVATION' || /CAT-1|CAT-2|RESEARCH|INNOVAT|R2R/i.test(catVal)) return 'RESEARCH_INNOVATION';
 
   // 2. Keyword check on criteria title and description
   if (/กระบวนการพัฒนา|นวัตกรรมบริการ|ระบบบริการ|ความคุ้มค่า|บทเรียนที่ได้รับ|การขยายผล|PDCA|Best Practice|ความพึงพอใจ|บริการ/i.test(full)) {
@@ -4367,6 +4375,145 @@ function getCriterionGroup_(c) {
   }
 
   return '';
+}
+
+function scoreCriterionRelevance_(c, catInfo) {
+  var score = 0;
+  var critCat = String(c.CategoryID || '').trim().toUpperCase();
+  var title = String(c.CriteriaNameTH || c.CriteriaName || '').trim();
+  var desc = String(c.DescriptionTH || '').trim();
+  var text = (critCat + ' ' + title + ' ' + desc).toUpperCase();
+
+  var wId = String(catInfo.categoryId || '').toUpperCase();
+  var wCode = String(catInfo.categoryCode || '').toUpperCase();
+
+  // 1. Exact Category match (Highest Priority)
+  if (wId && (critCat === wId || critCat.split(/[,;\s]+/).indexOf(wId) >= 0)) score += 100;
+  if (wCode && (critCat === wCode || critCat.split(/[,;\s]+/).indexOf(wCode) >= 0)) score += 80;
+
+  // 2. Specific subcategory signals
+  if (catInfo.isCQI) {
+    if (/CQI|PDCA|ทบทวนสถานการณ์|จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ|การพัฒนาคุณภาพตามแนวคิด/i.test(text)) score += 60;
+    if (critCat === 'CQI' || critCat === 'CAT-4') score += 50;
+  }
+  if (catInfo.isService) {
+    if (/SERVICE|บริการ|ความคุ้มค่า|นวัตกรรมบริการ|ระบบบริการ/i.test(text)) score += 60;
+    if (critCat === 'SERVICE' || critCat === 'CAT-3' || critCat === 'SERVICE_EXCELLENCE') score += 50;
+    // Penalty if it is strictly CQI / PDCA and we are evaluating Service Excellence
+    if (/PDCA|จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ/i.test(text)) score -= 40;
+  }
+  if (catInfo.isPrimary) {
+    if (/PRIMARY|ปฐมภูมิ|ชุมชน|เครือข่าย/i.test(text)) score += 60;
+    if (critCat === 'PRIMARY' || critCat === 'PRIMARY_CARE' || critCat === 'CAT-5') score += 50;
+  }
+  if (catInfo.isResearch) {
+    if (/ระเบียบวิธีวิจัย|จริยธรรมการวิจัย|คำถามวิจัย|สมมติฐาน|RESEARCH|วิจัย/i.test(text)) score += 60;
+    if (critCat === 'RESEARCH' || critCat === 'CAT-1') score += 50;
+    if (/สิ่งประดิษฐ์|ประดิษฐ์|นวัตกรรม/i.test(text)) score -= 20;
+  }
+  if (catInfo.isInnovation) {
+    if (/สิ่งประดิษฐ์|นวัตกรรม|ประดิษฐ์|INNOVAT/i.test(text)) score += 60;
+    if (critCat === 'INNOVATION' || critCat === 'CAT-2') score += 50;
+  }
+
+  // 3. Fallback group
+  if (catInfo.isServiceGroup && critCat === 'SERVICE_CQI_PRIMARY') score += 20;
+  if (!catInfo.isServiceGroup && critCat === 'RESEARCH_INNOVATION') score += 20;
+
+  return score;
+}
+
+function resolveSingleSuite_(candidates, work) {
+  if (!candidates || !candidates.length) return [];
+  var catInfo = resolveWorkCategoryInfo_(work);
+
+  // Group candidates into distinct non-overlapping candidate suites by CategoryID
+  var byCat = {};
+  candidates.forEach(function(c) {
+    var k = String(c.CategoryID || 'GENERAL').trim().toUpperCase();
+    if (!byCat[k]) byCat[k] = [];
+    byCat[k].push(c);
+  });
+
+  var rawSuites = [];
+  Object.keys(byCat).forEach(function(k) {
+    rawSuites.push(byCat[k]);
+  });
+
+  // Check for duplicate ItemNos in any suite and split if found
+  var cleanSuites = [];
+  rawSuites.forEach(function(suite) {
+    var seen = {};
+    var hasDups = false;
+    suite.forEach(function(c) {
+      var it = num_(c.ItemNo || c.SortOrder);
+      if (seen[it]) hasDups = true;
+      seen[it] = true;
+    });
+    if (!hasDups) {
+      cleanSuites.push(suite);
+    } else {
+      var s1 = [], s2 = [];
+      var s1Seen = {};
+      suite.forEach(function(c) {
+        var it = num_(c.ItemNo || c.SortOrder);
+        if (!s1Seen[it]) {
+          s1.push(c);
+          s1Seen[it] = true;
+        } else {
+          s2.push(c);
+        }
+      });
+      if (s1.length) cleanSuites.push(s1);
+      if (s2.length) cleanSuites.push(s2);
+    }
+  });
+
+  // Evaluate each suite
+  var bestSuite = null;
+  var bestScore = -99999;
+
+  cleanSuites.forEach(function(suite) {
+    suite.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
+    var totalMax = suite.reduce(function(sum, c) { return sum + num_(c.MaxScore); }, 0);
+    var suiteScore = 0;
+
+    // Must strictly enforce 100 points
+    if (totalMax === 100) suiteScore += 300;
+    else if (totalMax <= 100) suiteScore += 100;
+    else suiteScore -= 1000; // heavy penalty for exceeding 100
+
+    suite.forEach(function(c) {
+      suiteScore += scoreCriterionRelevance_(c, catInfo);
+    });
+
+    if (suiteScore > bestScore) {
+      bestScore = suiteScore;
+      bestSuite = suite;
+    }
+  });
+
+  if (bestSuite && bestSuite.length > 0) {
+    bestSuite.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
+    return bestSuite;
+  }
+
+  // Fallback: pick items with unique ItemNos capped at 100 points
+  var fallback = [];
+  var seenNo = {};
+  var total = 0;
+  candidates.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
+  for (var i = 0; i < candidates.length; i++) {
+    var item = candidates[i];
+    var it = num_(item.ItemNo || item.SortOrder);
+    var maxSc = num_(item.MaxScore);
+    if (!seenNo[it] && (total + maxSc <= 100)) {
+      seenNo[it] = true;
+      fallback.push(item);
+      total += maxSc;
+    }
+  }
+  return fallback;
 }
 
 function matchesWorkCriteria_(c, work) {
@@ -4383,8 +4530,8 @@ function matchesWorkCriteria_(c, work) {
     if (critCat === 'ALL') return true;
     if (workCatId && (critCat === workCatId || critCat.split(/[,;\s]+/).indexOf(workCatId) >= 0)) return true;
     if (workCatCode && (critCat === workCatCode || critCat.split(/[,;\s]+/).indexOf(workCatCode) >= 0)) return true;
-    if (catInfo.isServiceGroup && (critCat === 'SERVICE_CQI_PRIMARY' || /SERVICE|CQI|PRIMARY/i.test(critCat))) return true;
-    if (!catInfo.isServiceGroup && (critCat === 'RESEARCH_INNOVATION' || /RESEARCH|INNOVAT/i.test(critCat))) return true;
+    if (catInfo.isServiceGroup && critCat === 'SERVICE_CQI_PRIMARY') return true;
+    if (!catInfo.isServiceGroup && critCat === 'RESEARCH_INNOVATION') return true;
   }
 
   // 2. Criterion group match
@@ -4401,49 +4548,64 @@ function matchesWorkCriteria_(c, work) {
 function filterCriteriaForWork_(allCriteria, work) {
   if (!allCriteria || !allCriteria.length) return [];
   var activeList = allCriteria.filter(function(c) { return bool_(c.Active); });
-  if (!work) return activeList;
+  if (!activeList.length) return [];
+  if (!work) return resolveSingleSuite_(activeList, null);
 
   var catInfo = resolveWorkCategoryInfo_(work);
-  var workGroup = catInfo.isServiceGroup ? 'SERVICE_CQI_PRIMARY' : 'RESEARCH_INNOVATION';
+  var wCatId = String(catInfo.categoryId || work.CategoryID || '').trim().toUpperCase();
+  var wCatCode = String(catInfo.categoryCode || work.CategoryCode || '').trim().toUpperCase();
+  var wCatName = String(catInfo.categoryNameTH || work.CategoryName || work.CategoryNameTH || '').trim().toUpperCase();
 
-  // Priority 1: Direct Category match
-  var directMatched = activeList.filter(function(c) {
+  // Priority 1: Strict match on exact CategoryID or exact CategoryCode (excluding generic groups)
+  var exactList = activeList.filter(function(c) {
     var critCat = String(c.CategoryID || '').trim().toUpperCase();
-    if (!critCat) return false;
-    var wId = String(catInfo.categoryId || work.CategoryID || '').toUpperCase();
-    var wCode = String(catInfo.categoryCode || work.CategoryCode || '').toUpperCase();
-    if (wId && (critCat === wId || critCat.split(/[,;\s]+/).indexOf(wId) >= 0)) return true;
-    if (wCode && (critCat === wCode || critCat.split(/[,;\s]+/).indexOf(wCode) >= 0)) return true;
-    if (catInfo.isServiceGroup && (critCat === 'SERVICE_CQI_PRIMARY' || /SERVICE|CQI|PRIMARY/i.test(critCat))) return true;
-    if (!catInfo.isServiceGroup && (critCat === 'RESEARCH_INNOVATION' || /RESEARCH|INNOVAT/i.test(critCat))) return true;
+    if (!critCat || critCat === 'ALL' || critCat === 'SERVICE_CQI_PRIMARY' || critCat === 'RESEARCH_INNOVATION') {
+      return false;
+    }
+    if (wCatId && (critCat === wCatId || critCat.split(/[,;\s]+/).indexOf(wCatId) >= 0)) return true;
+    if (wCatCode && (critCat === wCatCode || critCat.split(/[,;\s]+/).indexOf(wCatCode) >= 0)) return true;
+    if (wCatName && critCat === wCatName) return true;
     return false;
   });
 
-  if (directMatched.length > 0) {
-    directMatched.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
-    return directMatched;
+  if (exactList.length > 0) {
+    var resolvedExact = resolveSingleSuite_(exactList, work);
+    if (resolvedExact.length > 0) return resolvedExact;
   }
 
-  // Priority 2: Group match
-  var groupMatched = activeList.filter(function(c) {
+  // Priority 2: Work group matching (SERVICE_CQI_PRIMARY or RESEARCH_INNOVATION)
+  var workGroup = catInfo.isServiceGroup ? 'SERVICE_CQI_PRIMARY' : 'RESEARCH_INNOVATION';
+  var groupList = activeList.filter(function(c) {
+    var critCat = String(c.CategoryID || '').trim().toUpperCase();
+    return critCat === workGroup;
+  });
+
+  if (groupList.length > 0) {
+    var resolvedGroup = resolveSingleSuite_(groupList, work);
+    if (resolvedGroup.length > 0) return resolvedGroup;
+  }
+
+  // Priority 3: Semantic / keyword matching
+  var semanticList = activeList.filter(function(c) {
     return getCriterionGroup_(c) === workGroup;
   });
-  if (groupMatched.length > 0) {
-    groupMatched.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
-    return groupMatched;
+  if (semanticList.length > 0) {
+    var resolvedSemantic = resolveSingleSuite_(semanticList, work);
+    if (resolvedSemantic.length > 0) return resolvedSemantic;
   }
 
-  // Priority 3: General criteria (CategoryID is empty or 'ALL')
-  var general = activeList.filter(function(c) {
+  // Priority 4: General criteria ('ALL' or empty CategoryID)
+  var generalList = activeList.filter(function(c) {
     var critCat = String(c.CategoryID || '').trim().toUpperCase();
     return !critCat || critCat === 'ALL';
   });
-  if (general.length > 0) {
-    general.sort(function(a, b) { return (num_(a.ItemNo || a.SortOrder) - num_(b.ItemNo || b.SortOrder)); });
-    return general;
+  if (generalList.length > 0) {
+    var resolvedGeneral = resolveSingleSuite_(generalList, work);
+    if (resolvedGeneral.length > 0) return resolvedGeneral;
   }
 
-  return [];
+  // Fallback: resolve from all active criteria
+  return resolveSingleSuite_(activeList, work);
 }
 
 function reviewerGetAssignment(token,conferenceId,assignmentId){
@@ -4454,8 +4616,11 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
     const cacheKey = 'REV_ASG_' + assignmentId;
     let cached = null;
     try { cached = cacheGetLarge_(cacheKey); } catch(e) {}
-    if (cached && cached.assignment && cached.work) {
-      return cached;
+    if (cached && cached.assignment && cached.work && cached.criteria && cached.criteria.length) {
+      var cachedSum = cached.criteria.reduce(function(sum, c){ return sum + num_(c.MaxScore); }, 0);
+      if (cachedSum <= 100 && cached.criteria.length <= 8) {
+        return cached;
+      }
     }
 
     const role=findOne_('UserConferenceRoles',{ConferenceID:cid,UserID:ctx.user.UserID,Role:'REVIEWER'}) ||
@@ -4578,8 +4743,9 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
       });
       if(roundSpecific.length>0) allCriteria=roundSpecific;
     }
+    const filteredCriteria = filterCriteriaForWork_(allCriteria, work);
     const criteriaMap={};
-    allCriteria.forEach(function(c){criteriaMap[c.CriteriaID]=c;});
+    filteredCriteria.forEach(function(c){criteriaMap[c.CriteriaID]=c;});
 
     // Fetch existing scores once to avoid repeated sheet reads
     const existingScores = findMany_('ReviewScores', {ConferenceID: cid, AssignmentID: assignmentId});
@@ -4841,16 +5007,31 @@ function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
     var rounds = findMany_('ReviewRounds',{ConferenceID:cid});
     var targetRoundId = roundId || (rounds[0] ? rounds[0].ReviewRoundID : 'RR-0001');
 
-    // 1. Deactivate old/legacy generic criteria
+    // 1. Deactivate old/legacy criteria that don't match or have conflicting ItemNos
     var existingCrit = findMany_('ScoringCriteria',{ConferenceID:cid});
+    var seenKeys = {};
     existingCrit.forEach(function(c){
-      var g = getCriterionGroup_(c);
-      if (!g) {
+      var cat = String(c.CategoryID || '').trim().toUpperCase();
+      var itemNo = num_(c.ItemNo);
+      var key = cat + '_' + itemNo;
+      // If no category or already duplicate, deactivate
+      if (!cat || cat === 'ALL' || seenKeys[key]) {
         updateRecord_('ScoringCriteria', c.__row, { Active: false, UpdatedAt: new Date() });
+      } else {
+        seenKeys[key] = true;
       }
     });
 
-    // 2. Define the two official suites (100 points each)
+    // 2. Define standard suites (Each exactly 100 points)
+    var cqiCriteria = [
+      { ItemNo: 1, NameTH: 'การทบทวนสถานการณ์ / ปัญหา / จุดเริ่มต้นของกิจกรรม', MaxScore: 10, Desc: 'ระบุปัญหา ผลกระทบ ข้อมูลเชิงประจักษ์ และความจำเป็นชัดเจน' },
+      { ItemNo: 2, NameTH: 'เป้าหมายและตัวชี้วัดที่ชัดเจนและวัดผลได้', MaxScore: 10, Desc: 'สอดคล้องกับปัญหา วัดผลลัพธ์เป็นรูปธรรม' },
+      { ItemNo: 3, NameTH: 'กิจกรรมและกระบวนการพัฒนาคุณภาพ (PDCA)', MaxScore: 30, Desc: 'ขั้นตอนการวิเคราะห์สาเหตุ การออกแบบกระบวนการใหม่ และการนำไปปฏิบัติจริง' },
+      { ItemNo: 4, NameTH: 'ผลการพัฒนาและการบรรลุเป้าหมาย', MaxScore: 25, Desc: 'การเปรียบเทียบผลลัพธ์ก่อน-หลัง ประสิทธิผล และความปลอดภัย' },
+      { ItemNo: 5, NameTH: 'บทเรียนที่ได้รับและการปรับปรุงต่อเนื่อง', MaxScore: 15, Desc: 'ปัจจัยความสำเร็จ ปัญหาอุปสรรค และแนวทางแก้ไข' },
+      { ItemNo: 6, NameTH: 'การขยายผลและโอกาสพัฒนาต่อเนื่อง', MaxScore: 10, Desc: 'การต่อยอด ถ่ายทอดความรู้ หรือการเป็นแนวปฏิบัติที่ดี (Best Practice)' }
+    ];
+
     var serviceCriteria = [
       { ItemNo: 1, NameTH: 'ความสำคัญของปัญหา / เหตุผลและความจำเป็น', MaxScore: 15, Desc: 'ระบุปัญหา ผลกระทบ หรือความจำเป็นในการพัฒนางานชัดเจน' },
       { ItemNo: 2, NameTH: 'วัตถุประสงค์และเป้าหมายที่วัดผลได้', MaxScore: 10, Desc: 'สอดคล้องกับปัญหา วัดผลสำเร็จได้เป็นรูปธรรม' },
@@ -4858,6 +5039,15 @@ function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
       { ItemNo: 4, NameTH: 'ผลลัพธ์การพัฒนาและความคุ้มค่า', MaxScore: 25, Desc: 'ผลลัพธ์เชิงคุณภาพ/เชิงปริมาณ ประสิทธิภาพ คุณภาพบริการ หรือความปลอดภัย' },
       { ItemNo: 5, NameTH: 'บทเรียนที่ได้รับและความยั่งยืน', MaxScore: 15, Desc: 'ปัจจัยความสำเร็จ ปัญหาอุปสรรค และแนวทางธำรงรักษาความต่อเนื่อง' },
       { ItemNo: 6, NameTH: 'การขยายผลและโอกาสพัฒนาต่อเนื่อง', MaxScore: 10, Desc: 'การต่อยอด ถ่ายทอดความรู้ หรือการเป็นต้นแบบการปฏิบัติงาน' }
+    ];
+
+    var primaryCriteria = [
+      { ItemNo: 1, NameTH: 'การวิเคราะห์ปัญหาและบริบทสุขภาพชุมชน', MaxScore: 15, Desc: 'ความเข้าใจปัญหาบริบทพื้นที่ ความต้องการของประชาชน/ชุมชน' },
+      { ItemNo: 2, NameTH: 'เป้าหมายและการมีส่วนร่วมของเครือข่าย', MaxScore: 15, Desc: 'ความร่วมมือของสหสาขาวิชาชีพ ชุมชน ท้องถิ่น และเครือข่ายสุขภาพ' },
+      { ItemNo: 3, NameTH: 'กระบวนการพัฒนาระบบบริการปฐมภูมิ', MaxScore: 25, Desc: 'การบูรณาการบริการ การสร้างเสริมสุขภาพ ป้องกันโรค และการดูแลต่อเนื่อง' },
+      { ItemNo: 4, NameTH: 'ผลลัพธ์ด้านสุขภาพและการเปลี่ยนแปลงเชิงบวก', MaxScore: 20, Desc: 'การเข้าถึงบริการ พฤติกรรมสุขภาพ หรือคุณภาพชีวิตของกลุ่มเป้าหมาย' },
+      { ItemNo: 5, NameTH: 'บทเรียนการทำงานและการสร้างพลังชุมชน', MaxScore: 15, Desc: 'การเรียนรู้ร่วมกัน การพึ่งตนเอง และความเข้มแข็งของชุมชน' },
+      { ItemNo: 6, NameTH: 'ความยั่งยืนและการพัฒนาต่อเนื่องในระบบปฐมภูมิ', MaxScore: 10, Desc: 'กลไกความต่อเนื่องและการขยายผลสู่พื้นที่อื่น' }
     ];
 
     var researchCriteria = [
@@ -4903,11 +5093,15 @@ function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
       });
     }
 
+    // Sync specific category suites (Each exactly 100 points)
+    syncGroupCriteria(researchCriteria, 'RESEARCH_INNOVATION', 'Research & Innovation');
     syncGroupCriteria(serviceCriteria, 'SERVICE_CQI_PRIMARY', 'Service/CQI/Primary');
-    syncGroupCriteria(researchCriteria, 'RESEARCH_INNOVATION', 'Research/Innovation');
+    syncGroupCriteria(cqiCriteria, 'CQI', 'CQI/Best Practice');
+    syncGroupCriteria(serviceCriteria, 'SERVICE', 'Service Excellence');
+    syncGroupCriteria(primaryCriteria, 'PRIMARY', 'Primary Care');
 
     invalidateCache_(cid);
-    return { success: true, message: 'ตั้งค่าเกณฑ์การให้คะแนน 2 กลุ่มเรียบร้อย (กลุ่มละ 100 คะแนน)' };
+    return { success: true, message: 'ตั้งค่าเกณฑ์การให้คะแนนแยกตามประเภทผลงานเรียบร้อย (แต่ละประเภทคะแนนเต็ม 100 คะแนน)' };
   });
 }
 function adminGetReviewConfig(token,conferenceId){
