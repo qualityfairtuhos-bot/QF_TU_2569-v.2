@@ -219,7 +219,7 @@
           </div>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:15px; margin-top:15px; flex-wrap:wrap">
-          <input id="workSearch" class="field" placeholder="ค้นหา CODE / ชื่อเรื่อง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="renderWorksTable()">
+          <input id="workSearch" class="field" placeholder="ค้นหา รหัสผลงาน / ชื่อเรื่อง / ชื่อผู้แต่ง / ผู้นำเสนอ" style="flex:1; min-width:200px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" oninput="renderWorksTable()">
           <select id="workCategory" class="field" style="width:230px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
             <option value="">ทุกประเภทผลงาน</option>
           </select>
@@ -2608,7 +2608,9 @@ function renderWorksTable(){
       const titleTH = String(w.TitleTH || w.ThaiTitle || '').toLowerCase();
       const titleEN = String(w.TitleEN || w.EnglishTitle || '').toLowerCase();
       const presenter = String(w.PresenterName || '').toLowerCase();
-      return code.includes(searchVal) || titleTH.includes(searchVal) || titleEN.includes(searchVal) || presenter.includes(searchVal);
+      const authorsStr = (w.authors || []).map(a => `${a.FirstName||""} ${a.LastName||""} ${a.FullName||""}`).join(" ").toLowerCase();
+      const allAuthors = (presenter + " " + authorsStr + " " + String(w.AuthorFullName || "") + " " + String(w.FirstAuthorName || "")).toLowerCase();
+      return code.includes(searchVal) || titleTH.includes(searchVal) || titleEN.includes(searchVal) || allAuthors.includes(searchVal);
     });
   }
   if(catVal){
@@ -2836,6 +2838,10 @@ async function openAssignByCategoryModal(){
               <button type="button" class="btn btn-sm btn-soft" id="btnBatchDeselectAllWorks" style="font-size:0.72rem; padding:2px 8px;"><i class="fa-solid fa-xmark"></i> ไม่เลือก</button>
             </div>
           </div>
+          <div style="position:relative; margin-bottom:8px;">
+            <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.85rem;"></i>
+            <input type="text" id="batchWorkSearchInput" placeholder="พิมพ์ค้นหาด้วย ชื่อเรื่อง / ชื่อผู้แต่ง / รหัสผลงาน (WorkCode)..." style="width:100%; box-sizing:border-box; padding:6px 10px 6px 30px; font-size:0.82rem; border:1px solid #cbd5e1; border-radius:6px; outline:none;" onfocus="this.style.borderColor='#006D70'" onblur="this.style.borderColor='#cbd5e1'">
+          </div>
           <div id="batchWorksListWrap" style="max-height:220px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; padding:6px; background:#fff;">
             <!-- Rendered by JS -->
           </div>
@@ -2901,6 +2907,7 @@ async function openAssignByCategoryModal(){
       didOpen: () => {
         const catSelect = document.getElementById('batchCategorySelect');
         const onlyUnassignedCb = document.getElementById('batchOnlyUnassigned');
+        const workSearchInput = document.getElementById('batchWorkSearchInput');
         const worksContainer = document.getElementById('batchWorksListWrap');
         const worksBadge = document.getElementById('batchWorksCountBadge');
         const revsBadge = document.getElementById('batchRevsCountBadge');
@@ -2913,6 +2920,7 @@ async function openAssignByCategoryModal(){
         function updateWorksList() {
           const selectedCat = catSelect ? catSelect.value : '';
           const onlyUn = onlyUnassignedCb ? onlyUnassignedCb.checked : true;
+          const q = (workSearchInput ? workSearchInput.value : '').trim().toLowerCase();
 
           const matchingWorks = allWorks.filter(w => {
             const rawCat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
@@ -2924,6 +2932,17 @@ async function openAssignByCategoryModal(){
             const assignedCount = num(w.ReviewerAssignedCount);
             if (onlyUn && assignedCount > 0) {
               return false;
+            }
+            if (q) {
+              const code = String(w.WorkCode || w.WorkID || '').toLowerCase();
+              const title = (String(w.TitleTH || '') + ' ' + String(w.TitleEN || '') + ' ' + String(w.ThaiTitle || '')).toLowerCase();
+              const presenter = String(w.PresenterName || '').toLowerCase();
+              const authorsStr = (w.authors || []).map(a => `${a.FirstName||""} ${a.LastName||""} ${a.FullName||""}`).join(" ").toLowerCase();
+              const allAuthors = (presenter + " " + authorsStr + " " + String(w.AuthorFullName || "") + " " + String(w.FirstAuthorName || "")).toLowerCase();
+              const matchSearch = code.includes(q) || title.includes(q) || allAuthors.includes(q);
+              if (!matchSearch) {
+                return false;
+              }
             }
             return true;
           });
@@ -3002,11 +3021,12 @@ async function openAssignByCategoryModal(){
 
         if (catSelect) catSelect.addEventListener('change', updateWorksList);
         if (onlyUnassignedCb) onlyUnassignedCb.addEventListener('change', updateWorksList);
+        if (workSearchInput) workSearchInput.addEventListener('input', updateWorksList);
 
         const btnSelectAll = document.getElementById('btnBatchSelectAllWorks');
         if (btnSelectAll) {
           btnSelectAll.addEventListener('click', () => {
-            document.querySelectorAll('.batch-work-item').forEach(cb => cb.checked = true);
+            if (worksContainer) worksContainer.querySelectorAll('.batch-work-item').forEach(cb => cb.checked = true);
             updateSummary();
           });
         }
@@ -3014,7 +3034,7 @@ async function openAssignByCategoryModal(){
         const btnDeselectAll = document.getElementById('btnBatchDeselectAllWorks');
         if (btnDeselectAll) {
           btnDeselectAll.addEventListener('click', () => {
-            document.querySelectorAll('.batch-work-item').forEach(cb => cb.checked = false);
+            if (worksContainer) worksContainer.querySelectorAll('.batch-work-item').forEach(cb => cb.checked = false);
             updateSummary();
           });
         }
@@ -4067,7 +4087,7 @@ async function loadUsers(forceRefresh = false){
   }
 }
 
-function openUserEditModal(uid){
+async function openUserEditModal(uid){
   const u = (window.USERS_LIST_CACHE || []).find(x => x.UserID === uid);
   if(!u) return;
   const roles = [
