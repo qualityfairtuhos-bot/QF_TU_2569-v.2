@@ -4672,20 +4672,57 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
     
     // Filter scores to only include valid criteria for this work
     const allScores=findMany_('ReviewScores',{ConferenceID:cid,AssignmentID:assignmentId});
-    const scores=allScores.filter(function(s){return !!validCritMap[s.CriteriaID];});
+    let scores=allScores.filter(function(s){return !!validCritMap[s.CriteriaID];});
 
-    // Auto-heal legacy total score if > 100 points or mismatched
-    if(scores.length>0){
-      const recalculatedTotal=Math.round(scores.reduce(function(sum,s){return sum+num_(s.Score);},0)*100)/100;
-      if(num_(a.TotalScore)>100||(num_(a.TotalScore)>0&&num_(a.TotalScore)!==recalculatedTotal)){
-        a.TotalScore=recalculatedTotal;
-        try{updateRecord_('ReviewAssignments',a.__row,{TotalScore:recalculatedTotal,UpdatedAt:new Date()});}catch(e){}
+    // If direct criteria match yielded no scores, match scored criteria to this work's category
+    if(scores.length === 0 && allScores.length > 0){
+      var scoreCritMap = {};
+      allCriteria.forEach(function(ac){ scoreCritMap[ac.CriteriaID] = ac; });
+      var candidateCrit = [];
+      allScores.forEach(function(s){
+        var ac = scoreCritMap[s.CriteriaID];
+        if (ac) candidateCrit.push(ac);
+      });
+      if (candidateCrit.length > 0) {
+        var resolvedSuite = resolveSingleSuite_(candidateCrit, work);
+        var resolvedMap = {};
+        resolvedSuite.forEach(function(rc){ resolvedMap[rc.CriteriaID] = true; });
+        scores = allScores.filter(function(s){ return !!resolvedMap[s.CriteriaID]; });
       }
-    } else if(num_(a.TotalScore)>100){
-      a.TotalScore=100;
+      if (scores.length === 0) {
+        // Fallback: take distinct items up to 100 points
+        var seenIt = {}, sumSoFar = 0;
+        allScores.forEach(function(s){
+          var it = s.CriteriaID;
+          var sc = num_(s.Score);
+          if (!seenIt[it] && (sumSoFar + sc <= 100)) {
+            seenIt[it] = true;
+            sumSoFar += sc;
+            scores.push(s);
+          }
+        });
+      }
     }
 
-    if(!a.OpenedAt)updateRecord_('ReviewAssignments',a.__row,{OpenedAt:new Date(),Status:'OPENED'});
+    // Auto-heal legacy total score to match reviewer's ACTUAL score (NEVER hardcode to 100)
+    if(scores.length > 0){
+      const recalculatedTotal = Math.round(scores.reduce(function(sum,s){return sum+num_(s.Score);},0)*100)/100;
+      if(num_(a.TotalScore) !== recalculatedTotal){
+        a.TotalScore = recalculatedTotal;
+        try{updateRecord_('ReviewAssignments',a.__row,{TotalScore:recalculatedTotal,UpdatedAt:new Date()});}catch(e){}
+      }
+    } else if(num_(a.TotalScore) > 100){
+      // If legacy total was doubled (e.g. from 2 suites), scale it down by half, never force to 100
+      var scaledTotal = Math.round((num_(a.TotalScore) / 200) * 100 * 100) / 100;
+      a.TotalScore = scaledTotal;
+      try{updateRecord_('ReviewAssignments',a.__row,{TotalScore:scaledTotal,UpdatedAt:new Date()});}catch(e){}
+    }
+
+    if(!a.OpenedAt){
+      a.OpenedAt = new Date();
+      if(a.Status === 'ASSIGNED') a.Status = 'OPENED';
+      try{updateRecord_('ReviewAssignments',a.__row,{OpenedAt:a.OpenedAt,Status:a.Status});}catch(e){}
+    }
     const result = {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};
     try { cachePutLarge_(cacheKey, result, 180); } catch(e) {}
     return result;
@@ -7057,19 +7094,23 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
     criteria.forEach(function(c){ validCritMap[c.CriteriaID] = true; });
     var scores = allScores.filter(function(s){ return !!validCritMap[s.CriteriaID]; });
 
-    // Self-heal assignments if TotalScore > 100 or corrupted
+    // Self-heal assignments to match reviewer's actual evaluation (NEVER force flat 100)
     assignments.forEach(function(a) {
       var myScores = scores.filter(function(s){ return s.AssignmentID === a.AssignmentID; });
       if (myScores.length > 0) {
         var recalculatedTotal = Math.round(myScores.reduce(function(sum, s){ return sum + num_(s.Score); }, 0) * 100) / 100;
-        if (num_(a.TotalScore) > 100 || (num_(a.TotalScore) > 0 && num_(a.TotalScore) !== recalculatedTotal)) {
+        if (num_(a.TotalScore) !== recalculatedTotal) {
           a.TotalScore = recalculatedTotal;
           try {
             updateRecord_('ReviewAssignments', a.__row, { TotalScore: recalculatedTotal, UpdatedAt: new Date() });
           } catch(e) {}
         }
       } else if (num_(a.TotalScore) > 100) {
-        a.TotalScore = 100;
+        var scaled = Math.round((num_(a.TotalScore) / 200) * 100 * 100) / 100;
+        a.TotalScore = scaled;
+        try {
+          updateRecord_('ReviewAssignments', a.__row, { TotalScore: scaled, UpdatedAt: new Date() });
+        } catch(e) {}
       }
     });
     
