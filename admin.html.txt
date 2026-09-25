@@ -350,7 +350,7 @@ const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','Registratio
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|lookup|export|inspect|list)/i.test(n);const isWrite=/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const lastArg=a.length>0?a[a.length-1]:null;const isForceRefresh=!!((lastArg&&typeof lastArg==='object'&&(lastArg.forceRefresh||lastArg.refresh||lastArg.bypassCache))||(n==='adminDashboard'&&(a[2]===true||(lastArg&&lastArg.forceRefresh))));const cacheKey=n+':'+JSON.stringify(a);if(!isForceRefresh&&isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(isForceRefresh&&window._rpcCache){window._rpcCache.delete(cacheKey)}if(!isForceRefresh&&window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const fetchHeaders={'Content-Type':'application/json'};if(isForceRefresh){fetchHeaders['x-bypass-cache']='1'}const response=await fetch('/api/gas',{method:'POST',headers:fetchHeaders,credentials:'include',body:JSON.stringify({action:n,args:a,bypassCache:isForceRefresh,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(!isForceRefresh&&isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?15000:45000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(!isForceRefresh&&window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
+window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|reviewerBootstrap|adminBootstrap|getPublicBootstrap|lookup|export|inspect|list|verifyWorkAccess|.*Bootstrap)/i.test(n);const isWrite=n!=='verifyWorkAccess'&&/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?30000:60000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
@@ -406,6 +406,7 @@ $('#loginForm').onsubmit=async e=>{
       renderAppShell(bootData);
       hide();
       await nav('dashboard');
+      prefetchAdminTabs();
     }else{
       await boot();
       hide();
@@ -427,6 +428,31 @@ async function boot(){
   renderAppShell(BOOT);
   const items=menuForRole(BOOT.role);
   await nav(items[0]?.[0]||'dashboard');
+  prefetchAdminTabs();
+}
+function prefetchAdminTabs(){
+  if(!BOOT || !BOOT.role) return;
+  const tabs = ['works','registrations','payments','reviewers','food'];
+  let delay = 500;
+  tabs.forEach(t => {
+    if(TAB_STATE.loaded[t] || TAB_STATE.inFlight[t]) return;
+    setTimeout(async () => {
+      if(TAB_STATE.loaded[t] || TAB_STATE.inFlight[t]) return;
+      TAB_STATE.inFlight[t] = true;
+      try{
+        if(t==='works') await loadWorks(false);
+        else if(t==='registrations') await loadRegistrations(false);
+        else if(t==='payments') await loadPayments(false);
+        else if(t==='reviewers') await Promise.all([loadReviewers(false), loadReviewConfig(false)]);
+        else if(t==='food') await loadFood(false);
+        TAB_STATE.loaded[t] = Date.now();
+      }catch(e){
+      }finally{
+        TAB_STATE.inFlight[t] = false;
+      }
+    }, delay);
+    delay += 400;
+  });
 }
 const TAB_STATE = window.TAB_STATE || { loaded: {}, inFlight: {} };
 window.TAB_STATE = TAB_STATE;

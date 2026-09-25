@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Reviewer Portal — TUH Quality Fair Conference Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root{--blue:#0c385b;--teal:#006d70;--gold:#c8b278;--soft:#f2f6f7;--line:#d9e3e8;--ink:#102a43;--green:#1b8f5a;--red:#b42318}*{box-sizing:border-box}body{margin:0;font-family:Prompt,sans-serif;background:radial-gradient(circle at 7% 8%,rgba(0,151,167,.16),transparent 30%),var(--soft);color:var(--ink)}button,input,select,textarea{font:inherit}.hidden{display:none!important}.en{display:block;font-size:.72em;color:#758593;font-weight:400}.login{min-height:100vh;display:grid;place-items:center;padding:20px}.login-card{width:min(900px,96vw);display:grid;grid-template-columns:1fr 1fr;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 24px 70px rgba(12,56,91,.2)}.brand{padding:42px;background:linear-gradient(145deg,#073552,#006d70);color:#fff}.logos{display:flex;gap:18px;align-items:center}.logos img{height:65px;max-width:165px;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,.2))}.brand h1{margin:45px 0 8px}.form{padding:42px}.field{margin:12px 0}.field label{font-weight:600;font-size:.88rem}.field input,.field select,.field textarea{width:100%;border:1px solid #c7d3da;border-radius:11px;padding:10px 12px;margin-top:5px}.password-wrap{position:relative}.password-wrap input{padding-right:48px}.eye{position:absolute;right:7px;top:31px;width:36px;height:36px;border:0;border-radius:9px;background:#e9f1f3;cursor:pointer}.remember{display:flex;gap:8px;align-items:flex-start;margin:12px 0;font-size:.82rem}.remember input{margin-top:3px}.help{font-size:.76rem;color:#667a88;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}.help a{color:var(--teal);font-weight:600}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}.primary{background:var(--teal);color:#fff}.soft{background:#e7eef2;color:#0c385b}.gold{background:var(--gold);color:#172b3a}.danger{background:#fee4e2;color:var(--red)}.app{display:flex;min-height:100vh;background:var(--soft)}.sidebar{width:260px;background:var(--teal);color:#fff;padding:20px;display:flex;flex-direction:column;flex-shrink:0}.sidebar-menu{display:flex;flex-direction:column;gap:5px;flex:1}.sidebar-menu button{background:transparent;border:0;color:#fff;text-align:left;padding:12px 15px;border-radius:8px;cursor:pointer;transition:0.2s;font-size:0.95rem;font-weight:500}.sidebar-menu button:hover,.sidebar-menu button.active{background:rgba(255,255,255,0.15)}.main-content{flex:1;padding:20px;max-width:calc(100vw - 260px);overflow-y:auto}.top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;background:#fff;padding:15px 20px;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.03)}.page-view.hidden{display:none!important}.user{text-align:right;font-size:.8rem}.container{max-width:1250px;margin:auto;padding:20px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.kpi,.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 7px 20px rgba(12,56,91,.05)}.kpi b{font-size:1.6rem}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:.86rem}.table th,.table td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{background:#f7fafb}.badge{display:inline-block;border-radius:999px;padding:4px 8px;font-size:.72rem;background:#e7eef2}.badge.ok{background:#e3f6ec;color:#126b45}.badge.warn{background:#fff1c7;color:#795800}.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.criterion{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;background:#fbfcfd}.criterion-head{display:flex;justify-content:space-between;gap:10px}.criterion input{width:100px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.loading{position:fixed;inset:0;background:rgba(244,247,248,.88);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;z-index:100}.loading.show{display:flex}.loading-box{background:#fff;padding:22px 28px;border-radius:18px;box-shadow:0 18px 45px rgba(0,0,0,.16)}.spin{display:inline-block;width:24px;height:24px;border:3px solid #DCE5EA;border-top-color:var(--teal);border-radius:50%;animation:s .8s linear infinite;margin-right:10px}@keyframes s{to{transform:rotate(360deg)}}@media(max-width:800px){.login-card{grid-template-columns:1fr}.brand{display:none}.kpis,.review-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.kpis,.review-grid{grid-template-columns:1fr}.container{padding:10px}.sidebar{width:200px}.main-content{max-width:calc(100vw - 200px)}}
+  
+    /* v2.1 direct-access rescue for Google Sites / embedded browsers */
+    .direct-access-bar{position:fixed;right:10px;bottom:10px;z-index:9999;display:none;background:rgba(255,255,255,0.85);border-radius:8px;padding:5px 8px;font-size:0.75rem;}
+    .direct-access-bar.show{display:block}
+    .direct-access-bar a{color:#64748b;text-decoration:underline;}
+    .filter-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+    .filter-tabs{display:flex;gap:10px;background:#fff;padding:6px;border-radius:999px;border:1px solid var(--line);box-shadow:0 4px 10px rgba(12,56,91,.02); overflow-x: auto;}
+    .filter-tab{background:transparent;border:0;padding:6px 16px;border-radius:999px;font-weight:500;color:#667a88;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:0.85rem;transition:0.2s; white-space: nowrap;}
+    .filter-tab:hover{background:#f7fafb}
+    .filter-tab.active{background:#e3f6ec;color:#006d70;font-weight:600}
+    .filter-tab .count-badge{background:#f2f6f7;color:#102a43;padding:2px 8px;border-radius:999px;font-size:0.75rem}
+    .filter-tab.active .count-badge{background:#006d70;color:#fff}
+    .filter-search input{border:1px solid var(--line);border-radius:999px;padding:10px 18px;width:280px;font-size:0.85rem;outline:none;background:#fff;box-shadow:inset 0 1px 3px rgba(0,0,0,.02)}
+    .kanban-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;margin-bottom:20px}
+    .kanban-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px;cursor:pointer;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);box-shadow:0 4px 12px rgba(12,56,91,.03);position:relative;overflow:hidden;text-align:left;}
+    .kanban-card:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(12,56,91,.08);border-color:#b0c4d0}
+    .kanban-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed var(--line);padding-bottom:12px}
+    .kanban-code{font-weight:700;color:var(--blue);font-size:0.95rem;display:flex;align-items:center;gap:6px}
+    .kanban-score{background:#e8f4f9;color:var(--teal);font-weight:700;min-width:38px;height:38px;padding:0 10px;display:flex;align-items:center;justify-content:center;border-radius:999px;font-size:1.1rem}
+    .kanban-score-pill{background:#f1f5f9;color:#475569;font-weight:700;padding:4px 12px;border-radius:999px;font-size:0.92rem;display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;}
+    .kanban-score-pill.scored{background:#ecfdf5;color:#047857;border-color:#a7f3d0;}
+    .kanban-score-pill.scored .score-num{font-weight:800;font-size:1.05rem;}
+    .kanban-score-pill .score-denom{font-size:0.75rem;color:#64748b;}
+    .kanban-card.is-complete{border-color:#a7f3d0;background:linear-gradient(180deg,#ffffff 0%,#f0fdf4 100%);}
+    .kanban-title{font-weight:700;font-size:1.02rem;line-height:1.5;color:#0f172a;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}
+    .kanban-meta{display:flex;flex-direction:column;gap:8px;font-size:0.8rem;color:#667a88}
+    .kanban-meta span{display:flex;align-items:center;gap:6px}
+    .kanban-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+    .kanban-empty{grid-column:1 / -1;text-align:center;padding:50px 20px;background:#fff;border-radius:18px;border:1px dashed var(--line);color:#667a88;font-size:0.95rem}
+
+    /* Category Grouping in Assignments List */
+    .assignment-category-section{margin-bottom:28px;background:#ffffff;border:1.5px solid #e2e8f0;border-radius:18px;padding:22px;box-shadow:0 4px 14px rgba(12,56,91,0.03);}
+    .assignment-category-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #f1f5f9;flex-wrap:wrap;gap:12px;}
+    .assignment-category-title{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+    .category-name-text{font-size:1.18rem;font-weight:800;color:#0C385B;}
+    .category-count-badge{background:#e0f2fe;color:#0369a1;border:1.5px solid #7dd3fc;font-weight:800;font-size:0.88rem;padding:3px 12px;border-radius:999px;}
+    .assignment-category-stats{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .stat-pill{font-size:0.82rem;font-weight:700;padding:4px 10px;border-radius:999px;}
+    .stat-pill.complete{background:#dcfce7;color:#15803d;border:1px solid #86efac;}
+    .stat-pill.pending{background:#fef3c7;color:#b45309;border:1px solid #fde68a;}
+
+    /* Prominent Work Hero Card in Review Page */
+    .review-work-hero-card{background:#ffffff;border:1.5px solid #cbd5e1;border-radius:18px;padding:22px 26px;margin-top:14px;margin-bottom:20px;box-shadow:0 4px 16px rgba(12,56,91,0.05);}
+    .review-work-hero-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;}
+    .review-work-info-col{flex:1 1 500px;min-width:280px;}
+    .review-work-badge-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+    .work-code-pill{background:#0C385B;color:#ffffff;font-weight:800;font-size:0.95rem;padding:5px 14px;border-radius:8px;letter-spacing:0.5px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(12,56,91,0.2);}
+    .work-category-pill{background:#f0fdf4;color:#166534;border:1.5px solid #86efac;font-weight:700;font-size:0.9rem;padding:4px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;}
+    .work-rubric-pill{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:0.85rem;font-weight:600;padding:4px 10px;border-radius:8px;display:inline-flex;align-items:center;gap:4px;}
+    .review-work-title{margin:0 0 6px 0;font-size:1.45rem;font-weight:800;line-height:1.45;color:#0f172a;letter-spacing:-0.2px;}
+    .review-work-subtitle-en{font-size:0.95rem;font-style:italic;color:#475569;margin-bottom:8px;line-height:1.4;}
+    .review-work-docs-col{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:260px;}
+    .review-work-docs-label{font-size:0.85rem;font-weight:700;color:#334155;letter-spacing:0.3px;}
+    .review-work-docs-btns{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%;}
+    .btn-doc-open-prominent{display:inline-flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-radius:12px;font-weight:700;font-size:0.98rem;text-decoration:none;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);border:none;cursor:pointer;}
+    .btn-doc-open-prominent:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.25) !important;filter:brightness(1.05);}
+    .btn-doc-icon{font-size:1.25rem;line-height:1;}
+    .btn-doc-text{flex:1;text-align:left;}
+    .btn-doc-arrow{font-size:1.15rem;font-weight:800;opacity:0.85;}
+    .review-work-docs-hint{font-size:0.76rem;color:#64748b;text-align:right;}
+    @media(max-width:768px){.review-work-docs-col{align-items:stretch;width:100%;}.review-work-docs-hint{text-align:left;}}
+    .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .dash-kpi-card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:20px; position:relative; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.02); }
+    .dash-kpi-title { font-size:0.9rem; color:#667a88; margin-bottom:10px; font-weight:600; }
+    .dash-kpi-value { font-size:2.2rem; font-weight:700; color:var(--ink); line-height:1; }
+    .dash-kpi-sub { font-size:0.8rem; color:#667a88; margin-top:8px; font-weight:500; }
+    .dash-icon { position:absolute; right:15px; top:15px; font-size:2.5rem; opacity:0.1; }
+    .login-card .brand h1 { font-size:clamp(1.35rem,2.2vw,1.75rem); letter-spacing:-0.02em; white-space:nowrap; }
+
+    /* 5 Main Categories & Criteria Scoring Styles */
+    .category-section { background:#fff; border:1px solid var(--line); border-radius:16px; margin:18px 0; overflow:hidden; box-shadow:0 4px 15px rgba(12,56,91,0.03); }
+    .category-header { background:linear-gradient(135deg,#f0f7f9 0%,#e6f1f4 100%); padding:14px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+    .category-header h3 { margin:0; font-size:1.02rem; color:var(--blue); font-weight:700; display:flex; align-items:center; gap:8px; }
+    .cat-pill { background:#fff; color:var(--teal); border:1.5px solid var(--teal); padding:4px 12px; border-radius:999px; font-size:0.85rem; font-weight:700; white-space:nowrap; }
+    .category-body { padding:16px; display:flex; flex-direction:column; gap:16px; }
+    .criterion-card { border:1.5px solid #cbd5e1; border-radius:14px; padding:18px 20px; background:#ffffff; transition:border-color 0.2s, box-shadow 0.2s; box-shadow:0 2px 8px rgba(0,0,0,0.03); }
+    .criterion-card:hover { border-color:#94a3b8; box-shadow:0 4px 14px rgba(0,0,0,0.06); }
+    
+    /* Header Row: Title on left, Prominent Score Input Box on right */
+    .criterion-header-row { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px; flex-wrap:wrap; }
+    .criterion-title-wrap { flex:1; min-width:260px; }
+    .criterion-main-title { font-size:1.02rem; color:#0f172a; line-height:1.45; }
+    .criterion-num-pill { background:#0369a1; color:#ffffff; font-weight:800; font-size:0.85rem; padding:3px 10px; border-radius:6px; display:inline-block; margin-right:8px; vertical-align:middle; }
+    .criterion-sub-en { color:#64748b; margin-top:4px; font-size:0.85rem; padding-left:2px; }
+    
+    /* Dedicated Score Box: Up to the Right with distinct background color */
+    .criterion-score-container { flex-shrink:0; min-width:230px; background:#fffbeb; border:2px solid #f59e0b; border-radius:12px; padding:12px 14px; box-shadow:0 2px 8px rgba(245,158,11,0.15); display:flex; flex-direction:column; align-items:stretch; }
+    .score-box-badge { display:flex; justify-content:space-between; align-items:center; font-size:0.84rem; font-weight:700; color:#92400e; margin-bottom:6px; }
+    .score-max-pill { background:#fef08a; color:#713f12; font-size:0.78rem; padding:2px 8px; border-radius:999px; font-weight:700; border:1px solid #fde047; }
+    .score-input-wrap { display:flex; align-items:center; gap:8px; }
+    .score-input-prominent { flex:1; min-width:0; font-size:1.45rem !important; font-weight:800 !important; text-align:center !important; color:#92400e !important; background:#fef3c7 !important; border:2.5px solid #d97706 !important; border-radius:10px !important; padding:8px 12px !important; box-sizing:border-box !important; box-shadow:inset 0 2px 4px rgba(217,119,6,0.1) !important; transition:all 0.2s; }
+    .score-input-prominent:focus { outline:none !important; border-color:#b45309 !important; background:#fffbeb !important; box-shadow:0 0 0 4px rgba(245,158,11,0.3) !important; }
+    .score-input-prominent.is-invalid { border-color:#dc2626 !important; background:#fee2e2 !important; color:#b91c1c !important; }
+    .score-unit-text { font-size:0.92rem; font-weight:700; color:#92400e; white-space:nowrap; }
+    
+    /* Rubric Description */
+    .criterion-rubric-desc { background:#f8fafc; border-left:4px solid #0284c7; border-radius:6px; padding:12px 16px; margin:10px 0 14px 0; font-size:0.9rem; color:#334155; line-height:1.65; white-space:pre-line; }
+    
+    /* Full-Width Long & Spacious Comment Box */
+    .criterion-comment-container { margin-top:10px; width:100%; }
+    .criterion-comment-label { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; font-size:0.88rem; font-weight:600; color:#334155; margin-bottom:6px; }
+    .criterion-comment-textarea { width:100%; min-height:80px; font-size:0.92rem; line-height:1.55; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 14px; box-sizing:border-box; background:#ffffff; transition:border-color 0.2s, box-shadow 0.2s; font-family:inherit; resize:vertical; }
+    .criterion-comment-textarea:focus { outline:none; border-color:#0284c7; box-shadow:0 0 0 3px rgba(2,132,199,0.15); background:#fcfdfe; }
+    
+    @media(max-width: 680px) {
+      .criterion-header-row { flex-direction:column; }
+      .criterion-score-container { width:100%; }
+    }
+    .live-summary-card { background:linear-gradient(145deg,#073552,#006d70); color:#fff; border-radius:18px; padding:20px 24px; margin-bottom:22px; box-shadow:0 10px 30px rgba(0,109,112,0.2); }
+    .live-summary-top { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid rgba(255,255,255,0.18); padding-bottom:14px; }
+    .live-summary-title { font-size:1.1rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .live-total-score-badge { font-size:1.6rem; font-weight:700; color:#ffd166; display:flex; align-items:baseline; gap:4px; }
+    .live-total-score-badge span { font-size:0.9rem; color:rgba(255,255,255,0.8); }
+    .live-summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:10px; margin-top:14px; }
+    .live-cat-box { background:rgba(255,255,255,0.12); border-radius:12px; padding:10px 12px; text-align:center; backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.15); }
+    .live-cat-box .cat-label { font-size:0.76rem; color:rgba(255,255,255,0.85); margin-bottom:4px; line-height:1.3; }
+    .live-cat-box .cat-val { font-size:1.1rem; font-weight:700; color:#fff; }
+    .score-progress-bar-bg { background:rgba(255,255,255,0.2); height:8px; border-radius:999px; margin-top:14px; overflow:hidden; }
+    .score-progress-bar-fill { height:100%; background:#ffd166; border-radius:999px; transition:width 0.3s cubic-bezier(0.4,0,0.2,1); }
+  </style>
+</head>
+<body>
+<div class="direct-access-bar" id="directAccessBar" role="status">
+  <a id="directAccessNewTab" href="/reviewer?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer" title="คัดลอกลิงก์นี้เพื่อเปิดในโหมดไม่ระบุตัวตน (Incognito)">หากจอขาว/เข้าไม่ได้ เปิด Incognito</a>
+</div>
+
+<section class="login" id="loginView">
+  <div class="login-card">
+    <div class="brand"><div class="logos"><img src="/images/tuh-logo.png" alt="TUH"><img src="/images/hacc-logo.png" alt="HACC"></div><h1>TUH 19 & HA-Regional 1</h1><p>Reviewer Portal — ระบบประเมินผลงานวิชาการ</p><span class="en" style="color:#d5ebec">Academic review system</span></div>
+    <form class="form" id="loginForm" autocomplete="on"><div style="display:flex; border-bottom:1px solid #d9e3e8; margin-bottom:20px;"><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('admin')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">Admin</a><a style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:var(--teal); border-bottom:2px solid var(--teal); font-weight:600; cursor:default;">Reviewer</a><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('scanner')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">สแกนสิทธิ์</a></div><h2>เข้าสู่ระบบ Reviewer</h2><div class="field"><label>Username / Email</label><input id="loginUser" name="username" autocomplete="username" required></div><div class="field password-wrap"><label>รหัสผ่าน<span class="en">Password</span></label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required><button type="button" class="eye" onclick="togglePassword()">👁</button></div><label class="remember"><input type="checkbox" id="rememberLogin" checked><span>จำ Username และรหัสผ่านบนอุปกรณ์ส่วนตัวนี้<span class="en">Remember credentials on this device</span></span></label><button class="btn primary" style="width:100%">เข้าสู่ระบบ</button><div style="display:flex; justify-content:space-between; margin-top:15px;"><a href="#" onclick="forgotPassword()" style="font-size:0.85rem; color:var(--teal); text-decoration:none;">ลืมรหัสผ่าน?</a><a href="#" onclick="signUp()" style="font-size:0.85rem; color:var(--teal); text-decoration:none; font-weight:600;">+ สมัครเข้าใช้งาน</a></div><div class="help">หากเปิดผ่าน Google Sites หรือเบราว์เซอร์ภายในแอปแล้วไม่สำเร็จ ให้ <a href="/reviewer?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer">เปิด Web App โดยตรง</a> โดยไม่ต้องออกจากบัญชี Google</div></form>
+  </div>
+</section>
+<section class="app hidden" id="appView">
+  <aside class="sidebar">
+    <div class="logos" style="margin-bottom:15px; flex-wrap:wrap">
+      <img src="/images/tuh-logo.png" alt="TUH" style="max-height:40px">
+      <img src="/images/hacc-logo.png" alt="HACC" style="max-height:40px">
+    </div>
+    <div style="margin-bottom: 30px">
+      <b id="confName">TUH 19 & HA-Regional 1</b><br>
+      <span style="font-size:0.8rem; color:rgba(255,255,255,0.7)">ระบบประเมินผลงานวิชาการ</span>
+    </div>
+    <div class="sidebar-menu">
+      <button class="active" onclick="nav('dashboard')" id="nav-dashboard">📌 Dashboard Reviewer</button>
+      <button onclick="nav('assignments')" id="nav-assignments">📋 งานที่ต้องประเมิน</button>
+      <button onclick="nav('report')" id="nav-report">📄 พิมพ์รายงานของฉัน</button>
+      <button onclick="logout()" style="margin-top:auto">🚪 ออกจากระบบ</button>
+    </div>
+  </aside>
+  <main class="main-content">
+    <header class="top-bar">
+      <div>
+        <h2 id="pageTitle" style="margin:0">Dashboard Reviewer</h2>
+      </div>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <div class="user" style="text-align:right; font-size:1.05rem; color:var(--blue)">
+          <b id="reviewerName">-</b>
+        </div>
+        <button class="btn primary" onclick="refreshData()" title="ดึงข้อมูลล่าสุดจาก Google Sheets">🔄 ดึงข้อมูลใหม่</button>
+        <button class="btn danger" onclick="logout()" style="background:#fee4e2; color:#b42318; border:1.5px solid #f87171; font-weight:700; padding:8px 16px; border-radius:10px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(180,35,24,0.15); transition:all 0.2s;" title="ออกจากระบบ">🚪 ออกจากระบบ</button>
+      </div>
+    </header>
+    <div id="page-dashboard" class="page-view">
+      <div style="background:#fff; border-radius:18px; padding:20px; margin-bottom:20px; border:1px solid var(--line); box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+        <h3 style="margin:0 0 5px 0">การประเมินผลงานวิชาการ TUH 19</h3>
+        <div style="font-size:0.85rem; color:#667a88">Dashboard เฉพาะของ Reviewer แสดงภาพรวมงานที่ได้รับมอบหมาย โดยไม่แสดงชื่อผู้แต่งเพื่อลด bias</div>
+      </div>
+      <div class="dash-kpis" id="dashboard-kpis"></div>
+    </div>
+    <div id="page-assignments" class="page-view hidden">
+      <div style="background:#fff; border-radius:18px; padding:20px; margin-bottom:20px; border:1px solid var(--line); box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:10px">
+          <div>
+            <h3 style="margin:0 0 5px 0">งานประเมินของฉัน</h3>
+            <div style="font-size:0.85rem; color:#667a88">รายการผลงานที่ได้รับมอบหมาย โดยไม่แสดงชื่อผู้แต่งหรือผู้นำเสนอเพื่อลด bias</div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn soft" onclick="printMyReport()">🖨 พิมพ์รายงานเฉพาะบุคคล</button>
+            <button class="btn primary" onclick="refreshData()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="kpis" id="assignments-kpis" style="margin-bottom:0"></div>
+      </div>
+      <div class="filter-bar">
+        <div class="filter-tabs" id="filterTabs">
+          <button class="filter-tab active" data-filter="all">ทั้งหมด <span class="count-badge" id="count-all">0</span></button>
+          <button class="filter-tab" data-filter="pending">รอดำเนินการ <span class="count-badge" id="count-pending">0</span></button>
+          <button class="filter-tab" data-filter="completed">ประเมินแล้ว <span class="count-badge" id="count-completed">0</span></button>
+        </div>
+        <div class="filter-search">
+          <input type="text" id="searchAssignment" placeholder="🔍 ค้นหารหัส / ชื่อเรื่อง" oninput="renderAssignmentsGrid()">
+        </div>
+      </div>
+      <div id="assignmentGrid"></div>
+      <div id="reviewHost"></div>
+    </div>
+    <div id="page-report" class="page-view hidden">
+      <div style="background:#fff; border-radius:18px; padding:20px; margin-bottom:20px; border:1px solid var(--line); box-shadow:0 4px 15px rgba(0,0,0,0.02)">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:10px">
+          <div>
+            <h3 style="margin:0 0 5px 0">รายงานการประเมินผลงานวิชาการเฉพาะบุคคล</h3>
+            <div style="font-size:0.85rem; color:#667a88">การประเมินผลงานวิชาการ TUH 19 & HA-Regional 1</div>
+            <div style="font-size:0.85rem; color:#667a88; margin-top:5px"><b style="color:var(--ink)">ผู้ประเมิน:</b> <span id="report-reviewer-name"></span></div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn primary" onclick="printMyReport()">🖨 พิมพ์รายงาน</button>
+          </div>
+        </div>
+        
+        <div style="background:#f7fafb; border-radius:12px; padding:15px; margin-bottom:20px; border:1px solid var(--line); display:flex; gap:20px; flex-wrap:wrap">
+           <div style="font-size:0.95rem">ได้รับมอบหมาย <b id="rep-tot" style="font-size:1.2rem; color:var(--teal)">0</b> เรื่อง</div>
+           <div style="font-size:0.95rem">ประเมินแล้ว <b id="rep-com" style="font-size:1.2rem; color:var(--green)">0</b> เรื่อง</div>
+           <div style="font-size:0.95rem">รอดำเนินการ <b id="rep-pen" style="font-size:1.2rem; color:var(--gold)">0</b> เรื่อง</div>
+           <div style="width:100%; height:1px; background:var(--line); margin:5px 0"></div>
+           <div style="font-size:0.95rem">ความก้าวหน้า <b id="rep-prog" style="font-size:1.3rem; color:var(--green)">0%</b></div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table" style="background:#fff; border-radius:12px; overflow:hidden">
+            <thead>
+              <tr style="background:#e8f4f9">
+                <th>รหัส</th>
+                <th>ชื่อผลงาน</th>
+                <th>สถานะ</th>
+                <th>คะแนน</th>
+                <th>ข้อเสนอแนะ</th>
+              </tr>
+            </thead>
+            <tbody id="reportRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+<div class="loading" id="loading"><div class="loading-box"><span class="spin"></span><b id="loadText">กำลังประมวลผล</b></div></div>
+<script>
+const CID=''+(new URLSearchParams(location.search).get('conferenceId')||'CONF-TUH-QF-2569')+'',CRED_KEY='tuhReviewerRememberedCredentials';let TOKEN='',BOOT=null,CURRENT=null;
+
+const APP_BASE_URL='';
+const DIRECT_ACCESS_URL='/reviewer?conferenceId=CONF-TUH-QF-2569';
+function installDirectAccessGuard(){
+  const embedded=window.self!==window.top;
+  const fromGoogleSites=/sites\.google\.com/i.test(document.referrer||'');
+  const inApp=/FBAN|FBAV|Line\/|Instagram|GSA\//i.test(navigator.userAgent||'');
+  const bar=document.getElementById('directAccessBar');
+  if(bar&&(embedded||fromGoogleSites||inApp))bar.classList.add('show');
+}
+function canonicalRoute(page){const routes={public:'/',admin:'/admin',reviewer:'/reviewer',scanner:'/scanner',launcher:'/launcher'};const target=routes[page||'public']||'/';return target+'?conferenceId='+encodeURIComponent(CID)}
+window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
+
+const $=s=>document.querySelector(s);window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|reviewerBootstrap|adminBootstrap|getPublicBootstrap|lookup|export|inspect|list|verifyWorkAccess|.*Bootstrap)/i.test(n);const isWrite=n!=='verifyWorkAccess'&&/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?30000:60000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$ ('#loading').classList.remove('show')}function togglePassword(){const e=$('#loginPassword'),showing=e.type==='text';e.type=showing?'password':'text';document.querySelector('.eye').textContent=showing?'👁':'🙈'}
+function loadCreds(){try{const username=localStorage.getItem(CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}function saveCreds(){if($('#rememberLogin').checked)localStorage.setItem(CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(CRED_KEY)}function storedToken(){return '__COOKIE__'}function storeToken(){}
+$('#loginForm').onsubmit=async e=>{e.preventDefault();show('กำลังเข้าสู่ระบบ');try{const u=$('#loginUser').value.trim(),p=$('#loginPassword').value;const r=await rpc('loginUser',u,p,CID,navigator.userAgent,{portal:'reviewer'});const allowedRoles=['REVIEWER','SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'];if(!allowedRoles.includes(r.role))throw new Error('บัญชีนี้ไม่มีสิทธิ์ Reviewer');TOKEN=r.token;saveCreds();storeToken(TOKEN);$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#confName').textContent='TUH 19 & HA-Regional 1';$('#reviewerName').textContent=(r.user&&r.user.FullName)||u;hide();if(r.reviewerBoot&&r.reviewerBoot.reviewer){BOOT=r.reviewerBoot;$('#reviewerName').textContent=BOOT.reviewer.FullName||BOOT.reviewer.Email;renderAll()}else{await boot()}}catch(e){hide();Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message})}};
+async function boot(){try{BOOT=await rpc('reviewerBootstrap',TOKEN,CID);$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#confName').textContent='TUH 19 & HA-Regional 1';$('#reviewerName').textContent=BOOT.reviewer.FullName||BOOT.reviewer.Email;renderAll()}finally{hide()}}
+function prefetchAssignments(){
+  if(!BOOT||!BOOT.assignments||!BOOT.assignments.length) return;
+  const list = BOOT.assignments.slice(0, 20);
+  let delay = 250;
+  list.forEach(a => {
+    const aid = a.AssignmentID;
+    if(ASSIGNMENT_CACHE[aid]) return;
+    setTimeout(async () => {
+      if(ASSIGNMENT_CACHE[aid]) return;
+      try{
+        const res = await rpc('reviewerGetAssignment', TOKEN, CID, aid);
+        if(res && res.assignment) {
+          ASSIGNMENT_CACHE[aid] = res;
+        }
+      }catch(err){}
+    }, delay);
+    delay += 300;
+  });
+}
+function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); prefetchAssignments(); }
+function statusBadge(s){const c=s==='COMPLETE'?'ok':(s==='PASS'?'ok':'warn');return `<span class="badge ${c}">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
+let currentFilter = 'all';
+const ASSIGNMENT_CACHE = {};
+
+function renderAssignments(){const a=(BOOT&&BOOT.assignments)||[],complete=a.filter(x=>x.Status==='COMPLETE').length,pending=a.length-complete;const kh=[['ได้รับมอบหมาย',a.length],['ประเมินเสร็จ',complete],['รอดำเนินการ',pending],['ความคืบหน้า',a.length?Math.round(complete*100/a.length)+'%':'0%']].map(x=>`<div class="kpi"><span>${x[0]}</span><br><b>${x[1]}</b></div>`).join('');const dk=$('#kpis');if(dk)dk.innerHTML=kh;const ak=$('#assignments-kpis');if(ak)ak.innerHTML=kh;const elAll=$('#count-all');if(elAll)elAll.textContent=a.length;const elPen=$('#count-pending');if(elPen)elPen.textContent=pending;const elCom=$('#count-completed');if(elCom)elCom.textContent=complete;renderAssignmentsGrid();}
+function getAssignmentCategory(x) {
+  if (!x) return 'ผลงานทั่วไป';
+  const catName = String(x.CategoryName || x.CategoryNameTH || '').trim();
+  const catId = String(x.CategoryID || '').trim();
+  const catCode = String(x.CategoryCode || '').trim();
+  const allText = (catName + ' ' + catId + ' ' + catCode).toUpperCase();
+
+  // 1. Service Excellence (including CAT-SERVICE, SERVICE, CAT-3, บริการ, etc.)
+  if (/SERVICE|CAT-SERVICE|CAT-3|บริการ/i.test(allText) && !/CQI|BEST\s*PRACTICE/i.test(allText)) {
+    return 'Service Excellence';
+  }
+  // 2. CQI / Best Practice (including CAT-CQI, CQI, CAT-4, BEST PRACTICE, etc.)
+  if (/CQI|BEST\s*PRACTICE|CAT-CQI|CAT-4/i.test(allText)) {
+    return 'CQI / Best Practice';
+  }
+  // 3. Research (including CAT-RESEARCH, RESEARCH, CAT-1, วิจัย, R2R, etc.)
+  if (/RESEARCH|วิจัย|R2R|CAT-RESEARCH|CAT-1/i.test(allText)) {
+    return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+  }
+  // 4. Innovation (including CAT-INNOVATION, INNOVAT, CAT-2, นวัตกรรม, สิ่งประดิษฐ์, etc.)
+  if (/INNOVAT|นวัตกรรม|สิ่งประดิษฐ์|CAT-INNOVAT|CAT-2/i.test(allText)) {
+    return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  }
+  // 5. Primary Care (including CAT-PRIMARY, PRIMARY, CAT-5, ปฐมภูมิ, ชุมชน, etc.)
+  if (/PRIMARY|ปฐมภูมิ|COMMUNITY|CAT-PRIMARY|CAT-5/i.test(allText)) {
+    return 'Primary Care & Community Network Development';
+  }
+
+  if (catName && catName !== 'ผลงานทั่วไป' && !/^CAT-/i.test(catName)) {
+    return catName;
+  }
+  return catName || 'ผลงานทั่วไป';
+}
+
+function renderAssignmentsGrid(){
+  const container = $('#assignmentGrid');
+  if(!container) return;
+  if(!BOOT){
+    container.innerHTML = `<div class="kanban-empty"><span class="spin"></span> กำลังโหลดผลงานที่ได้รับมอบหมาย...</div>`;
+    return;
+  }
+  const a = BOOT.assignments || [];
+  const search = ($('#searchAssignment').value || '').toLowerCase().trim();
+  const filtered = a.filter(x => {
+    if(currentFilter === 'pending' && x.Status === 'COMPLETE') return false;
+    if(currentFilter === 'completed' && x.Status !== 'COMPLETE') return false;
+    if(search){
+      const cat = getAssignmentCategory(x);
+      const txt = `${x.WorkCode||''} ${x.TitleTH||''} ${x.TitleEN||''} ${x.AuthorName||''} ${x.PresenterName||''} ${cat} ${x.CategoryName||''}`.toLowerCase();
+      if(!txt.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if(filtered.length === 0){
+    container.innerHTML = `<div class="kanban-empty" style="background:#fff; border-radius:16px; padding:40px 20px; border:1px dashed var(--line); color:#64748b;">ไม่พบผลงานที่ตรงกับเงื่อนไขการค้นหาหรือตัวกรอง</div>`;
+    return;
+  }
+
+  // Group filtered assignments by category
+  const groups = {};
+  const groupOrder = [];
+  filtered.forEach(x => {
+    const cat = getAssignmentCategory(x);
+    if(!groups[cat]){
+      groups[cat] = [];
+      groupOrder.push(cat);
+    }
+    groups[cat].push(x);
+  });
+
+  // Render each category group with clear headers
+  container.innerHTML = groupOrder.map(cat => {
+    const list = groups[cat];
+    const completedCount = list.filter(item => item.Status === 'COMPLETE').length;
+    const pendingCount = list.length - completedCount;
+
+    let catIcon = '📂';
+    let catThemeColor = '#006D70';
+    if (/วิจัย|RESEARCH/i.test(cat)) { catIcon = '🔬'; catThemeColor = '#0C385B'; }
+    else if (/นวัตกรรม|INNOVAT/i.test(cat)) { catIcon = '💡'; catThemeColor = '#b45309'; }
+    else if (/SERVICE|บริการ/i.test(cat)) { catIcon = '🏥'; catThemeColor = '#0284c7'; }
+    else if (/CQI|BEST\s*PRACTICE/i.test(cat)) { catIcon = '📈'; catThemeColor = '#15803d'; }
+    else if (/ปฐมภูมิ|PRIMARY/i.test(cat)) { catIcon = '🌱'; catThemeColor = '#047857'; }
+
+    const cardsHtml = list.map(x => {
+      const isComplete = x.Status === 'COMPLETE';
+      const scoreVal = (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '') ? x.TotalScore : '-';
+      return `
+        <div class="kanban-card ${isComplete ? 'is-complete' : ''}" onclick="openAssignment('${esc(x.AssignmentID)}')">
+          <div class="kanban-header">
+            <div class="kanban-code" style="color:${catThemeColor}; font-weight:800;">
+              <span># ${esc(x.WorkCode)}</span>
+            </div>
+            <div class="kanban-score-pill ${isComplete ? 'scored' : 'empty'}">
+              <span class="score-num">${esc(scoreVal)}</span>
+              <span class="score-denom">/ 100</span>
+            </div>
+          </div>
+          <div class="kanban-title" title="${esc(x.TitleTH || x.TitleEN || '-')}">
+            ${esc(x.TitleTH || x.TitleEN || '-')}
+          </div>
+          <div class="kanban-meta">
+            <span>📅 มอบหมาย: ${esc(formatDate(x.AssignedAt))}</span>
+            ${x.PresenterName ? `<span>👤 ผู้นำเสนอ: ${esc(x.PresenterName)}</span>` : ''}
+          </div>
+          <div class="kanban-badges">
+            ${statusBadge(x.Status)}
+            ${x.Decision ? statusBadge(x.Decision) : ''}
+            <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:600;">${esc(cat)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="assignment-category-section">
+        <div class="assignment-category-header">
+          <div class="assignment-category-title">
+            <span style="font-size:1.35rem;">${catIcon}</span>
+            <span class="category-name-text">ประเภท: ${esc(cat)}</span>
+            <span class="category-count-badge">${list.length} เรื่อง</span>
+          </div>
+          <div class="assignment-category-stats">
+            <span class="stat-pill complete">ประเมินแล้ว ${completedCount} เรื่อง</span>
+            <span class="stat-pill pending">รอประเมิน ${pendingCount} เรื่อง</span>
+          </div>
+        </div>
+        <div class="kanban-grid">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+document.addEventListener('click',e=>{const tab=e.target.closest('.filter-tab');if(tab){document.querySelectorAll('.filter-tab').forEach(el=>el.classList.remove('active'));tab.classList.add('active');currentFilter=tab.dataset.filter;renderAssignmentsGrid()}});
+
+async function openAssignment(id){
+  if (ASSIGNMENT_CACHE[id]) {
+    const cachedCrit = (ASSIGNMENT_CACHE[id] && ASSIGNMENT_CACHE[id].criteria) || [];
+    const sumMax = cachedCrit.reduce((sum, c) => sum + (Number(c.MaxScore) || 0), 0);
+    if (sumMax <= 100 && cachedCrit.length <= 8) {
+      CURRENT = ASSIGNMENT_CACHE[id];
+      renderReview();
+      const h = $('#reviewHost');
+      if (h) h.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    delete ASSIGNMENT_CACHE[id];
+  }
+  show('กำลังเปิดผลงาน');
+  try{
+    CURRENT = await rpc('reviewerGetAssignment', TOKEN, CID, id);
+    ASSIGNMENT_CACHE[id] = CURRENT;
+    hide();
+    renderReview();
+    const h = $('#reviewHost');
+    if (h) h.scrollIntoView({ behavior: 'smooth' });
+  }catch(e){
+    hide();
+    Swal.fire({icon:'error',title:'เปิดผลงานไม่ได้',text:e.message});
+  }
+}
+
+function resolveReviewerCriteria(rawCriteria, work) {
+  if (!rawCriteria || !rawCriteria.length) return [];
+  const w = work || (CURRENT && CURRENT.work) || {};
+  const catCode = String(w.CategoryCode || w.CategoryID || '').trim().toUpperCase();
+  const catName = String(w.CategoryName || w.CategoryNameTH || '').trim().toUpperCase();
+  const fullWorkCat = (catCode + ' ' + catName).toUpperCase();
+
+  const isResearch = /RESEARCH|วิจัย|R2R/i.test(fullWorkCat);
+  const isInnovation = /INNOVAT|นวัตกรรม|สิ่งประดิษฐ์/i.test(fullWorkCat);
+  const isCQI = /CQI|BEST\s*PRACTICE/i.test(fullWorkCat);
+  const isService = (/SERVICE|บริการ/i.test(fullWorkCat)) && !isCQI;
+  const isPrimary = /PRIMARY|ปฐมภูมิ/i.test(fullWorkCat);
+
+  // Group into candidate suites by CategoryID
+  const byCat = {};
+  rawCriteria.forEach(c => {
+    const k = String(c.CategoryID || 'DEFAULT').trim().toUpperCase();
+    if (!byCat[k]) byCat[k] = [];
+    byCat[k].push(c);
+  });
+
+  const suites = [];
+  Object.keys(byCat).forEach(k => suites.push(byCat[k]));
+
+  const cleanSuites = [];
+  suites.forEach(suite => {
+    const seen = new Set();
+    let hasDups = false;
+    suite.forEach(c => {
+      const it = Number(c.ItemNo || c.SortOrder) || 0;
+      if (seen.has(it)) hasDups = true;
+      seen.add(it);
+    });
+    if (!hasDups) {
+      cleanSuites.push(suite);
+    } else {
+      const s1 = [], s2 = [];
+      const s1Seen = new Set();
+      suite.forEach(c => {
+        const it = Number(c.ItemNo || c.SortOrder) || 0;
+        if (!s1Seen.has(it)) {
+          s1.push(c);
+          s1Seen.add(it);
+        } else {
+          s2.push(c);
+        }
+      });
+      if (s1.length) cleanSuites.push(s1);
+      if (s2.length) cleanSuites.push(s2);
+    }
+  });
+
+  let bestSuite = null;
+  let bestScore = -99999;
+
+  cleanSuites.forEach(suite => {
+    suite.sort((a, b) => (Number(a.ItemNo || a.SortOrder) || 0) - (Number(b.ItemNo || b.SortOrder) || 0));
+    const totalMax = suite.reduce((sum, c) => sum + (Number(c.MaxScore) || 0), 0);
+    let sScore = 0;
+    if (totalMax === 100) sScore += 300;
+    else if (totalMax <= 100) sScore += 100;
+    else sScore -= 1000;
+
+    suite.forEach(c => {
+      const critCat = String(c.CategoryID || '').toUpperCase();
+      const title = String(c.CriteriaNameTH || c.CriteriaName || '').toUpperCase();
+      const text = critCat + ' ' + title + ' ' + String(c.DescriptionTH || '').toUpperCase();
+      if (w.CategoryID && (critCat === String(w.CategoryID).toUpperCase() || critCat.split(/[,;\s]+/).includes(String(w.CategoryID).toUpperCase()))) sScore += 100;
+      if (catCode && (critCat === catCode || critCat.split(/[,;\s]+/).includes(catCode))) sScore += 80;
+
+      if (isCQI) {
+        if (/CQI|PDCA|ทบทวนสถานการณ์|จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ/i.test(text)) sScore += 60;
+        if (critCat === 'CQI' || critCat === 'CAT-4') sScore += 50;
+      }
+      if (isService) {
+        if (/SERVICE|บริการ|ความคุ้มค่า|นวัตกรรมบริการ/i.test(text)) sScore += 60;
+        if (critCat === 'SERVICE' || critCat === 'CAT-3') sScore += 50;
+        if (/PDCA|จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ/i.test(text)) sScore -= 40;
+      }
+      if (isPrimary) {
+        if (/PRIMARY|ปฐมภูมิ|ชุมชน|เครือข่าย/i.test(text)) sScore += 60;
+        if (critCat === 'PRIMARY' || critCat === 'CAT-5') sScore += 50;
+      }
+      if (isResearch) {
+        if (/ระเบียบวิธีวิจัย|จริยธรรมการวิจัย|คำถามวิจัย|RESEARCH|วิจัย/i.test(text)) sScore += 60;
+        if (critCat === 'RESEARCH' || critCat === 'CAT-1') sScore += 50;
+      }
+      if (isInnovation) {
+        if (/สิ่งประดิษฐ์|นวัตกรรม|INNOVAT/i.test(text)) sScore += 60;
+        if (critCat === 'INNOVATION' || critCat === 'CAT-2') sScore += 50;
+      }
+      if (!isResearch && !isInnovation && critCat === 'SERVICE_CQI_PRIMARY') sScore += 20;
+      if ((isResearch || isInnovation) && critCat === 'RESEARCH_INNOVATION') sScore += 20;
+    });
+
+    if (sScore > bestScore) {
+      bestScore = sScore;
+      bestSuite = suite;
+    }
+  });
+
+  if (bestSuite && bestSuite.length > 0) {
+    return bestSuite;
+  }
+
+  // Fallback: pick unique items up to 100 points
+  const fallback = [];
+  const seenNo = new Set();
+  let tot = 0;
+  rawCriteria.slice().sort((a, b) => (Number(a.ItemNo || a.SortOrder) || 0) - (Number(b.ItemNo || b.SortOrder) || 0)).forEach(c => {
+    const it = Number(c.ItemNo || c.SortOrder) || 0;
+    const max = Number(c.MaxScore) || 0;
+    if (!seenNo.has(it) && tot + max <= 100) {
+      seenNo.add(it);
+      fallback.push(c);
+      tot += max;
+    }
+  });
+  return fallback.length > 0 ? fallback : rawCriteria;
+}
+
+function handleScoreInput(input, maxScore) {
+  if (!input) return;
+  const max = parseFloat(maxScore) || 0;
+  let val = parseFloat(input.value);
+  const container = input.closest('.criterion-score-container');
+  const hintEl = container ? container.querySelector('.score-limit-hint') : null;
+  
+  if (!isNaN(val)) {
+    if (val > max) {
+      input.classList.add('is-invalid');
+      input.value = max;
+      if (hintEl) {
+        hintEl.style.color = '#dc2626';
+        hintEl.innerHTML = `⚠️ ปรับเป็น ${max} (เกินคะแนนเต็ม!)`;
+      }
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'warning',
+        title: `ห้ามลงคะแนนเกินคะแนนเต็ม (${max} คะแนน)`,
+        text: `ระบบปรับลดกลับเป็นคะแนนเต็ม (${max} คะแนน) ให้อัตโนมัติ`,
+        showConfirmButton: false,
+        timer: 2500
+      });
+    } else if (val < 0) {
+      input.value = 0;
+      input.classList.remove('is-invalid');
+    } else {
+      input.classList.remove('is-invalid');
+      if (hintEl) {
+        hintEl.style.color = '#15803d';
+        hintEl.innerHTML = `✓ คะแนนถูกต้อง (ไม่เกิน ${max})`;
+      }
+    }
+  } else {
+    input.classList.remove('is-invalid');
+    if (hintEl) {
+      hintEl.style.color = '#92400e';
+      hintEl.innerHTML = `* กำกับไม่เกิน ${max} คะแนน`;
+    }
+  }
+  updateLiveReviewScores();
+}
+
+function updateLiveReviewScores() {
+  const form = $('#reviewForm');
+  if (!form || !CURRENT || !CURRENT.criteria) return;
+  const critList = CURRENT.criteria || [];
+  let grandTotal = 0;
+  let totalMax = 0;
+  
+  critList.forEach(c => {
+    const max = Number(c.MaxScore) || 0;
+    totalMax += max;
+    const input = form.elements['score_' + c.CriteriaID];
+    if (input) {
+      let rawVal = input.value.trim();
+      let val = parseFloat(rawVal);
+      if (!isNaN(val)) {
+        if (val < 0) { val = 0; input.value = 0; }
+        if (val > max) { val = max; input.value = max; }
+        grandTotal += val;
+      }
+      const valDisplay = !isNaN(val) && rawVal !== '' ? (Math.round(val * 100) / 100) : '-';
+      const summaryCrit = $(`#summary_crit_${c.CriteriaID}`);
+      if (summaryCrit) summaryCrit.textContent = valDisplay;
+    }
+  });
+  
+  if (totalMax > 100) totalMax = 100;
+  if (grandTotal > totalMax) grandTotal = totalMax;
+
+  const fmt = n => (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
+  const totalDisplay = $('#summary_total_score');
+  if (totalDisplay) totalDisplay.textContent = fmt(grandTotal);
+  const totalMaxDisplay = $('#summary_max_score');
+  if (totalMaxDisplay) totalMaxDisplay.textContent = totalMax;
+  const bar = $('#summary_score_bar');
+  if (bar) {
+    const pct = totalMax > 0 ? (grandTotal / totalMax) * 100 : 0;
+    bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  }
+}
+
+function renderReview() {
+  nav('assignments');
+  const d = CURRENT, w = d.work, a = d.assignment, scoreMap = {};
+  (d.scores || []).forEach(x => scoreMap[x.CriteriaID] = x);
+  
+  // Strictly resolve criteria to the single 100-point suite matching this work's category
+  const criteriaList = resolveReviewerCriteria(d.criteria, w).slice().sort((x, y) => (Number(x.ItemNo || x.SortOrder) || 0) - (Number(y.ItemNo || y.SortOrder) || 0));
+  d.criteria = criteriaList; // sync back to CURRENT.criteria
+  const totalMax = criteriaList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
+  
+  let initTotal = 0;
+  criteriaList.forEach(c => {
+    const old = scoreMap[c.CriteriaID] || {};
+    const sc = Number(old.Score);
+    if (!isNaN(sc)) initTotal += sc;
+  });
+  
+  const fmt = n => (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
+  
+  const itemsHtml = criteriaList.map(c => {
+    const old = scoreMap[c.CriteriaID] || {};
+    const val = (old.Score !== undefined && old.Score !== null) ? old.Score : '';
+    const max = Number(c.MaxScore) || 0;
+    return `
+      <div class="criterion-card" style="margin-bottom:16px">
+        <div class="criterion-header-row">
+          <div class="criterion-title-wrap">
+            <div class="criterion-main-title">
+              <span class="criterion-num-pill">ข้อ ${esc(c.ItemNo)}</span>
+              <b>${esc(c.CriteriaNameTH || c.CriteriaName || '')}</b>
+            </div>
+            ${c.CriteriaNameEN ? `<div class="criterion-sub-en">${esc(c.CriteriaNameEN)}</div>` : ''}
+          </div>
+          <div class="criterion-score-container">
+            <div class="score-box-badge">
+              <span style="font-weight:700;">✍️ กรอกคะแนนข้อนี้</span>
+              <span class="score-max-pill">เต็ม ${max} คะแนน</span>
+            </div>
+            <div class="score-input-wrap">
+              <input type="number" min="0" max="${max}" step="0.5" 
+                     class="score-input-prominent"
+                     name="score_${esc(c.CriteriaID)}" 
+                     value="${esc(val)}" 
+                     oninput="handleScoreInput(this, ${max})" 
+                     onblur="handleScoreInput(this, ${max})" 
+                     placeholder="0"
+                     required>
+              <span class="score-unit-text">คะแนน</span>
+            </div>
+            <div class="score-limit-hint" style="font-size:0.75rem; color:#92400e; margin-top:5px; text-align:center; font-weight:600;">
+              * กำกับไม่เกิน ${max} คะแนน
+            </div>
+          </div>
+        </div>
+        ${c.DescriptionTH ? `
+          <div class="criterion-rubric-desc">
+            ${esc(c.DescriptionTH)}
+          </div>
+        ` : ''}
+        <div class="criterion-comment-container">
+          <div class="criterion-comment-label">
+            <span style="font-weight:700; color:#1e293b; display:flex; align-items:center; gap:6px;">💬 <span>ข้อเสนอแนะเฉพาะหัวข้อนี้ (ถ้ามี)</span></span>
+            <span style="font-size:0.8rem; font-weight:normal; color:#64748b;">(กล่องข้อเสนอแนะกว้างเต็มพื้นที่ สะดวกต่อการเขียนและอ่านง่าย)</span>
+          </div>
+          <textarea class="criterion-comment-textarea" 
+                    name="comment_${esc(c.CriteriaID)}" 
+                    placeholder="พิมพ์ข้อคิดเห็น ข้อเสนอแนะ หรือเหตุผลในการให้คะแนนข้อนี้เพื่อเป็นประโยชน์แก่ผู้ส่งผลงาน...">${esc(old.Comment || '')}</textarea>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  const workCategoryName = esc(getAssignmentCategory(w) || w.CategoryName || w.CategoryNameTH || 'ผลงานวิชาการ');
+  
+  const oe = d.oldEvaluation;
+  let oldEvaluationHtml = '';
+  if (oe && oe.scores && oe.scores.length > 0) {
+    const oldCritList = oe.criteria || [];
+    const oldScoreRows = oldCritList.map(c => {
+      const s = (oe.scores || []).find(x => String(x.CriteriaID).trim() === String(c.CriteriaID).trim()) || {};
+      return `
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:8px 10px;">
+            <b>ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH || c.CriteriaName || '')}</b>
+            <span style="color:#64748b; font-size:0.75rem;">(เต็ม ${esc(c.MaxScore)})</span>
+          </td>
+          <td style="padding:8px 10px; text-align:center; font-weight:700; color:#0369a1;">
+            ${esc(s.Score !== undefined && s.Score !== null ? s.Score : '-')}
+          </td>
+          <td style="padding:8px 10px; color:#334155; font-size:0.85rem;">
+            ${esc(s.Comment || '-')}
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    oldEvaluationHtml = `
+      <div class="card" style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; margin:16px 0; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <div style="font-weight:700; color:#0369a1; font-size:0.98rem; display:flex; align-items:center; gap:6px;">
+              <span>📌</span> ข้อมูลการประเมินเดิมที่อาจารย์เคยให้ไว้ตามเกณฑ์เดิม
+            </div>
+            <div style="font-size:0.85rem; color:#0284c7; margin-top:2px;">
+              คะแนนเดิมรวม: <b>${esc(oe.totalScore || '-')} คะแนน</b> • 
+              ผลการประเมิน: <b>${esc(oe.decision || '-')}</b>
+              ${oe.completedAt ? ` • บันทึกเมื่อ ${formatDate(oe.completedAt)}` : ''}
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn soft" style="font-size:0.82rem; padding:6px 12px; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc;" onclick="autoFillProportionalScores()">
+              ⚡ คำนวณคะแนนตามสัดส่วนเดิม
+            </button>
+            <button type="button" class="btn soft" style="font-size:0.82rem; padding:6px 12px; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc;" onclick="copyOldCommentsToForm()">
+              📋 คัดลอกข้อเสนอแนะเดิม
+            </button>
+            <button type="button" class="btn soft" id="toggleOldScoresBtn" style="font-size:0.82rem; padding:6px 12px; background:#fff; color:#0369a1; border:1px solid #7dd3fc;" onclick="toggleOldEvaluationDetails()">
+              👁️ แสดงเกณฑ์และคะแนนเดิม
+            </button>
+          </div>
+        </div>
+
+        <div id="oldEvaluationDetails" style="display:none; margin-top:14px; border-top:1px dashed #7dd3fc; padding-top:12px;">
+          <div style="font-size:0.85rem; color:#0369a1; margin-bottom:8px; font-weight:600;">
+            รายละเอียดคะแนนตามเกณฑ์เดิม (${oldCritList.length} ข้อ):
+          </div>
+          <div class="table-wrap" style="background:#fff; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:10px;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+              <thead>
+                <tr style="background:#f8fafc; color:#475569; text-align:left; border-bottom:1px solid #e2e8f0;">
+                  <th style="padding:8px 10px;">หัวข้อเกณฑ์เดิม</th>
+                  <th style="padding:8px 10px; width:100px; text-align:center;">คะแนนเดิม</th>
+                  <th style="padding:8px 10px;">ข้อเสนอแนะเดิม</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${oldScoreRows}
+              </tbody>
+            </table>
+          </div>
+          ${oe.recommendationToAuthor ? `
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-top:8px;">
+              <b style="font-size:0.8rem; color:#475569;">ข้อเสนอแนะถึงผู้ส่งผลงาน (เดิม):</b>
+              <div style="font-size:0.85rem; margin-top:4px; color:#1e293b;">${esc(oe.recommendationToAuthor)}</div>
+            </div>
+          ` : ''}
+          ${oe.internalComment ? `
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-top:8px;">
+              <b style="font-size:0.8rem; color:#475569;">ความเห็นภายในถึงคณะกรรมการ (เดิม):</b>
+              <div style="font-size:0.85rem; margin-top:4px; color:#1e293b;">${esc(oe.internalComment)}</div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+  
+  const filesList = (d.files || []).sort((x,y) => new Date(x.UploadedAt||x.CreatedAt||0) - new Date(y.UploadedAt||y.CreatedAt||0));
+  let blindIdx = 0;
+  const docButtonsHtml = filesList.length > 0 ? filesList.map(f => {
+    let catLabel = 'เปิดอ่านเอกสาร';
+    let btnStyle = 'background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color:#ffffff; box-shadow:0 4px 14px rgba(2,132,199,0.35);';
+    let icon = '📄';
+    
+    if (f.FileCategory === 'BLIND') {
+      blindIdx++;
+      const vText = blindIdx > 1 ? ` (แก้ไข V${blindIdx})` : '';
+      catLabel = `เปิดอ่านเอกสารผลงาน (Blind Review${vText})`;
+      btnStyle = 'background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color:#ffffff; box-shadow:0 4px 14px rgba(2,132,199,0.35);';
+      icon = '📑';
+    } else if (f.FileCategory === 'ORIGINAL') {
+      catLabel = 'เปิดอ่านเอกสารผลงานต้นฉบับ';
+      btnStyle = 'background:linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color:#ffffff; box-shadow:0 4px 14px rgba(13,148,136,0.35);';
+      icon = '📄';
+    } else if (f.FileCategory === 'WORD') {
+      catLabel = 'ดาวน์โหลดไฟล์ Word ต้นฉบับ';
+      btnStyle = 'background:linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color:#ffffff; box-shadow:0 4px 14px rgba(37,99,235,0.35);';
+      icon = '📝';
+    } else if (f.FileCategory === 'FINAL_PRESENTATION') {
+      catLabel = 'เปิดไฟล์นำเสนอ (Presentation)';
+      btnStyle = 'background:linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color:#ffffff; box-shadow:0 4px 14px rgba(124,58,237,0.35);';
+      icon = '📽️';
+    } else {
+      catLabel = `เปิดเอกสาร ${esc(f.FileCategory || 'แนบ')}`;
+    }
+
+    return `
+      <a class="btn-doc-open-prominent" target="_blank" href="${esc(f.FileUrl)}" style="${btnStyle}">
+        <span class="btn-doc-icon">${icon}</span>
+        <span class="btn-doc-text">${catLabel}</span>
+        <span class="btn-doc-arrow">↗</span>
+      </a>
+    `;
+  }).join('') : `
+    <div style="padding:10px 16px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px; color:#64748b; font-size:0.88rem; text-align:center;">
+      ⚠️ ไม่พบไฟล์เอกสารแนบในระบบ
+    </div>
+  `;
+
+  $('#reviewHost').innerHTML = `
+    <!-- Top Work Hero Header Card -->
+    <div class="review-work-hero-card">
+      <div class="review-work-hero-top">
+        <div class="review-work-info-col">
+          <div class="review-work-badge-row">
+            <span class="work-code-pill">📌 รหัสผลงาน: ${esc(w.WorkCode || '-')}</span>
+            <span class="work-category-pill">🏷️ ประเภท: <b>${workCategoryName}</b></span>
+            <span class="work-rubric-pill">⚖️ เกณฑ์ประเมิน ${criteriaList.length} ข้อ (คะแนนเต็ม ${totalMax} คะแนน)</span>
+          </div>
+          <h1 class="review-work-title">
+            ${esc(w.TitleTH || w.TitleEN || '-')}
+          </h1>
+          ${w.TitleEN && w.TitleTH ? `<div class="review-work-subtitle-en">${esc(w.TitleEN)}</div>` : ''}
+          ${(w.PresenterName || w.Institution) ? `
+            <div style="font-size:0.85rem; color:#64748b; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px;">
+              ${w.PresenterName ? `<span>👤 <b>ผู้นำเสนอ:</b> ${esc(w.PresenterName)}</span>` : ''}
+              ${w.Institution ? `<span>🏛️ <b>หน่วยงาน:</b> ${esc(w.Institution)}</span>` : ''}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="review-work-docs-col">
+          <div class="review-work-docs-label">
+            <span>📄 เอกสารผลงานสำหรับเปิดอ่าน</span>
+          </div>
+          <div class="review-work-docs-btns">
+            ${docButtonsHtml}
+          </div>
+          <div class="review-work-docs-hint">
+            (คลิกเพื่อเปิดอ่านเอกสาร PDF ในแท็บใหม่)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${oldEvaluationHtml}
+
+    <div class="card" style="margin-top:0">
+
+      <!-- Live Score Summary Banner -->
+      <div class="live-summary-card">
+        <div class="live-summary-top">
+          <div class="live-summary-title">
+            <span>📊 สรุปคะแนนประเมินสด (Live Score)</span>
+          </div>
+          <div class="live-total-score-badge">
+            <span style="font-size:1rem">คะแนนรวม:</span>
+            <b id="summary_total_score">${fmt(initTotal)}</b>
+            <span>/ <span id="summary_max_score">${totalMax}</span> คะแนน</span>
+          </div>
+        </div>
+        <div class="score-progress-bar-bg">
+          <div class="score-progress-bar-fill" id="summary_score_bar" style="width:${totalMax > 0 ? Math.min(100, Math.max(0, (initTotal/totalMax)*100)) : 0}%"></div>
+        </div>
+        <div class="live-summary-grid">
+          ${criteriaList.map(c => {
+            const old = scoreMap[c.CriteriaID] || {};
+            const valDisplay = (old.Score !== undefined && old.Score !== null && old.Score !== '') ? old.Score : '-';
+            return `
+              <div class="live-cat-box" title="${esc(c.CriteriaNameTH || c.CriteriaName || '')}">
+                <div class="cat-label">ข้อ ${esc(c.ItemNo)}: ${esc(c.CriteriaNameTH || c.CriteriaName || '').substring(0, 16)}${String(c.CriteriaNameTH||'').length > 16 ? '...' : ''}</div>
+                <div class="cat-val">
+                  <span id="summary_crit_${c.CriteriaID}">${valDisplay}</span>
+                  <span style="font-size:0.75rem; font-weight:400; opacity:0.8">/${c.MaxScore}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      ${oldEvaluationHtml}
+
+      <form id="reviewForm" onsubmit="return false;">
+        <div class="category-section" style="margin:0 0 20px 0;">
+          <div class="category-header">
+            <h3>📋 รายการประเมินตามเกณฑ์ (${criteriaList.length} หัวข้อ)</h3>
+            <span class="cat-pill">คะแนนเต็มรวม ${totalMax} คะแนน</span>
+          </div>
+          <div class="category-body">
+            ${itemsHtml}
+          </div>
+        </div>
+
+        <div class="card" style="background:#f8fafc; border:1px solid var(--line); border-radius:14px; margin-top:20px; padding:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:14px;">
+            <h3 style="margin:0; color:var(--blue); font-size:1.1rem; font-weight:700;">สรุปผลการประเมินภาพรวม</h3>
+            <div class="field" style="margin:0; min-width:280px; flex:0 1 350px;">
+              <label style="display:block; font-weight:700; font-size:0.9rem; margin-bottom:4px; color:var(--ink);">ผลการประเมินภาพรวม (Decision) <span style="color:var(--red)">*</span></label>
+              <select name="Decision" required style="font-weight:600; width:100%; border:2px solid var(--teal); border-radius:10px; padding:9px 12px; background:#fff;">
+                <option value="">-- กรุณาเลือกผลการประเมิน --</option>
+                <option value="PASS" ${a.Decision === 'PASS' ? 'selected' : ''}>ผ่าน (PASS)</option>
+                <option value="REVISION" ${a.Decision === 'REVISION' ? 'selected' : ''}>แก้ไขปรับปรุง (REVISION)</option>
+                <option value="REJECT" ${a.Decision === 'REJECT' ? 'selected' : ''}>ไม่ผ่าน (REJECT)</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin:0 0 16px 0; width:100%;">
+            <label style="display:block; font-weight:600; font-size:0.9rem; margin-bottom:6px; color:var(--ink);">ข้อเสนอแนะถึงผู้ส่งผลงาน (Recommendation to Author)</label>
+            <textarea name="RecommendationToAuthor" rows="4" style="width:100%; min-height:90px; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 14px; box-sizing:border-box; background:#ffffff; font-family:inherit; resize:vertical; line-height:1.5;" placeholder="ข้อความนี้จะแสดงให้ผู้ส่งผลงานเห็นเพื่อนำไปปรับปรุงผลงาน">${esc(a.RecommendationToAuthor || '')}</textarea>
+          </div>
+          <div class="field" style="margin:0; width:100%;">
+            <label style="display:block; font-weight:600; font-size:0.9rem; margin-bottom:6px; color:var(--ink);">ความเห็นภายในถึงคณะกรรมการ (Internal Comment)</label>
+            <textarea name="InternalComment" rows="6" style="width:100%; min-height:140px; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 14px; box-sizing:border-box; background:#ffffff; font-family:inherit; resize:vertical; line-height:1.5;" placeholder="ข้อความนี้สำหรับคณะกรรมการวิชาการเท่านั้น (ผู้ส่งผลงานจะไม่เห็น)">${esc(a.InternalComment || '')}</textarea>
+          </div>
+        </div>
+
+        <div class="actions" style="justify-content:flex-end; margin-top:20px; gap:12px;">
+          <button type="button" class="btn soft" style="padding:12px 20px" onclick="saveReview(false)">💾 บันทึกร่าง (Draft)</button>
+          <button type="button" class="btn primary" style="padding:12px 24px" onclick="saveReview(true)">🚀 ยืนยันส่งผลประเมิน (Submit)</button>
+        </div>
+      </form>
+    </div>
+  `;
+  $('#reviewHost').scrollIntoView({ behavior: 'smooth' });
+}
+
+function toggleOldEvaluationDetails() {
+  const panel = $('#oldEvaluationDetails');
+  const btn = $('#toggleOldScoresBtn');
+  if (!panel || !btn) return;
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  btn.textContent = isHidden ? '🙈 ซ่อนเกณฑ์และคะแนนเดิม' : '👁️ แสดงเกณฑ์และคะแนนเดิม';
+}
+
+function copyOldCommentsToForm() {
+  if (!CURRENT || !CURRENT.oldEvaluation) return;
+  const oe = CURRENT.oldEvaluation;
+  const f = $('#reviewForm');
+  if (!f) return;
+  if (oe.recommendationToAuthor && f.elements['RecommendationToAuthor']) {
+    f.elements['RecommendationToAuthor'].value = oe.recommendationToAuthor;
+  }
+  if (oe.internalComment && f.elements['InternalComment']) {
+    f.elements['InternalComment'].value = oe.internalComment;
+  }
+  if (oe.decision && f.elements['Decision']) {
+    f.elements['Decision'].value = oe.decision;
+  }
+  toast('คัดลอกข้อเสนอแนะเดิมลงในฟอร์มเรียบร้อยแล้ว');
+}
+
+function autoFillProportionalScores() {
+  if (!CURRENT || !CURRENT.oldEvaluation || !CURRENT.criteria) return;
+  const oe = CURRENT.oldEvaluation;
+  const oldTotal = Number(oe.totalScore) || 0;
+  const oldMax = (oe.criteria || []).reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
+  const ratio = oldMax > 0 ? (oldTotal / oldMax) : 0;
+  
+  const f = $('#reviewForm');
+  if (!f) return;
+  
+  CURRENT.criteria.forEach(c => {
+    const input = f.elements['score_' + c.CriteriaID];
+    if (input) {
+      const max = Number(c.MaxScore) || 0;
+      const propScore = Math.round((max * ratio) * 2) / 2;
+      input.value = propScore;
+    }
+  });
+  
+  updateLiveReviewScores();
+  copyOldCommentsToForm();
+  toast('คำนวณคะแนนตามสัดส่วนเดิม (' + Math.round(ratio * 100) + '%) ให้เรียบร้อยแล้ว สามารถปรับแก้ได้ตามต้องการ');
+}
+
+async function saveReview(submit) {
+  try {
+    const f = $('#reviewForm') || document.querySelector('form#reviewForm') || document.forms['reviewForm'];
+    if (!f) {
+      return Swal.fire({ icon: 'error', title: 'ไม่พบแบบฟอร์มประเมิน', text: 'กรุณาลองรีเฟรชหน้าเว็บหรือเลือกผลงานใหม่อีกครั้ง' });
+    }
+    if (!CURRENT || !CURRENT.assignment) {
+      return Swal.fire({ icon: 'error', title: 'ไม่พบข้อมูลผลงาน', text: 'กรุณากลับไปเลือกผลงานที่ต้องการประเมินใหม่อีกครั้ง' });
+    }
+    const critList = CURRENT.criteria || [];
+    const missing = [];
+    const exceeded = [];
+    let totalEntered = 0;
+    const totalMax = critList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
+    
+    const scores = critList.map(c => {
+      const input = f.elements['score_' + c.CriteriaID] || f.querySelector(`[name="score_${c.CriteriaID}"]`);
+      const rawVal = input ? input.value.trim() : '';
+      const max = Number(c.MaxScore) || 0;
+      if (submit && (rawVal === '' || isNaN(parseFloat(rawVal)))) {
+        missing.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName || ''}`);
+      }
+      const sc = parseFloat(rawVal);
+      if (!isNaN(sc) && sc > max) {
+        exceeded.push(`ข้อ ${c.ItemNo}. ${c.CriteriaNameTH || c.CriteriaName || ''} (ระบุ ${sc} คะแนน ซึ่งเกินคะแนนเต็ม ${max} คะแนน)`);
+      }
+      if (!isNaN(sc)) totalEntered += sc;
+      const commentInput = f.elements['comment_' + c.CriteriaID] || f.querySelector(`[name="comment_${c.CriteriaID}"]`);
+      return {
+        CriteriaID: c.CriteriaID,
+        Score: rawVal,
+        Comment: commentInput ? commentInput.value : ''
+      };
+    });
+
+    if (exceeded.length > 0) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'คะแนนเกินคะแนนเต็ม!',
+        html: `<div style="text-align:left; font-size:0.9rem;">ห้ามลงคะแนนเกินคะแนนเต็มในแต่ละหัวข้อ กรุณาแก้ไขก่อนบันทึก:<br><ul style="margin:8px 0 0 20px; color:#dc2626; font-weight:600;">${exceeded.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
+      });
+    }
+    
+    if (submit && missing.length > 0) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'กรุณากรอกคะแนนให้ครบทุกข้อ',
+        html: `<div style="text-align:left; font-size:0.9rem;">พบหัวข้อที่ยังไม่ได้ให้คะแนน:<br><ul style="margin:5px 0 0 20px; color:#b42318">${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`
+      });
+    }
+    
+    const decisionEl = f.elements['Decision'] || f.querySelector('[name="Decision"]');
+    const recEl = f.elements['RecommendationToAuthor'] || f.querySelector('[name="RecommendationToAuthor"]');
+    const internalEl = f.elements['InternalComment'] || f.querySelector('[name="InternalComment"]');
+
+    const payload = {
+      Scores: scores,
+      Decision: decisionEl ? decisionEl.value : '',
+      RecommendationToAuthor: recEl ? recEl.value : '',
+      InternalComment: internalEl ? internalEl.value : ''
+    };
+    
+    if (submit && !payload.Decision) {
+      return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกผลการประเมิน (ผ่าน / แก้ไข / ไม่ผ่าน)' });
+    }
+    
+    if (submit) {
+      const x = await Swal.fire({
+        icon: 'question',
+        title: 'ยืนยันการส่งผลประเมิน?',
+        html: `
+          <div style="text-align:left; font-size:0.95rem;">
+            <p><b>คะแนนรวมสุทธิ: <span style="color:var(--teal); font-size:1.2rem">${totalEntered.toFixed(2).replace(/\.00$/,'')} / ${totalMax} คะแนน</span></b></p>
+            <p>ผลการประเมิน: <b>${payload.Decision === 'PASS' ? 'ผ่าน (PASS)' : payload.Decision === 'REVISION' ? 'แก้ไข (REVISION)' : 'ไม่ผ่าน (REJECT)'}</b></p>
+            <p style="color:#b42318; font-size:0.85rem;">* หลังส่งผลแล้วข้อมูลจะถูกส่งเข้าสู่ระบบหลักทันที</p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยันส่งผลประเมิน',
+        cancelButtonText: 'กลับไปแก้ไข',
+        confirmButtonColor: '#006D70'
+      });
+      if (!x.isConfirmed) return;
+    }
+    
+    show(submit ? 'กำลังส่งผลประเมิน...' : 'กำลังบันทึกร่าง...');
+    const aid = CURRENT.assignment.AssignmentID;
+    const r = await rpc('reviewerSaveReview', TOKEN, CID, aid, payload, submit);
+    
+    // Immediately update local cache and state so UI updates in milliseconds
+    if (r && r.assignment) {
+      if (CURRENT && CURRENT.assignment) {
+        Object.assign(CURRENT.assignment, r.assignment);
+        if (r.scores) CURRENT.scores = r.scores;
+      }
+      ASSIGNMENT_CACHE[aid] = CURRENT;
+      if (BOOT && BOOT.assignments) {
+        const idx = BOOT.assignments.findIndex(x => x.AssignmentID === aid);
+        if (idx >= 0) {
+          BOOT.assignments[idx] = Object.assign({}, BOOT.assignments[idx], r.assignment);
+        }
+      }
+    }
+    
+    hide();
+    
+    Swal.fire({
+      icon: 'success',
+      title: submit ? 'ส่งผลประเมินเรียบร้อยแล้ว' : 'บันทึกร่างเรียบร้อยแล้ว',
+      text: 'คะแนนรวม ' + (r && r.totalScore !== undefined ? r.totalScore : totalEntered.toFixed(2).replace(/\.00$/,'')) + ' / ' + totalMax + ' คะแนน',
+      timer: 1800,
+      timerProgressBar: true,
+      confirmButtonColor: '#006D70',
+      confirmButtonText: 'ตกลง'
+    });
+    
+    renderAll();
+    
+    if (submit) {
+      $('#reviewHost').innerHTML = '';
+      const grid = $('#assignmentGrid');
+      if (grid) grid.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Background sync bootstrap silently without blocking the user
+    rpc('reviewerBootstrap', TOKEN, CID).then(freshBoot => {
+      if (freshBoot && freshBoot.assignments) {
+        BOOT = freshBoot;
+        renderAll();
+      }
+    }).catch(function(){});
+  } catch (e) {
+    hide();
+    console.error('saveReview error:', e);
+    Swal.fire({
+      icon: 'error',
+      title: submit ? 'ส่งผลประเมินไม่สำเร็จ' : 'บันทึกร่างไม่สำเร็จ',
+      text: e.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
+    });
+  }
+}
+async function refreshData() { show('กำลังดึงข้อมูล'); try { BOOT = await rpc('reviewerBootstrap', TOKEN, CID); renderAll(); hide(); Swal.fire({icon:'success', title:'รีเฟรชข้อมูลเรียบร้อย', timer:1500, showConfirmButton:false}); } catch(e) { hide(); Swal.fire({icon:'error', title:'ผิดพลาด', text:e.message}); } }
+function renderDashboard() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pass=a.filter(x=>x.Decision==='PASS').length, rev=a.filter(x=>x.Decision==='REVISION'||x.Decision==='REJECT').length, pct=(v)=>tot?Math.round(v*100/tot)+'%':'0%'; $('#dashboard-kpis').innerHTML=`<div class="dash-kpi-card"><div class="dash-kpi-title">ได้รับมอบหมาย</div><div class="dash-kpi-value" style="color:var(--blue)">${tot}</div><div class="dash-kpi-sub">${tot?'100%':'0%'}</div><div class="dash-icon">📋</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ประเมินแล้ว</div><div class="dash-kpi-value" style="color:var(--green)">${com}</div><div class="dash-kpi-sub">${pct(com)}</div><div class="dash-icon">✅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">รอดำเนินการ</div><div class="dash-kpi-value" style="color:#d97706">${pen}</div><div class="dash-kpi-sub">${pct(pen)}</div><div class="dash-icon">⏳</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ผ่าน</div><div class="dash-kpi-value" style="color:var(--green)">${pass}</div><div class="dash-kpi-sub">${pct(pass)}</div><div class="dash-icon">🏅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ให้ปรับปรุง/ปฏิเสธ</div><div class="dash-kpi-value" style="color:var(--red)">${rev}</div><div class="dash-kpi-sub">${pct(rev)}</div><div class="dash-icon">⚠️</div></div>`; }
+function renderReportPage() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pct=tot?Math.round(com*100/tot)+'%':'0%'; const rn=BOOT.reviewer.FullName||BOOT.reviewer.Email; const el=$('#report-reviewer-name'); if(el)el.textContent=rn+' ('+BOOT.reviewer.Email+')'; const rt=$('#rep-tot');if(rt)rt.textContent=tot; const rc=$('#rep-com');if(rc)rc.textContent=com; const rp=$('#rep-pen');if(rp)rp.textContent=pen; const rprog=$('#rep-prog');if(rprog)rprog.textContent=pct; const tbody=$('#reportRows'); if(tbody){tbody.innerHTML=a.length?a.map(x=>`<tr><td style="font-weight:600; white-space:nowrap">${esc(x.WorkCode)}</td><td><div style="font-weight:500">${esc(x.TitleTH||'-')}</div></td><td>${statusBadge(x.Status)}<br>${x.Decision?statusBadge(x.Decision):''}</td><td style="font-weight:600; color:var(--teal)">${esc(x.TotalScore||'-')}</td><td style="font-size:0.8rem">${esc(x.RecommendationToAuthor||'-')}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center">ไม่มีข้อมูล</td></tr>';} }
+function printMyReport() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pct=tot?Math.round(com*100/tot)+'%':'0%'; const rn=BOOT.reviewer.FullName||BOOT.reviewer.Email; const dateStr=new Date().toLocaleString('th-TH'); const rows=a.map((x,i)=>`<tr><td style="white-space:nowrap; font-weight:bold">${esc(x.WorkCode)}</td><td>${esc(x.TitleTH||'-')}</td><td>${esc(x.Status)} ${x.Decision?'/ '+esc(x.Decision):''}</td><td>${esc(x.TotalScore||'-')}</td><td>${esc(x.RecommendationToAuthor||'-')}</td></tr>`).join(''); const win=window.open('','_blank'); win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานการประเมิน</title><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Prompt',sans-serif;font-size:12px;color:#102a43;margin:0;padding:20px;}h2{text-align:center;margin:0 0 5px 0;font-size:18px;}h3{text-align:center;margin:0 0 20px 0;font-size:14px;color:#006d70;font-weight:500;}.box{border:1px solid #d9e3e8;border-radius:8px;padding:15px;margin-bottom:20px;}.box-row{display:flex;gap:20px;margin-bottom:5px;}.val{font-size:16px;font-weight:bold;}.val.green{color:#1b8f5a;}.val.teal{color:#006d70;}table{width:100%;border-collapse:collapse;margin-top:20px;}th,td{border:1px solid #d9e3e8;padding:8px 10px;text-align:left;vertical-align:top;}th{background:#e8f4f9;font-weight:600;}@media print{body{-webkit-print-color-adjust:exact;padding:0;}@page{margin:1cm;}}</style></head><body><h2>การประเมินผลงานวิชาการ</h2><h3>TUH 19 & HA-Regional 1</h3><div class="box"><div><b>ผู้ประเมิน:</b> ${esc(rn)}</div><div><b>Email:</b> ${esc(BOOT.reviewer.Email)}</div><div><b>วันที่พิมพ์รายงาน:</b> ${esc(dateStr)}</div></div><div class="box"><div class="box-row"><div>ได้รับมอบหมาย <span class="val teal">${tot}</span> เรื่อง</div><div>ประเมินแล้ว <span class="val green">${com}</span> เรื่อง</div><div>รอดำเนินการ <span class="val">${pen}</span> เรื่อง</div></div><div style="border-top:1px solid #d9e3e8; margin:10px 0;"></div><div>ความก้าวหน้า <span class="val green" style="font-size:18px">${pct}</span></div></div><table><thead><tr><th>รหัส</th><th>ชื่อผลงาน</th><th>สถานะ</th><th>คะแนน</th><th>ข้อเสนอแนะ</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="text-align:center">ไม่มีข้อมูล</td></tr>'}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`); win.document.close(); }
+function nav(p) { document.querySelectorAll('.page-view').forEach(el=>el.classList.add('hidden')); const tp = document.getElementById('page-'+p); if(tp) tp.classList.remove('hidden'); document.querySelectorAll('.sidebar-menu button').forEach(el=>el.classList.remove('active')); const tn = document.getElementById('nav-'+p); if(tn) tn.classList.add('active'); const titles={dashboard:'Dashboard Reviewer',assignments:'งานที่ต้องประเมิน',report:'พิมพ์รายงานของฉัน'}; document.getElementById('pageTitle').textContent=titles[p]||'Reviewer Portal'; }
+async function refreshPage(){if(CURRENT==='dashboard')await renderAll()}
+async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
+async function signUp(){const html=`<style>.swal-form{text-align:left;font-size:0.9rem}.swal-form .row{display:flex;gap:10px;margin-bottom:10px}.swal-form .row>div{flex:1}.swal-form label{display:block;margin-bottom:4px;font-weight:600;color:#334155}.swal-form input,.swal-form select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box}</style><div class="swal-form"><div class="row"><div><label>Username (หรือใช้อีเมล)</label><input id="su_user" placeholder="Username"></div><div><label>อีเมล (Email) *</label><input id="su_email" type="email" placeholder="Email"></div></div><div class="row"><div><label>รหัสผ่าน (Password) *</label><input id="su_pass" type="password"></div></div><div class="row"><div style="flex:0.4"><label>คำนำหน้า</label><input id="su_prefix" placeholder="นาย, นาง, นางสาว"></div><div><label>ชื่อ (First Name) *</label><input id="su_fname"></div><div><label>นามสกุล (Last Name) *</label><input id="su_lname"></div></div><div class="row"><div><label>เบอร์โทรศัพท์ (Phone)</label><input id="su_phone"></div><div><label>หน่วยงาน (Organization)</label><input id="su_org"></div></div><div class="row"><div><label>สิทธิ์การใช้งาน (Role) *</label><select id="su_role"><option value="Registration">ฝ่ายทะเบียนและการเงิน (Registration)</option><option value="Scanner">จุดบริการอาหารและเช็คอิน (Scanner)</option><option value="Academic">จัดการผลงาน (Academic)</option><option value="Reviewer">ผู้ประเมินผลงาน (Reviewer)</option></select></div></div></div>`;const{value:data}=await Swal.fire({title:'สมัครเข้าใช้งาน',html:html,width:'600px',showCancelButton:true,confirmButtonText:'สมัครสมาชิก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80',preConfirm:()=>{const email=document.getElementById('su_email').value.trim(),pass=document.getElementById('su_pass').value.trim(),fname=document.getElementById('su_fname').value.trim(),lname=document.getElementById('su_lname').value.trim();if(!email||!pass||!fname||!lname){Swal.showValidationMessage('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');return false}return{Username:document.getElementById('su_user').value.trim(),Email:email,Password:pass,Prefix:document.getElementById('su_prefix').value.trim(),FirstName:fname,LastName:lname,Phone:document.getElementById('su_phone').value.trim(),Organization:document.getElementById('su_org').value.trim(),Role:document.getElementById('su_role').value}}});if(data){show('กำลังบันทึกข้อมูล...');try{await rpc('registerNewUser',data,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ส่งข้อมูลสมัครสมาชิกเรียบร้อยแล้ว กรุณารอผู้ดูแลระบบอนุมัติ'})}catch(e){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:e.message})}finally{hide()}}}
+async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhReviewerToken');sessionStorage.removeItem('tuhReviewerToken');TOKEN='';BOOT=null;CURRENT=null;$('#appView').classList.add('hidden');$('#loginView').classList.remove('hidden');hide();}
+window.addEventListener('load',async()=>{
+  loadCreds();
+  try{
+    const bootData=await rpc('reviewerBootstrap','__COOKIE__',CID);
+    if(bootData&&bootData.reviewer){
+      BOOT=bootData;
+      TOKEN='__COOKIE__';
+      $('#loginView').classList.add('hidden');
+      $('#appView').classList.remove('hidden');
+      $('#confName').textContent='TUH 19 & HA-Regional 1';
+      $('#reviewerName').textContent=BOOT.reviewer.FullName||BOOT.reviewer.Email;
+      renderAll();
+    }
+  }catch(e){
+    // Clean initial landing state, no blocking error popup
+  }
+});
+</script>
+<footer style="text-align:center; padding: 20px; font-size: 0.85rem; color: #667a88; margin-top: 40px;">
+  © 2026 สงวนลิขสิทธิ์ • แพลตฟอร์มนี้เป็นนวัตกรรมที่พัฒนาขึ้นเพื่อสนับสนุนงานวิชาการ<br>
+  หากท่านสนใจนำไปใช้ประโยชน์ เรายินดีต้อนรับทุกความร่วมมือ<br>
+  ติดต่อสอบถาม คณะพยาบาลศาสตร์ มหาวิทยาลัยธรรมศาสตร์ •<br><br>
+  • ผู้พัฒนาปรับปรุงระบบ : ภญ.อาภัสรี บัวประดิษฐ์ สำนักงานสาธารณสุขจังหวัดนครนายก •
+</footer>
+</body>
+</html>

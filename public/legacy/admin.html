@@ -36,75 +36,6 @@
     .direct-access-bar{position:fixed;right:10px;bottom:10px;z-index:9999;display:none;background:rgba(255,255,255,0.85);border-radius:8px;padding:5px 8px;font-size:0.75rem;}
     .direct-access-bar.show{display:block}
     .direct-access-bar a{color:#64748b;text-decoration:underline;}
-
-    /* Professional Print System & A4 Styling */
-    #tuhPrintContainer { display: none; }
-    @media print {
-      @page {
-        size: A4 portrait;
-        margin: 8mm 10mm;
-      }
-      body {
-        background: #fff !important;
-        color: #000 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      body > *:not(#tuhPrintContainer) {
-        display: none !important;
-      }
-      #tuhPrintContainer {
-        display: block !important;
-        position: static !important;
-        width: 100% !important;
-        background: #fff !important;
-        color: #000 !important;
-      }
-      .no-print {
-        display: none !important;
-      }
-      .page-break-inside-avoid {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-      }
-    }
-    .print-preview-modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(4px);
-      z-index: 99999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 16px;
-      overflow-y: auto;
-    }
-    .print-preview-toolbar {
-      width: min(920px, 98vw);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #0f172a;
-      color: #fff;
-      padding: 12px 18px;
-      border-radius: 12px 12px 0 0;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .print-preview-paper {
-      width: min(920px, 98vw);
-      background: #fff;
-      color: #111;
-      padding: 36px 44px;
-      border-radius: 0 0 12px 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-      box-sizing: border-box;
-      margin-bottom: 40px;
-      min-height: 900px;
-    }
   </style>
 </head>
 <body>
@@ -419,9 +350,6 @@ const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','Registratio
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
-window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();
-function getAdminSessionCache(k){try{const raw=sessionStorage.getItem(k);if(!raw)return null;const item=JSON.parse(raw);if(item&&item.exp>Date.now())return item.data;sessionStorage.removeItem(k);}catch(e){}return null;}
-function setAdminSessionCache(k,data,ttl){try{sessionStorage.setItem(k,JSON.stringify({data,exp:Date.now()+ttl}));}catch(e){}}
 window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|reviewerBootstrap|adminBootstrap|getPublicBootstrap|lookup|export|inspect|list|verifyWorkAccess|.*Bootstrap)/i.test(n);const isWrite=n!=='verifyWorkAccess'&&/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?30000:60000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function show(t){$('#loadText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}function hide(){$('#loading').classList.remove('show')}
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
@@ -464,45 +392,6 @@ function renderAppShell(bootData){
   $('#menu').innerHTML=items.map((x,i)=>`<button class="${i===0?'active':''}" data-page="${x[0]}" onclick="nav('${x[0]}')">${x[1]}<span class="en">${x[2]}</span></button>`).join('');
 }
 
-let _hasPrefetchedAdmin = false;
-function idlePrefetchAdminData(){
-  if(_hasPrefetchedAdmin || !TOKEN) return;
-  _hasPrefetchedAdmin = true;
-  setTimeout(() => {
-    const queue = [
-      () => rpc('adminListRegistrations', TOKEN, CID, {}).then(rows => {
-        if(rows && Array.isArray(rows)){
-          window.REGISTRATION_ROWS = rows;
-          setAdminSessionCache('tuh_cache_regs_' + CID, rows, 180000);
-          if ($('#regCountBadge')) {
-            $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
-          }
-        }
-      }),
-      () => rpc('adminListWorks', TOKEN, CID, {}).then(rows => {
-        if(rows && Array.isArray(rows)){
-          window.WORK_ROWS = rows;
-          setAdminSessionCache('tuh_cache_works_' + CID, rows, 180000);
-        }
-      }),
-      () => rpc('adminListPayments', TOKEN, CID, {}).then(rows => {
-        if(rows && Array.isArray(rows)){
-          window.PAYMENT_ROWS = rows;
-          setAdminSessionCache('tuh_cache_payments_' + CID, rows, 180000);
-        }
-      })
-    ];
-    let idx = 0;
-    function runNext(){
-      if(idx >= queue.length) return;
-      queue[idx++]().catch(() => {}).finally(() => {
-        setTimeout(runNext, 400);
-      });
-    }
-    runNext();
-  }, 1000);
-}
-
 $('#loginForm').onsubmit=async e=>{
   e.preventDefault();
   show('กำลังเข้าสู่ระบบ');
@@ -517,7 +406,7 @@ $('#loginForm').onsubmit=async e=>{
       renderAppShell(bootData);
       hide();
       await nav('dashboard');
-      idlePrefetchAdminData();
+      prefetchAdminTabs();
     }else{
       await boot();
       hide();
@@ -528,53 +417,42 @@ $('#loginForm').onsubmit=async e=>{
 };
 function menuForRole(role){const all=[['dashboard','ภาพรวม','Overview'],['settings','ตั้งค่าระบบ','Settings'],['registrations','ผู้ลงทะเบียน','Registrations'],['payments','การเงิน','Finance'],['works','ผลงาน','Academic works'],['reviewers','Reviewer','Reviewers'],['food','คูปองอาหาร','Meal pass'],['users','ผู้ใช้งาน','Users'],['import','นำเข้า Excel','Excel import']];const allow={SUPERADMIN:all.map(x=>x[0]),CONFERENCE_ADMIN:all.filter(x=>x[0]!=='users').map(x=>x[0]),REGISTRATION_STAFF:['dashboard','import','registrations','food'],FINANCE_STAFF:['dashboard','payments','food'],ACADEMIC_STAFF:['dashboard','works','reviewers'],FOOD_STAFF:['food'],VIEWER:['dashboard']}[role]||['dashboard'];return all.filter(x=>allow.includes(x[0]))}
 async function boot(){
-  let hasRenderedCachedShell = false;
   try{
-    const cached = JSON.parse(localStorage.getItem('tuhAdminBootCache_'+CID)||'null');
+    const cached=JSON.parse(localStorage.getItem('tuhAdminBootCache_'+CID)||'null');
     if(cached && cached.user && cached.role) {
-      BOOT = cached;
       renderAppShell(cached);
-      hasRenderedCachedShell = true;
     }
   }catch(e){}
-
-  if(hasRenderedCachedShell){
-    hide();
-    const items = menuForRole(BOOT.role);
-    const initialPage = items[0]?.[0] || 'dashboard';
-    nav(initialPage, false);
-    Promise.all([
-      rpc('adminBootstrap', TOKEN, CID),
-      rpc('adminDashboard', TOKEN, CID, false, { type: '' }).catch(() => null)
-    ]).then(([freshBoot, freshDash]) => {
-      if(freshBoot){
-        BOOT = freshBoot;
-        try{localStorage.setItem('tuhAdminBootCache_'+CID, JSON.stringify(BOOT))}catch(e){}
-        renderAppShell(BOOT);
+  BOOT=await rpc('adminBootstrap',TOKEN,CID);
+  try{localStorage.setItem('tuhAdminBootCache_'+CID,JSON.stringify(BOOT))}catch(e){}
+  renderAppShell(BOOT);
+  const items=menuForRole(BOOT.role);
+  await nav(items[0]?.[0]||'dashboard');
+  prefetchAdminTabs();
+}
+function prefetchAdminTabs(){
+  if(!BOOT || !BOOT.role) return;
+  const tabs = ['works','registrations','payments','reviewers','food'];
+  let delay = 500;
+  tabs.forEach(t => {
+    if(TAB_STATE.loaded[t] || TAB_STATE.inFlight[t]) return;
+    setTimeout(async () => {
+      if(TAB_STATE.loaded[t] || TAB_STATE.inFlight[t]) return;
+      TAB_STATE.inFlight[t] = true;
+      try{
+        if(t==='works') await loadWorks(false);
+        else if(t==='registrations') await loadRegistrations(false);
+        else if(t==='payments') await loadPayments(false);
+        else if(t==='reviewers') await Promise.all([loadReviewers(false), loadReviewConfig(false)]);
+        else if(t==='food') await loadFood(false);
+        TAB_STATE.loaded[t] = Date.now();
+      }catch(e){
+      }finally{
+        TAB_STATE.inFlight[t] = false;
       }
-      if(freshDash && CURRENT === 'dashboard'){
-        try{sessionStorage.setItem('tuhDashCache_' + CID + '_', JSON.stringify(freshDash))}catch(e){}
-        renderDashboardUi(freshDash, '');
-      }
-      idlePrefetchAdminData();
-    }).catch(err => {
-      const msg = String(err?.message || '');
-      if(msg.includes('Session') || msg.includes('401') || msg.includes('สิทธิ์')){
-        logout();
-      }
-    });
-  } else {
-    const [freshBoot] = await Promise.all([
-      rpc('adminBootstrap', TOKEN, CID),
-      rpc('adminDashboard', TOKEN, CID, false, { type: '' }).catch(() => null)
-    ]);
-    BOOT = freshBoot;
-    try{localStorage.setItem('tuhAdminBootCache_'+CID, JSON.stringify(BOOT))}catch(e){}
-    renderAppShell(BOOT);
-    const items = menuForRole(BOOT.role);
-    await nav(items[0]?.[0] || 'dashboard');
-    idlePrefetchAdminData();
-  }
+    }, delay);
+    delay += 400;
+  });
 }
 const TAB_STATE = window.TAB_STATE || { loaded: {}, inFlight: {} };
 window.TAB_STATE = TAB_STATE;
@@ -1534,35 +1412,9 @@ async function sendBatchEmails(batchId, emailTarget){
     viewImportBatchDetail(batchId);
   } catch(e) { err(e); }
 }
-function renderRegistrationsTable(rows){
-  if(!rows) rows = [];
-  if ($('#regCountBadge')) {
-    $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
-  }
-  $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
-  initRegScrollSync();
-  setTimeout(updateRegTopScrollbar, 50);
-  reapplyTableSort($('#regRows')?.closest('table'));
-  refreshTableSortHeaders();
-}
-
 async function loadRegistrations(forceRefresh = false){
-  let hasRendered = false;
-  if(!forceRefresh){
-    if(window.REGISTRATION_ROWS && window.REGISTRATION_ROWS.length){
-      renderRegistrationsTable(window.REGISTRATION_ROWS);
-      hasRendered = true;
-    } else {
-      const cached = getAdminSessionCache('tuh_cache_regs_' + CID);
-      if(cached && cached.length){
-        window.REGISTRATION_ROWS = cached;
-        renderRegistrationsTable(cached);
-        hasRendered = true;
-      }
-    }
-  }
-  const shouldBlock = !hasRendered || forceRefresh;
-  if(shouldBlock) show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผู้ลงทะเบียนจาก Google Sheets...' : 'กำลังโหลดผู้ลงทะเบียน');
+  const hasRows = !!(window.REGISTRATION_ROWS && window.REGISTRATION_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผู้ลงทะเบียนจาก Google Sheets...' : 'กำลังโหลดผู้ลงทะเบียน');
   try{
     const rows=await rpc('adminListRegistrations',TOKEN,CID,{
       q:$('#regSearch')?$('#regSearch').value:'',
@@ -1572,12 +1424,18 @@ async function loadRegistrations(forceRefresh = false){
       forceRefresh: !!forceRefresh,
       refresh: !!forceRefresh
     });
-    window.REGISTRATION_ROWS = rows || [];
-    setAdminSessionCache('tuh_cache_regs_' + CID, window.REGISTRATION_ROWS, 180000);
-    renderRegistrationsTable(window.REGISTRATION_ROWS);
-    if(forceRefresh) toast(`รีเฟรชข้อมูลผู้ลงทะเบียนสำเร็จ (${window.REGISTRATION_ROWS.length} คน)`);
+    if ($('#regCountBadge')) {
+      $('#regCountBadge').innerHTML = `<span class="count-pill" style="background:#006D70; color:#fff; padding:3px 9px; font-size:0.78rem; display:inline-block; border-radius:999px; font-weight:600;"><i class="fa-solid fa-user-check"></i> พบ <b>${rows.length}</b> รายการ</span>`;
+    }
+    window.REGISTRATION_ROWS = rows;
+    $('#regRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.RegID)}</td><td><b>${esc(r.FullName)}</b></td><td>${esc(r.ParticipantType)}</td><td>${esc(r.CID)}</td><td>${esc(r.Email)}<br>${esc(r.Phone)}</td><td>${statusBadge(r.DataCompletenessStatus)}</td><td>${statusBadge(r.RegistrationStatus)}<br>${statusBadge(r.PaymentStatus)}</td><td style="white-space:nowrap"><div class="actions" style="display:flex;gap:4px;flex-wrap:nowrap"><button class="btn btn-primary btn-sm" onclick="openRegistrationView('${esc(r.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-blue btn-sm" onclick="openRegistrationEdit('${esc(r.RegID)}')"><i class="fa-solid fa-pen-to-square"></i> แก้ไข</button><button class="btn btn-email btn-sm" onclick="openRegEmailModal('${esc(r.RegID)}')"><i class="fa-solid fa-envelope"></i> ส่งเมล์</button><button class="btn btn-soft btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_VERIFIED')"><i class="fa-solid fa-check"></i> ตรวจผ่าน</button><button class="btn btn-gold btn-sm" onclick="setRegStatus('${esc(r.RegID)}','REGISTRATION_RETURNED')"><i class="fa-solid fa-rotate-left"></i> ส่งคืน</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    initRegScrollSync();
+    setTimeout(updateRegTopScrollbar, 50);
+    reapplyTableSort($('#regRows')?.closest('table'));
+    refreshTableSortHeaders();
+    if(forceRefresh) toast(`รีเฟรชข้อมูลผู้ลงทะเบียนสำเร็จ (${rows.length} คน)`);
   }finally{
-    if(shouldBlock) hide();
+    hide();
   }
 }
 
@@ -2452,36 +2310,9 @@ function renderSignSheetWindow(win,d,filters){
 
 window.PAYMENT_ROWS = [];
 
-function renderPaymentsTable(rows){
-  if(!rows) rows = [];
-  $('#payRows').innerHTML=rows.length?rows.map(p=>{
-    const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);
-    const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;
-    const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;
-    const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;
-    return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`
-  }).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
-  reapplyTableSort($('#payRows')?.closest('table'));
-  refreshTableSortHeaders();
-}
-
 async function loadPayments(forceRefresh = false){
-  let hasRendered = false;
-  if(!forceRefresh){
-    if(window.PAYMENT_ROWS && window.PAYMENT_ROWS.length){
-      renderPaymentsTable(window.PAYMENT_ROWS);
-      hasRendered = true;
-    } else {
-      const cached = getAdminSessionCache('tuh_cache_payments_' + CID);
-      if(cached && cached.length){
-        window.PAYMENT_ROWS = cached;
-        renderPaymentsTable(cached);
-        hasRendered = true;
-      }
-    }
-  }
-  const shouldBlock = !hasRendered || forceRefresh;
-  if(shouldBlock) show(forceRefresh ? 'กำลังรีเฟรชข้อมูลการเงินจาก Google Sheets...' : 'กำลังโหลดการเงิน');
+  const hasRows=!!(window.PAYMENT_ROWS&&window.PAYMENT_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลการเงินจาก Google Sheets...' : 'กำลังโหลดการเงิน');
   try{
     const q=($('#paySearch')?.value||'').trim();
     const status=($('#payStatus')?.value||'').trim();
@@ -2494,11 +2325,18 @@ async function loadPayments(forceRefresh = false){
     if(receiptStatus==='ISSUED'){rows=rows.filter(p=>p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued);}
     else if(receiptStatus==='NOT_ISSUED'){rows=rows.filter(p=>!(p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued));}
     window.PAYMENT_ROWS=rows;
-    setAdminSessionCache('tuh_cache_payments_' + CID, window.PAYMENT_ROWS, 180000);
-    renderPaymentsTable(window.PAYMENT_ROWS);
+    $('#payRows').innerHTML=rows.length?rows.map(p=>{
+      const canAct=!!p.PaymentID&&['PENDING_VERIFY','RETURNED'].includes(p.Status);
+      const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;
+      const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;
+      const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;
+      return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`
+    }).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
+    reapplyTableSort($('#payRows')?.closest('table'));
+    refreshTableSortHeaders();
     if(forceRefresh) toast(`รีเฟรชข้อมูลการเงินสำเร็จ (${rows.length} รายการ)`);
   }finally{
-    if(shouldBlock) hide();
+    hide();
   }
 }
 
@@ -2976,47 +2814,24 @@ function renderWorksTable(){
 }
 
 async function loadWorks(forceRefresh = false){
-  let hasRendered = false;
-  if(!forceRefresh){
-    if(window.WORK_ROWS && window.WORK_ROWS.length){
-      updateWorkCategoryDropdown(window.WORK_ROWS);
-      renderWorksTable();
-      hasRendered = true;
-    } else {
-      const cached = getAdminSessionCache('tuh_cache_works_' + CID);
-      if(cached && cached.length){
-        window.WORK_ROWS = cached;
-        updateWorkCategoryDropdown(window.WORK_ROWS);
-        renderWorksTable();
-        hasRendered = true;
-      }
-    }
-  }
-  const shouldBlock = !hasRendered || forceRefresh;
-  if(shouldBlock) show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผลงานจาก Google Sheets...' : 'กำลังโหลดผลงาน');
+  const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผลงานจาก Google Sheets...' : 'กำลังโหลดผลงาน');
   try{
     if(!window.REGISTRATION_ROWS || !window.REGISTRATION_ROWS.length){
-      const cachedRegs = getAdminSessionCache('tuh_cache_regs_' + CID);
-      if(cachedRegs && cachedRegs.length){
-        window.REGISTRATION_ROWS = cachedRegs;
-      } else {
-        rpc('adminListRegistrations', TOKEN, CID, {}).then(regs => {
-          if(regs && Array.isArray(regs)){
-            window.REGISTRATION_ROWS = regs;
-            setAdminSessionCache('tuh_cache_regs_' + CID, regs, 180000);
-            renderWorksTable();
-          }
-        }).catch(()=>{});
-      }
+      rpc('adminListRegistrations', TOKEN, CID, {}).then(regs => {
+        if(regs && Array.isArray(regs)){
+          window.REGISTRATION_ROWS = regs;
+          renderWorksTable();
+        }
+      }).catch(()=>{});
     }
     const rows = await rpc('adminListWorks', TOKEN, CID, { forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.WORK_ROWS = rows || [];
-    setAdminSessionCache('tuh_cache_works_' + CID, window.WORK_ROWS, 180000);
     updateWorkCategoryDropdown(window.WORK_ROWS);
     renderWorksTable();
     if(forceRefresh) toast(`รีเฟรชข้อมูลผลงานสำเร็จ (${window.WORK_ROWS.length} เรื่อง)`);
   }finally{
-    if(shouldBlock) hide();
+    hide();
   }
 }
 function num(v){return Number(v)||0;}
@@ -3465,63 +3280,6 @@ async function openEmail(to, subj, msg, wid){
     }catch(e){err(e);}
   }
 }
-function calcStats(nums) {
-  const arr = (nums || []).map(Number).filter(n => !isNaN(n));
-  const n = arr.length;
-  if (n === 0) return { count: 0, mean: 0, sd: 0, sum: 0 };
-  const sum = arr.reduce((a, b) => a + b, 0);
-  const mean = sum / n;
-  if (n === 1) return { count: 1, mean: mean, sd: 0, sum: sum };
-  const variance = arr.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (n - 1);
-  return { count: n, mean: mean, sd: Math.sqrt(variance), sum: sum };
-}
-
-function openPrintPreview(htmlContent, docTitle) {
-  let container = document.getElementById('tuhPrintContainer');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'tuhPrintContainer';
-    document.body.appendChild(container);
-  }
-  container.innerHTML = htmlContent;
-
-  const oldModal = document.getElementById('tuhPrintPreviewModal');
-  if (oldModal) oldModal.remove();
-
-  const modal = document.createElement('div');
-  modal.id = 'tuhPrintPreviewModal';
-  modal.className = 'print-preview-modal no-print';
-  modal.innerHTML = `
-    <div class="print-preview-toolbar no-print">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <i class="fa-solid fa-file-invoice" style="color:#00c49f; font-size:1.2rem;"></i>
-        <b style="font-size:0.95rem;">${esc(docTitle || 'ตัวอย่างเอกสารสำหรับพิมพ์')}</b>
-      </div>
-      <div style="display:flex; gap:10px;">
-        <button type="button" class="btn" style="background:#006D70; color:#fff; font-weight:700; padding:8px 18px; border-radius:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:0.9rem;" onclick="triggerDirectPrint()">
-          <i class="fa-solid fa-print"></i> สั่งพิมพ์ออกเครื่องพิมพ์ / บันทึก PDF
-        </button>
-        <button type="button" class="btn" style="background:#475569; color:#fff; font-weight:600; padding:8px 14px; border-radius:6px; border:none; cursor:pointer;" onclick="closePrintPreview()">
-          ✕ ปิด
-        </button>
-      </div>
-    </div>
-    <div class="print-preview-paper" id="printPreviewPaper">
-      ${htmlContent}
-    </div>
-  `;
-  document.body.appendChild(modal);
-}
-
-function triggerDirectPrint() {
-  window.print();
-}
-
-function closePrintPreview() {
-  const modal = document.getElementById('tuhPrintPreviewModal');
-  if (modal) modal.remove();
-}
-
 async function openScoreSummary(wid){
   show('กำลังโหลดข้อมูลคะแนน');
   try {
@@ -3532,144 +3290,73 @@ async function openScoreSummary(wid){
     const criteriaList = (criteria || []).slice().sort((x, y) => (Number(x.ItemNo || x.SortOrder) || 0) - (Number(y.ItemNo || y.SortOrder) || 0));
     const totalMax = criteriaList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
     
-    const completed = (assignments || []).filter(a => ['COMPLETE', 'LOCKED', 'SUBMITTED'].includes(String(a.Status).toUpperCase()) || (Number(a.TotalScore) > 0 && String(a.Status).toUpperCase() !== 'CANCELLED'));
+    const completed = assignments.filter(a => ['COMPLETE', 'LOCKED'].includes(String(a.Status).toUpperCase()));
     
-    // Resolve reviewer names if not provided
-    completed.forEach((a, i) => {
-      if (!a.ReviewerName) {
-        const revRow = (window.REVIEWER_ROWS || []).find(r => (r.ReviewerID === a.ReviewerID) || (r.reviewer && r.reviewer.ReviewerID === a.ReviewerID));
-        const revObj = revRow ? (revRow.reviewer || revRow) : null;
-        a.ReviewerName = revObj?.FullName || [revObj?.Prefix, revObj?.FirstName, revObj?.LastName].filter(Boolean).join(' ') || `กรรมการท่านที่ ${i+1}`;
-        a.ReviewerPosition = revObj?.Position || '';
-        a.ReviewerInstitution = revObj?.Institution || '';
-      }
-    });
-
     const authorNames = (authors || []).map(x => esc(x.FullName || [x.Prefix, x.FirstName, x.LastName].filter(Boolean).join(' ') || x.FirstName)).filter(Boolean).join(', ') || esc(getWorkPresenterDisplay(work).name);
     
-    const scoreMapByAsgn = {};
-    const critScoresMap = {};
-    criteriaList.forEach(c => critScoresMap[c.CriteriaID] = []);
-
-    completed.forEach(a => {
-      scoreMapByAsgn[a.AssignmentID] = {};
-      const myScores = (scores || []).filter(s => s.AssignmentID === a.AssignmentID);
-      myScores.forEach(s => {
-        scoreMapByAsgn[a.AssignmentID][s.CriteriaID] = s;
-      });
-      criteriaList.forEach(c => {
-        const sc = scoreMapByAsgn[a.AssignmentID][c.CriteriaID];
-        const val = (sc && sc.Score !== undefined && sc.Score !== null && sc.Score !== '') ? Number(sc.Score) : 0;
-        critScoresMap[c.CriteriaID].push(val);
-      });
-    });
-
-    const totalScores = completed.map(a => Number(a.TotalScore) || 0);
-    const totalStats = calcStats(totalScores);
-
     let html = `<div style="text-align:left; font-size:0.9rem;">
       <div style="margin-bottom:15px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
-          <div>
-            <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH || work.TitleEN || '')}</div>
-            <div style="margin-top:4px; color:#475569;"><small>ประเภท: <b>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</b> | ผู้ส่ง/ผู้แต่ง: <b>${authorNames}</b></small></div>
-          </div>
-          ${completed.length > 0 ? `
-            <button type="button" class="btn" style="background:#006D70; color:#fff; font-size:0.85rem; font-weight:600; padding:8px 14px; border-radius:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,109,112,0.25);" onclick="printWorkScoreReport('${esc(wid)}')">
-              <i class="fa-solid fa-print"></i> พิมพ์รายงานผลคะแนน (PDF)
-            </button>
-          ` : ''}
-        </div>
+        <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH || work.TitleEN || '')}</div>
+        <div style="margin-top:4px; color:#475569;"><small>ประเภท: <b>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</b> | ผู้ส่ง/ผู้แต่ง: <b>${authorNames}</b></small></div>
       </div>`;
     
     if (completed.length === 0) {
       html += `<div class="muted" style="text-align:center; padding:25px; background:#f1f5f9; border-radius:8px;">ยังไม่มีกรรมการส่งคะแนน (ประเมินแล้ว 0/${assignments.length} ท่าน)</div>`;
     } else {
-      html += `
-        <!-- Statistical Summary Banner -->
-        <div style="background:linear-gradient(135deg, #073552 0%, #006D70 100%); color:#fff; border-radius:12px; padding:16px; margin-top:10px; margin-bottom:14px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px;">
+      let totalSum = 0;
+      const critSums = {};
+      criteriaList.forEach(c => critSums[c.CriteriaID] = 0);
+      
+      completed.forEach((a, i) => {
+        totalSum += Number(a.TotalScore) || 0;
+        const myScores = scores.filter(s => s.AssignmentID === a.AssignmentID);
+        const myScoreMap = {};
+        myScores.forEach(s => myScoreMap[s.CriteriaID] = s);
+        
+        const subItemsHtml = criteriaList.map(c => {
+          const sc = myScoreMap[c.CriteriaID];
+          const val = sc && sc.Score !== undefined && sc.Score !== null && sc.Score !== '' ? Number(sc.Score) : 0;
+          critSums[c.CriteriaID] = (critSums[c.CriteriaID] || 0) + val;
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px dashed #e2e8f0; font-size:0.85rem;">
+              <span style="color:#334155;">ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH || c.CriteriaName)}</span>
+              <span style="font-weight:600; color:#006D70;">${val} / ${c.MaxScore}</span>
+            </div>
+            ${sc && sc.Comment ? `<div style="font-size:0.8rem; color:#64748b; margin:2px 0 6px 8px; padding-left:8px; border-left:2px solid #cbd5e1;">ข้อเสนอแนะ: ${esc(sc.Comment)}</div>` : ''}
+          `;
+        }).join('');
+        
+        html += `<div style="margin-bottom:16px; border:1px solid #cbd5e1; border-radius:10px; padding:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
             <div>
-              <span style="font-size:1.05rem; font-weight:700;">📊 สรุปคะแนนเฉลี่ยและค่า SD (${completed.length} กรรมการ)</span>
-              <div style="font-size:0.8rem; color:rgba(255,255,255,0.85); margin-top:2px;">คะแนนเต็มรวม ${totalMax} คะแนน</div>
+              <b style="font-size:0.95rem; color:#0f172a;">กรรมการท่านที่ ${i+1}</b>
+              <span style="margin-left:8px; font-size:0.8rem; color:#64748b;">(ผลการประเมิน: <b>${esc(a.Decision || 'ประเมินแล้ว')}</b>)</span>
             </div>
-            <div style="text-align:right;">
-              <div style="font-size:1.5rem; font-weight:800; color:#ffd166;">
-                ${totalStats.mean.toFixed(2)} <span style="font-size:0.95rem; font-weight:500; color:#fff;">± ${totalStats.sd.toFixed(2)}</span>
-              </div>
-              <div style="font-size:0.78rem; color:#dceff1;">(ค่าเฉลี่ย: <b>${totalStats.mean.toFixed(2)}</b> | ค่า SD: <b>${totalStats.sd.toFixed(2)}</b>)</div>
-            </div>
+            <span style="background:#e0f2fe; color:#0369a1; padding:3px 12px; border-radius:999px; font-weight:700; font-size:0.95rem;">รวม ${Number(a.TotalScore)} / ${totalMax} คะแนน</span>
           </div>
-        </div>
-
-        <!-- Comparative Criteria Table with Mean and SD -->
-        <div style="margin-bottom:18px;">
-          <div style="font-weight:700; font-size:0.92rem; color:#0f172a; margin-bottom:6px;">ตารางเปรียบเทียบคะแนนแต่ละเกณฑ์ พร้อมค่าเฉลี่ยและ SD:</div>
-          <div style="overflow-x:auto; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
-            <table class="table" style="font-size:0.82rem; margin:0; color:#1e293b;">
-              <thead>
-                <tr style="background:#f1f5f9;">
-                  <th style="width:36px; text-align:center;">ข้อ</th>
-                  <th>เกณฑ์การให้คะแนน</th>
-                  <th style="width:45px; text-align:center;">เต็ม</th>
-                  ${completed.map((a, i) => `<th style="text-align:center; min-width:85px;" title="${esc(a.ReviewerName)}">${esc(a.ReviewerName ? a.ReviewerName.split(' ')[0] : 'ก.' + (i+1))}</th>`).join('')}
-                  <th style="text-align:center; background:#e6f4f4; color:#006D70; font-weight:700; width:68px;">ค่าเฉลี่ย</th>
-                  <th style="text-align:center; background:#fef3c7; color:#92400e; font-weight:700; width:62px;">ค่า SD</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${criteriaList.map(c => {
-                  const stats = calcStats(critScoresMap[c.CriteriaID]);
-                  return `<tr>
-                    <td style="text-align:center; font-weight:600; color:#64748b;">${esc(c.ItemNo)}</td>
-                    <td style="color:#0f172a;">${esc(c.CriteriaNameTH || c.CriteriaName)}</td>
-                    <td style="text-align:center; color:#64748b;">${c.MaxScore}</td>
-                    ${completed.map(a => {
-                      const sc = (scoreMapByAsgn[a.AssignmentID] || {})[c.CriteriaID];
-                      const val = (sc && sc.Score !== undefined && sc.Score !== null && sc.Score !== '') ? Number(sc.Score) : '-';
-                      return `<td style="text-align:center; font-weight:600; color:#006D70;">${val}</td>`;
-                    }).join('')}
-                    <td style="text-align:center; font-weight:700; background:#f0fdf4; color:#166534;">${stats.mean.toFixed(2)}</td>
-                    <td style="text-align:center; font-weight:700; background:#fffbeb; color:#92400e;">${stats.sd.toFixed(2)}</td>
-                  </tr>`;
-                }).join('')}
-                <tr style="background:#f8fafc; font-weight:700; border-top:2px solid #94a3b8;">
-                  <td colspan="2" style="text-align:right; font-weight:700; color:#0f172a;">รวมคะแนนประเมิน:</td>
-                  <td style="text-align:center; color:#64748b;">${totalMax}</td>
-                  ${completed.map(a => `<td style="text-align:center; color:#006D70; font-weight:700;">${Number(a.TotalScore).toFixed(2)}</td>`).join('')}
-                  <td style="text-align:center; background:#dcfce7; color:#166534; font-size:0.95rem; font-weight:800;">${totalStats.mean.toFixed(2)}</td>
-                  <td style="text-align:center; background:#fef3c7; color:#92400e; font-size:0.95rem; font-weight:800;">${totalStats.sd.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div style="background:#fafafa; border:1px solid #eef2f6; border-radius:6px; padding:4px 8px; margin-bottom:8px;">
+            ${subItemsHtml}
           </div>
-        </div>
-
-        <!-- Individual Reviewer Details & Comments -->
-        <div style="margin-bottom:16px;">
-          <div style="font-weight:700; font-size:0.92rem; color:#0f172a; margin-bottom:8px;">รายละเอียดและคำแนะนำของกรรมการแต่ละคน:</div>
-          ${completed.map((a, i) => `
-            <div style="margin-bottom:12px; border:1px solid #cbd5e1; border-radius:10px; padding:12px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-              <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px;">
-                <div>
-                  <b style="font-size:0.92rem; color:#0f172a;">กรรมการท่านที่ ${i+1}: ${esc(a.ReviewerName)}</b>
-                  ${a.ReviewerInstitution ? `<span style="margin-left:6px; font-size:0.8rem; color:#64748b;">(${esc(a.ReviewerInstitution)})</span>` : ''}
-                  <span style="margin-left:8px; font-size:0.8rem; color:#475569;">ผลประเมิน: <b>${esc(a.Decision || 'ประเมินแล้ว')}</b></span>
-                </div>
-                <span style="background:#e0f2fe; color:#0369a1; padding:3px 12px; border-radius:999px; font-weight:700; font-size:0.92rem;">
-                  รวม ${Number(a.TotalScore)} / ${totalMax} คะแนน
-                </span>
+          ${a.RecommendationToAuthor ? `<div style="margin-top:10px; padding:8px 12px; background:#f0fdf4; border-radius:6px; border:1px solid #bbf7d0; font-size:0.85rem; color:#166534;"><b>ข้อเสนอแนะถึงผู้ส่งผลงาน:</b><br>${esc(a.RecommendationToAuthor).replace(/\n/g, '<br>')}</div>` : ''}
+          ${a.InternalComment ? `<div style="margin-top:6px; padding:8px 12px; background:#fffbeb; border-radius:6px; border:1px solid #fef3c7; font-size:0.85rem; color:#92400e;"><b>ความเห็นภายใน:</b><br>${esc(a.InternalComment).replace(/\n/g, '<br>')}</div>` : ''}
+        </div>`;
+      });
+      
+      const avg = totalSum / completed.length;
+      html += `
+        <div style="background:linear-gradient(135deg, #073552 0%, #006D70 100%); color:#fff; border-radius:12px; padding:16px; margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px;">
+            <span style="font-size:1.05rem; font-weight:700;">📊 สรุปคะแนนเฉลี่ยรวม (${completed.length} ท่าน)</span>
+            <span style="font-size:1.4rem; font-weight:800; color:#ffd166;">${avg.toFixed(2)} <small style="font-size:0.9rem; font-weight:400; color:#fff;">/ ${totalMax} คะแนน</small></span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-top:12px;">
+            ${criteriaList.map(c => `
+              <div style="background:rgba(255,255,255,0.12); padding:8px; border-radius:8px; text-align:center;">
+                <div style="font-size:0.75rem; color:rgba(255,255,255,0.85);">ข้อ ${esc(c.ItemNo)}: ${esc(c.CriteriaNameTH || c.CriteriaName).substring(0, 15)}</div>
+                <div style="font-size:1.1rem; font-weight:700; color:#fff; margin-top:2px;">${((critSums[c.CriteriaID] || 0) / completed.length).toFixed(2)} <span style="font-size:0.75rem; opacity:0.8;">/${c.MaxScore}</span></div>
               </div>
-              <div style="padding:8px 12px; background:#f0fdf4; border-radius:6px; border:1px solid #bbf7d0; font-size:0.85rem; color:#166534; margin-top:6px;">
-                <b>คำแนะนำ/ข้อเสนอแนะถึงผู้ส่งผลงาน:</b><br>${esc(a.RecommendationToAuthor || 'ไม่มีข้อเสนอแนะเพิ่มเติม').replace(/\n/g, '<br>')}
-              </div>
-              ${a.InternalComment ? `
-                <div style="padding:6px 12px; background:#fffbeb; border-radius:6px; border:1px solid #fef3c7; font-size:0.82rem; color:#92400e; margin-top:6px;">
-                  <b>ความเห็นภายในคณะกรรมการ:</b><br>${esc(a.InternalComment).replace(/\n/g, '<br>')}
-                </div>
-              ` : ''}
-            </div>
-          `).join('')}
+            `).join('')}
+          </div>
         </div>
       `;
     }
@@ -3691,11 +3378,6 @@ async function openScoreSummary(wid){
           </div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${completed.length > 0 ? `
-            <button type="button" class="btn" style="background:#006D70; color:#fff; font-size:0.85rem; font-weight:600;" onclick="printWorkScoreReport('${esc(wid)}')">
-              <i class="fa-solid fa-print"></i> พิมพ์รายงานผลคะแนน
-            </button>
-          ` : ''}
           ${anyLocked 
             ? `<button type="button" class="btn soft" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; font-size:0.85rem;" onclick="adminUnlockScoresAction('${esc(wid)}')">🔓 ปลดล็อกให้กรรมการแก้ไข</button>`
             : `<button type="button" class="btn soft" style="background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:0.85rem;" onclick="adminLockScoresAction('${esc(wid)}')">🔒 รับคะแนนและล็อกแบบประเมิน</button>`}
@@ -3709,484 +3391,10 @@ async function openScoreSummary(wid){
     Swal.fire({
       title: 'สรุปคะแนนประเมินผลงาน',
       html: html,
-      width: 860,
+      width: 780,
       confirmButtonColor: '#006D70',
       confirmButtonText: 'ปิด'
     });
-  } catch(e) {
-    err(e);
-  }
-}
-
-async function printWorkScoreReport(wid) {
-  show('กำลังจัดเตรียมรายงานผลคะแนน...');
-  try {
-    const res = await rpc('adminGetWorkScoreSummary', TOKEN, CID, wid);
-    hide();
-    const {work, authors, assignments, scores, criteria} = res;
-    const criteriaList = (criteria || []).slice().sort((x, y) => (Number(x.ItemNo || x.SortOrder) || 0) - (Number(y.ItemNo || y.SortOrder) || 0));
-    const totalMax = criteriaList.reduce((acc, c) => acc + (Number(c.MaxScore) || 0), 0) || 100;
-    const completed = (assignments || []).filter(a => ['COMPLETE', 'LOCKED', 'SUBMITTED'].includes(String(a.Status).toUpperCase()) || (Number(a.TotalScore) > 0 && String(a.Status).toUpperCase() !== 'CANCELLED'));
-
-    if (completed.length === 0) {
-      return Swal.fire({ icon: 'info', title: 'ยังไม่มีผลคะแนน', text: 'ผลงานนี้ยังไม่มีกรรมการส่งผลการประเมิน' });
-    }
-
-    // Resolve reviewer names
-    completed.forEach((a, i) => {
-      if (!a.ReviewerName) {
-        const revRow = (window.REVIEWER_ROWS || []).find(r => (r.ReviewerID === a.ReviewerID) || (r.reviewer && r.reviewer.ReviewerID === a.ReviewerID));
-        const revObj = revRow ? (revRow.reviewer || revRow) : null;
-        a.ReviewerName = revObj?.FullName || [revObj?.Prefix, revObj?.FirstName, revObj?.LastName].filter(Boolean).join(' ') || `กรรมการคนที่ ${i+1}`;
-        a.ReviewerPosition = revObj?.Position || '';
-        a.ReviewerInstitution = revObj?.Institution || '';
-      }
-    });
-
-    const authorNames = (authors || []).map(x => esc(x.FullName || [x.Prefix, x.FirstName, x.LastName].filter(Boolean).join(' ') || x.FirstName)).filter(Boolean).join(', ') || esc(getWorkPresenterDisplay(work).name);
-    const authorOrgs = (authors || []).map(x => esc(x.Organization || x.Institution || x.Department)).filter(Boolean).join(', ') || esc(work.Institution || work.Department || '-');
-
-    const scoreMapByAsgn = {};
-    const critScoresMap = {};
-    criteriaList.forEach(c => critScoresMap[c.CriteriaID] = []);
-
-    completed.forEach(a => {
-      scoreMapByAsgn[a.AssignmentID] = {};
-      const myScores = (scores || []).filter(s => s.AssignmentID === a.AssignmentID);
-      myScores.forEach(s => {
-        scoreMapByAsgn[a.AssignmentID][s.CriteriaID] = s;
-      });
-      criteriaList.forEach(c => {
-        const sc = scoreMapByAsgn[a.AssignmentID][c.CriteriaID];
-        const val = (sc && sc.Score !== undefined && sc.Score !== null && sc.Score !== '') ? Number(sc.Score) : 0;
-        critScoresMap[c.CriteriaID].push(val);
-      });
-    });
-
-    const totalScores = completed.map(a => Number(a.TotalScore) || 0);
-    const totalStats = calcStats(totalScores);
-
-    // Build the official report HTML
-    const reportHtml = `
-      <div class="official-score-sheet" style="font-family:'Prompt',-apple-system,BlinkMacSystemFont,sans-serif; color:#111; line-height:1.45; font-size:12px;">
-        <!-- Header -->
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #006D70; padding-bottom:12px; margin-bottom:16px;">
-          <img src="/images/tuh-logo.png" alt="TUH" style="height:55px; object-fit:contain;">
-          <div style="text-align:center; flex:1; padding:0 15px;">
-            <div style="font-size:15px; font-weight:700; color:#0C385B;">งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ครั้งที่ 19</div>
-            <div style="font-size:13px; font-weight:600; color:#006D70;">และการประชุมวิชาการ HA Regional Forum ครั้งที่ 1 ประจำปี 2569</div>
-            <div style="font-size:14px; font-weight:700; margin-top:4px; color:#1e293b; text-decoration:underline;">
-              ใบสรุปผลการให้คะแนนการนำเสนอผลงานวิชาการ (รอบตัดสิน)
-            </div>
-          </div>
-          <img src="/images/hacc-logo.png" alt="HACC" style="height:55px; object-fit:contain;">
-        </div>
-
-        <!-- Work Metadata Box -->
-        <div style="border:1px solid #94a3b8; border-radius:6px; padding:10px 14px; margin-bottom:16px; background:#f8fafc; font-size:12px;">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 20px;">
-            <div><b>รหัสผลงาน:</b> <span style="font-size:14px; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}</span></div>
-            <div><b>ประเภทผลงาน:</b> <span>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</span></div>
-            <div><b>รูปแบบการนำเสนอ:</b> <span>${esc(work.PresentationTypeName || (work.PresentationTypeID === 'PRES-POSTER' ? 'โปสเตอร์ (Poster Presentation)' : 'บรรยาย (Oral Presentation)'))}</span></div>
-            <div><b>วันที่พิมพ์รายงาน:</b> <span>${new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'})}</span></div>
-            <div style="grid-column:1/-1;"><b>ชื่อผลงาน (ไทย):</b> <span style="font-weight:600;">${esc(work.TitleTH || '-')}</span></div>
-            ${work.TitleEN ? `<div style="grid-column:1/-1;"><b>ชื่อผลงาน (อังกฤษ):</b> <span>${esc(work.TitleEN)}</span></div>` : ''}
-            <div style="grid-column:1/-1;"><b>เจ้าของผลงาน / ผู้นำเสนอ:</b> <span>${authorNames}</span></div>
-            <div style="grid-column:1/-1;"><b>หน่วยงาน / สังกัด:</b> <span>${authorOrgs}</span></div>
-          </div>
-        </div>
-
-        <!-- Scores Table -->
-        <div style="margin-bottom:16px;">
-          <div style="font-weight:700; font-size:13px; color:#0f172a; margin-bottom:6px;">ตารางสรุปผลคะแนนจากคณะกรรมการผู้ทรงคุณวุฒิ:</div>
-          <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
-            <thead>
-              <tr style="background:#e2e8f0; color:#0f172a;">
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:35px;">ลำดับ</th>
-                <th style="border:1px solid #64748b; padding:6px 8px;">ประเด็น / เกณฑ์การให้คะแนน</th>
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:45px;">คะแนนเต็ม</th>
-                ${completed.map((a, i) => `
-                  <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; min-width:80px;">
-                    กรรมการคนที่ ${i+1}<br>
-                    <span style="font-size:9px; font-weight:normal; color:#334155;">(${esc(a.ReviewerName ? a.ReviewerName.split(' ')[0] : 'ท่านที่ ' + (i+1))})</span>
-                  </th>
-                `).join('')}
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:70px; background:#e6f4f4; color:#006D70; font-weight:700;">คะแนนเฉลี่ย<br>(Mean)</th>
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:60px; background:#fef3c7; color:#92400e; font-weight:700;">ค่า SD</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${criteriaList.map((c, idx) => {
-                const stats = calcStats(critScoresMap[c.CriteriaID]);
-                return `
-                  <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : ''}">
-                    <td style="border:1px solid #cbd5e1; padding:5px 4px; text-align:center; font-weight:600;">${esc(c.ItemNo || idx+1)}</td>
-                    <td style="border:1px solid #cbd5e1; padding:5px 8px;">${esc(c.CriteriaNameTH || c.CriteriaName)}</td>
-                    <td style="border:1px solid #cbd5e1; padding:5px 4px; text-align:center; color:#64748b;">${c.MaxScore}</td>
-                    ${completed.map(a => {
-                      const sc = (scoreMapByAsgn[a.AssignmentID] || {})[c.CriteriaID];
-                      const val = (sc && sc.Score !== undefined && sc.Score !== null && sc.Score !== '') ? Number(sc.Score) : 0;
-                      return `<td style="border:1px solid #cbd5e1; padding:5px 4px; text-align:center; font-weight:600;">${val}</td>`;
-                    }).join('')}
-                    <td style="border:1px solid #cbd5e1; padding:5px 4px; text-align:center; font-weight:700; background:#f0fdf4; color:#166534;">${stats.mean.toFixed(2)}</td>
-                    <td style="border:1px solid #cbd5e1; padding:5px 4px; text-align:center; font-weight:700; background:#fffbeb; color:#92400e;">${stats.sd.toFixed(2)}</td>
-                  </tr>
-                `;
-              }).join('')}
-              <tr style="background:#f1f5f9; font-weight:700; border-top:2px solid #475569;">
-                <td colspan="2" style="border:1px solid #64748b; padding:6px 8px; text-align:right; font-size:12px;">รวมคะแนนประเมิน:</td>
-                <td style="border:1px solid #64748b; padding:6px 4px; text-align:center; font-size:12px;">${totalMax}</td>
-                ${completed.map(a => `
-                  <td style="border:1px solid #64748b; padding:6px 4px; text-align:center; font-size:12px; color:#006D70; font-weight:700;">
-                    ${Number(a.TotalScore).toFixed(2)}
-                  </td>
-                `).join('')}
-                <td style="border:1px solid #64748b; padding:6px 4px; text-align:center; font-size:13px; font-weight:800; background:#dcfce7; color:#166534;">
-                  ${totalStats.mean.toFixed(2)}
-                </td>
-                <td style="border:1px solid #64748b; padding:6px 4px; text-align:center; font-size:13px; font-weight:800; background:#fef3c7; color:#92400e;">
-                  ${totalStats.sd.toFixed(2)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Reviewer Comments -->
-        <div style="margin-bottom:18px;" class="page-break-inside-avoid">
-          <div style="font-weight:700; font-size:13px; color:#0f172a; margin-bottom:6px;">ข้อคิดเห็นและข้อเสนอแนะของกรรมการผู้ประเมิน:</div>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            ${completed.map((a, i) => `
-              <div style="border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; background:#fff;">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:4px;">
-                  <b style="color:#006D70; font-size:12px;">กรรมการคนที่ ${i+1}: ${esc(a.ReviewerName)} ${a.ReviewerPosition ? `(${esc(a.ReviewerPosition)})` : ''}</b>
-                  <span style="font-size:11px; color:#475569;">คะแนนที่ให้: <b>${Number(a.TotalScore).toFixed(2)} / ${totalMax}</b> (${esc(a.Decision || 'ประเมินแล้ว')})</span>
-                </div>
-                <div style="font-size:11px; color:#334155; line-height:1.4;">
-                  <b>ข้อเสนอแนะถึงผู้นำเสนอ:</b> ${esc(a.RecommendationToAuthor || '-')}
-                </div>
-                ${a.InternalComment ? `
-                  <div style="font-size:10px; color:#64748b; margin-top:3px;">
-                    <b>ความเห็นเพิ่มเติม:</b> ${esc(a.InternalComment)}
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Signatures Block -->
-        <div style="margin-top:24px; padding-top:10px; border-top:1px dashed #94a3b8;" class="page-break-inside-avoid">
-          <div style="font-weight:700; font-size:12px; color:#0f172a; margin-bottom:14px; text-align:center;">
-            คณะกรรมการผู้ประเมินผลงานวิชาการ
-          </div>
-          <div style="display:grid; grid-template-columns:repeat(${Math.min(completed.length, 3)}, 1fr); gap:16px; text-align:center;">
-            ${completed.map((a, i) => `
-              <div style="padding:10px 6px;">
-                <div style="margin-bottom:35px; color:#64748b;">ลงชื่อ ...........................................................</div>
-                <div style="font-weight:600; font-size:11px; color:#0f172a;">( ${esc(a.ReviewerName)} )</div>
-                <div style="font-size:10px; color:#64748b; margin-top:2px;">กรรมการผู้ประเมินคนที่ ${i+1}</div>
-                <div style="font-size:10px; color:#64748b; margin-top:4px;">วันที่ .......... / .......... / ................</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="margin-top:20px; font-size:9px; color:#94a3b8; text-align:center; border-top:1px solid #e2e8f0; padding-top:6px;">
-          ระบบบริหารจัดการงานประชุมวิชาการ TUH Quality Fair • มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต • เอกสารออก ณ วันที่ ${new Date().toLocaleString('th-TH')}
-        </div>
-      </div>
-    `;
-
-    openPrintPreview(reportHtml, `ใบสรุปผลคะแนน_${esc(work.WorkCode || work.WorkID)}`);
-  } catch(e) {
-    err(e);
-  }
-}
-
-async function openReviewerEvaluationReport(reviewerId) {
-  show('กำลังโหลดรายงานผลการประเมินของ Reviewer...');
-  try {
-    let rep = null;
-    try {
-      rep = await rpc('adminGetReviewerEvaluationReport', TOKEN, CID, reviewerId);
-    } catch(e) {
-      console.warn('RPC adminGetReviewerEvaluationReport failed, falling back to local assembly', e);
-    }
-
-    // Resilient fallback if needed
-    if (!rep || !rep.reviewer) {
-      const allRevs = window.REVIEWER_ROWS || [];
-      const rRow = allRevs.find(r => r.ReviewerID === reviewerId || r.reviewer?.ReviewerID === reviewerId);
-      const rev = rRow ? (rRow.reviewer || rRow) : { ReviewerID: reviewerId, FullName: reviewerId };
-      const allWorks = window.WORK_ROWS || [];
-      const asgns = [];
-      allWorks.forEach(w => {
-        if (w.Reviewers && Array.isArray(w.Reviewers)) {
-          w.Reviewers.forEach(r => {
-            if (r.ReviewerID === reviewerId) {
-              asgns.push({
-                WorkID: w.WorkID,
-                WorkCode: w.WorkCode || w.WorkID,
-                TitleTH: w.TitleTH || w.TitleEN,
-                CategoryName: w.CategoryName || w.Category,
-                PresenterName: getWorkPresenterDisplay(w).name,
-                Status: r.Status || 'ASSIGNED',
-                TotalScore: Number(r.TotalScore) || 0,
-                Decision: r.Decision || '',
-                RecommendationToAuthor: r.RecommendationToAuthor || ''
-              });
-            }
-          });
-        }
-      });
-      rep = { reviewer: rev, assignments: asgns, criteria: [] };
-    }
-
-    hide();
-    const rev = rep.reviewer || {};
-    const assignments = rep.assignments || [];
-    const completedList = assignments.filter(a => ['COMPLETE', 'LOCKED', 'SUBMITTED'].includes(String(a.Status).toUpperCase()) || (Number(a.TotalScore) > 0 && String(a.Status).toUpperCase() !== 'CANCELLED'));
-    const completedCount = completedList.length;
-    const pendingCount = assignments.length - completedCount;
-    const totalScores = completedList.map(a => Number(a.TotalScore) || 0);
-    const avgScore = totalScores.length > 0 ? (totalScores.reduce((a, b) => a + b, 0) / totalScores.length) : 0;
-
-    let html = `
-      <div style="text-align:left; font-size:0.9rem;">
-        <!-- Reviewer Profile Header -->
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:14px; margin-bottom:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:10px;">
-            <div>
-              <div style="font-size:1.15rem; font-weight:700; color:#006D70;">
-                ${esc(rev.Prefix||'')}${esc(rev.FirstName||'')} ${esc(rev.LastName||'')}
-              </div>
-              <div style="font-size:0.85rem; color:#475569; margin-top:2px;">
-                <b>รหัส:</b> ${esc(rev.ReviewerID)} | <b>ตำแหน่ง:</b> ${esc(rev.Position||'-')} | <b>หน่วยงาน:</b> ${esc(rev.Institution||'-')} ${rev.Department ? `(${esc(rev.Department)})` : ''}
-              </div>
-              <div style="font-size:0.82rem; color:#64748b; margin-top:2px;">
-                <b>สาขาที่ประเมิน:</b> ${esc(rev.ExpertiseCategories||'-')} | <b>Email:</b> ${esc(rev.Email||'-')} | <b>โทร:</b> ${esc(rev.Phone||'-')}
-              </div>
-            </div>
-            <button type="button" class="btn" style="background:#006D70; color:#fff; font-weight:700; padding:8px 16px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(0,109,112,0.3);" onclick="printReviewerEvaluationReport('${esc(reviewerId)}')">
-              <i class="fa-solid fa-print"></i> พิมพ์รายงานผลการประเมิน (PDF)
-            </button>
-          </div>
-
-          <!-- KPI Cards -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px;">
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
-              <div style="font-size:0.75rem; color:#64748b;">ภาระงานทั้งหมด</div>
-              <div style="font-size:1.3rem; font-weight:800; color:#0f172a;">${assignments.length} <small style="font-size:0.75rem; font-weight:400;">เรื่อง</small></div>
-            </div>
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
-              <div style="font-size:0.75rem; color:#166534;">ประเมินเสร็จแล้ว</div>
-              <div style="font-size:1.3rem; font-weight:800; color:#166534;">${completedCount} <small style="font-size:0.75rem; font-weight:400;">เรื่อง</small></div>
-            </div>
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
-              <div style="font-size:0.75rem; color:#92400e;">รอดำเนินการ / แบบร่าง</div>
-              <div style="font-size:1.3rem; font-weight:800; color:#92400e;">${pendingCount} <small style="font-size:0.75rem; font-weight:400;">เรื่อง</small></div>
-            </div>
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
-              <div style="font-size:0.75rem; color:#006D70;">คะแนนเฉลี่ยที่ให้</div>
-              <div style="font-size:1.3rem; font-weight:800; color:#006D70;">${completedCount > 0 ? avgScore.toFixed(2) : '-'} <small style="font-size:0.75rem; font-weight:400;">/ 100</small></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Assignments List Table -->
-        <h4 style="margin:0 0 8px; font-size:0.95rem; color:#0f172a;">รายการผลงานที่ได้รับมอบหมายและผลคะแนน:</h4>
-    `;
-
-    if (assignments.length === 0) {
-      html += `<div class="muted" style="text-align:center; padding:30px; background:#f1f5f9; border-radius:8px;">ยังไม่ได้รับมอบหมายผลงานในรอบนี้</div>`;
-    } else {
-      html += `
-        <div class="table-wrap" style="max-height:420px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px;">
-          <table class="table" style="font-size:0.83rem; margin:0;">
-            <thead>
-              <tr style="background:#f1f5f9; position:sticky; top:0; z-index:2;">
-                <th style="width:30px; text-align:center;">ที่</th>
-                <th>รหัสผลงาน</th>
-                <th>ชื่อผลงานวิชาการ</th>
-                <th>ประเภท</th>
-                <th>ผู้นำเสนอ</th>
-                <th style="text-align:center;">สถานะ</th>
-                <th style="text-align:center;">คะแนนที่ให้</th>
-                <th style="text-align:center;">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${assignments.map((a, i) => {
-                const isComp = ['COMPLETE', 'LOCKED', 'SUBMITTED'].includes(String(a.Status).toUpperCase()) || Number(a.TotalScore) > 0;
-                const badge = isComp 
-                  ? '<span class="badge ok">ส่งคะแนนแล้ว</span>' 
-                  : (String(a.Status).toUpperCase().includes('DRAFT') ? '<span class="badge warn">บันทึกร่าง</span>' : '<span class="badge">ยังไม่ประเมิน</span>');
-                
-                return `
-                  <tr>
-                    <td style="text-align:center; font-weight:600; color:#64748b;">${i+1}</td>
-                    <td style="font-weight:700; color:#006D70; white-space:nowrap;">${esc(a.WorkCode || a.WorkID)}</td>
-                    <td>
-                      <div style="font-weight:600; color:#0f172a;">${esc(a.TitleTH || a.TitleEN || '')}</div>
-                      ${a.RecommendationToAuthor ? `<div style="font-size:0.78rem; color:#166534; margin-top:3px; background:#f0fdf4; padding:3px 6px; border-radius:4px; border:1px solid #bbf7d0;"><b>ข้อเสนอแนะ:</b> ${esc(a.RecommendationToAuthor)}</div>` : ''}
-                    </td>
-                    <td style="font-size:0.8rem; color:#475569;">${esc(a.CategoryName || a.CategoryID || '-')}</td>
-                    <td style="font-size:0.8rem; color:#475569;">${esc(a.PresenterName || '-')}</td>
-                    <td style="text-align:center;">${badge}</td>
-                    <td style="text-align:center; font-weight:700; font-size:0.95rem; color:${isComp ? '#006D70' : '#94a3b8'};">
-                      ${isComp ? `${Number(a.TotalScore).toFixed(2)}` : '-'}
-                    </td>
-                    <td style="text-align:center; white-space:nowrap;">
-                      <button type="button" class="btn-sq" style="color:#006D70; background:#e6f4f4;" title="ดูคะแนนรวมทุกกรรมการ" onclick="openScoreSummary('${esc(a.WorkID)}')">
-                        <i class="fa-solid fa-chart-simple"></i>
-                      </button>
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    html += `</div>`;
-
-    Swal.fire({
-      title: 'รายงานผลการประเมินของ Reviewer',
-      html: html,
-      width: 900,
-      confirmButtonColor: '#006D70',
-      confirmButtonText: 'ปิด'
-    });
-  } catch(e) {
-    err(e);
-  }
-}
-
-async function printReviewerEvaluationReport(reviewerId) {
-  show('กำลังจัดเตรียมรายงานของ Reviewer...');
-  try {
-    let rep = null;
-    try {
-      rep = await rpc('adminGetReviewerEvaluationReport', TOKEN, CID, reviewerId);
-    } catch(e) {
-      console.warn('RPC failed, falling back', e);
-    }
-
-    if (!rep || !rep.reviewer) {
-      const allRevs = window.REVIEWER_ROWS || [];
-      const rRow = allRevs.find(r => r.ReviewerID === reviewerId || r.reviewer?.ReviewerID === reviewerId);
-      const rev = rRow ? (rRow.reviewer || rRow) : { ReviewerID: reviewerId, FullName: reviewerId };
-      rep = { reviewer: rev, assignments: [] };
-    }
-
-    hide();
-    const rev = rep.reviewer || {};
-    const assignments = rep.assignments || [];
-    const completedList = assignments.filter(a => ['COMPLETE', 'LOCKED', 'SUBMITTED'].includes(String(a.Status).toUpperCase()) || (Number(a.TotalScore) > 0 && String(a.Status).toUpperCase() !== 'CANCELLED'));
-    const totalScores = completedList.map(a => Number(a.TotalScore) || 0);
-    const avgScore = totalScores.length > 0 ? (totalScores.reduce((a, b) => a + b, 0) / totalScores.length) : 0;
-
-    const reportHtml = `
-      <div class="official-reviewer-sheet" style="font-family:'Prompt',-apple-system,BlinkMacSystemFont,sans-serif; color:#111; line-height:1.45; font-size:12px;">
-        <!-- Header -->
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #006D70; padding-bottom:12px; margin-bottom:16px;">
-          <img src="/images/tuh-logo.png" alt="TUH" style="height:55px; object-fit:contain;">
-          <div style="text-align:center; flex:1; padding:0 15px;">
-            <div style="font-size:15px; font-weight:700; color:#0C385B;">งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ครั้งที่ 19</div>
-            <div style="font-size:13px; font-weight:600; color:#006D70;">และการประชุมวิชาการ HA Regional Forum ครั้งที่ 1 ประจำปี 2569</div>
-            <div style="font-size:14px; font-weight:700; margin-top:4px; color:#1e293b; text-decoration:underline;">
-              รายงานสรุปผลการประเมินผลงานวิชาการโดยผู้ทรงคุณวุฒิ (Reviewer Evaluation Report)
-            </div>
-          </div>
-          <img src="/images/hacc-logo.png" alt="HACC" style="height:55px; object-fit:contain;">
-        </div>
-
-        <!-- Reviewer Profile Box -->
-        <div style="border:1px solid #94a3b8; border-radius:6px; padding:12px 16px; margin-bottom:16px; background:#f8fafc; font-size:12px;">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px;">
-            <div><b>ผู้ทรงคุณวุฒิ / กรรมการ:</b> <span style="font-size:13px; font-weight:700; color:#006D70;">${esc(rev.Prefix||'')}${esc(rev.FirstName||'')} ${esc(rev.LastName||'')}</span></div>
-            <div><b>รหัสผู้ประเมิน:</b> <span>${esc(rev.ReviewerID)}</span></div>
-            <div><b>ตำแหน่งทางวิชาการ/บริหาร:</b> <span>${esc(rev.Position||'-')}</span></div>
-            <div><b>สาขาความเชี่ยวชาญ:</b> <span>${esc(rev.ExpertiseCategories||'-')}</span></div>
-            <div><b>หน่วยงาน / สถาบัน:</b> <span>${esc(rev.Institution||'-')} ${rev.Department ? `(${esc(rev.Department)})` : ''}</span></div>
-            <div><b>อีเมล / โทรศัพท์:</b> <span>${esc(rev.Email||'-')} / ${esc(rev.Phone||'-')}</span></div>
-            <div style="grid-column:1/-1; margin-top:4px; padding-top:6px; border-top:1px dashed #cbd5e1; display:flex; gap:20px;">
-              <div>ภาระงานที่ได้รับมอบหมาย: <b>${assignments.length}</b> เรื่อง</div>
-              <div>ประเมินแล้วเสร็จ: <b style="color:#166534;">${completedList.length}</b> เรื่อง</div>
-              <div>รอดำเนินการ: <b style="color:#92400e;">${assignments.length - completedList.length}</b> เรื่อง</div>
-              <div>คะแนนเฉลี่ยที่ประเมิน: <b style="color:#006D70;">${completedList.length > 0 ? avgScore.toFixed(2) : '-'}</b> / 100 คะแนน</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Works Evaluated Table -->
-        <div style="margin-bottom:16px;">
-          <div style="font-weight:700; font-size:13px; color:#0f172a; margin-bottom:6px;">ตารางรายการผลงานที่ได้รับมอบหมายและคะแนนการประเมิน:</div>
-          <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
-            <thead>
-              <tr style="background:#e2e8f0; color:#0f172a;">
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:30px;">ลำดับ</th>
-                <th style="border:1px solid #64748b; padding:6px 6px; width:70px; text-align:center;">รหัสผลงาน</th>
-                <th style="border:1px solid #64748b; padding:6px 8px;">ชื่อผลงานวิชาการ</th>
-                <th style="border:1px solid #64748b; padding:6px 8px; width:110px;">ประเภทผลงาน</th>
-                <th style="border:1px solid #64748b; padding:6px 8px; width:110px;">ผู้นำเสนอ</th>
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:65px;">สถานะ</th>
-                <th style="border:1px solid #64748b; padding:6px 4px; text-align:center; width:55px;">คะแนน</th>
-                <th style="border:1px solid #64748b; padding:6px 8px; width:170px;">ข้อคิดเห็น / ข้อเสนอแนะ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${assignments.map((a, idx) => {
-                const isComp = ['COMPLETE', 'LOCKED', 'SUBMITTED'].includes(String(a.Status).toUpperCase()) || Number(a.TotalScore) > 0;
-                return `
-                  <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : ''}">
-                    <td style="border:1px solid #cbd5e1; padding:6px 4px; text-align:center; font-weight:600;">${idx+1}</td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 6px; text-align:center; font-weight:700; color:#006D70;">${esc(a.WorkCode || a.WorkID)}</td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 8px;">
-                      <b>${esc(a.TitleTH || a.TitleEN || '')}</b>
-                    </td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 8px; font-size:10px;">${esc(a.CategoryName || a.CategoryID || '-')}</td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 8px; font-size:10px;">${esc(a.PresenterName || '-')}</td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 4px; text-align:center; font-size:10px;">
-                      ${isComp ? '<span style="color:#166534; font-weight:600;">ประเมินแล้ว</span>' : '<span style="color:#64748b;">รอดำเนินการ</span>'}
-                    </td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 4px; text-align:center; font-weight:700; color:${isComp ? '#006D70' : '#94a3b8'};">
-                      ${isComp ? Number(a.TotalScore).toFixed(2) : '-'}
-                    </td>
-                    <td style="border:1px solid #cbd5e1; padding:6px 8px; font-size:10px; color:#334155;">
-                      ${esc(a.RecommendationToAuthor || a.InternalComment || '-')}
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Signature Block -->
-        <div style="margin-top:28px; padding-top:10px; border-top:1px dashed #94a3b8;" class="page-break-inside-avoid">
-          <div style="display:flex; justify-content:flex-end;">
-            <div style="text-align:center; width:280px;">
-              <div style="margin-bottom:40px; color:#64748b;">ลงชื่อ ...........................................................</div>
-              <div style="font-weight:700; font-size:12px; color:#0f172a;">( ${esc(rev.Prefix||'')}${esc(rev.FirstName||'')} ${esc(rev.LastName||'')} )</div>
-              <div style="font-size:11px; color:#64748b; margin-top:2px;">ผู้ทรงคุณวุฒิ / กรรมการผู้ประเมิน</div>
-              <div style="font-size:10px; color:#64748b; margin-top:4px;">วันที่ .......... / .......... / ................</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="margin-top:20px; font-size:9px; color:#94a3b8; text-align:center; border-top:1px solid #e2e8f0; padding-top:6px;">
-          ระบบบริหารจัดการงานประชุมวิชาการ TUH Quality Fair • มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต • เอกสารออก ณ วันที่ ${new Date().toLocaleString('th-TH')}
-        </div>
-      </div>
-    `;
-
-    openPrintPreview(reportHtml, `รายงานการประเมิน_${esc(rev.FullName || rev.ReviewerID)}`);
   } catch(e) {
     err(e);
   }
@@ -4666,7 +3874,6 @@ function renderReviewersTable(){
     <td>${x.CurrentAssignedCount}/${x.MaxWorkload}</td>
     <td>${statusBadge(x.Status)}</td>
     <td class="actions" style="display:flex; gap:5px; flex-wrap:nowrap">
-      <button class="btn-sq" style="color:#006D70; background:#e0f2fe;" title="รายงานผลการประเมิน / พิมพ์รายงานของ Reviewer ท่านนี้" onclick="openReviewerEvaluationReport('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-print"></i></button>
       <button class="btn-sq" style="color:#fd7e14" title="แก้ไข" onclick="openReviewerForm('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-pen"></i></button>
       <button class="btn-sq" style="color:#0d6efd" title="ส่ง Username/Password" onclick="resendReviewerCreds('${esc(x.reviewer.ReviewerID)}')"><i class="fa-solid fa-key"></i></button>
       <button class="btn-sq" style="color:#198754" title="ส่งอีเมล" onclick="openEmail('${esc(x.reviewer.Email)}','','เรียน ${esc(x.reviewer.FullName||'')}', '')"><i class="fa-solid fa-envelope"></i></button>
@@ -4675,30 +3882,15 @@ function renderReviewersTable(){
 }
 
 async function loadReviewers(forceRefresh = false){
-  let hasRendered = false;
-  if(!forceRefresh){
-    if(window.REVIEWER_ROWS && window.REVIEWER_ROWS.length){
-      renderReviewersTable();
-      hasRendered = true;
-    } else {
-      const cached = getAdminSessionCache('tuh_cache_reviewers_' + CID);
-      if(cached && cached.length){
-        window.REVIEWER_ROWS = cached;
-        renderReviewersTable();
-        hasRendered = true;
-      }
-    }
-  }
-  const shouldBlock = !hasRendered || forceRefresh;
-  if(shouldBlock) show(forceRefresh ? 'กำลังรีเฟรชข้อมูล Reviewer จาก Google Sheets...' : 'กำลังโหลด Reviewer');
+  const hasRows = !!(window.REVIEWER_ROWS && window.REVIEWER_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูล Reviewer จาก Google Sheets...' : 'กำลังโหลด Reviewer');
   try{
     const rows=await rpc('adminListReviewers',TOKEN,CID,{ forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.REVIEWER_ROWS = rows || [];
-    setAdminSessionCache('tuh_cache_reviewers_' + CID, window.REVIEWER_ROWS, 180000);
     renderReviewersTable();
     if(forceRefresh) toast(`รีเฟรชข้อมูล Reviewer สำเร็จ (${window.REVIEWER_ROWS.length} ท่าน)`);
   }finally{
-    if(shouldBlock) hide();
+    hide();
   }
 }
 async function resendReviewerCreds(id){
@@ -4965,48 +4157,28 @@ async function promptReplaceWorkFile(workId, regId, existingFilesHtml) {
   Swal.fire({title:'อัปโหลดไฟล์ผลงาน', html:h, width:600, showConfirmButton:false, showCloseButton:true});
 }
 // Users Management
-function renderUsersTable(rows){
-  if(!rows) rows = [];
-  $('#userRows').innerHTML=rows.length ? rows.map(x=>`<tr>
-    <td><b>${esc(x.UserID)}</b></td>
-    <td><b>${esc(x.FullName)}</b><br><span class="muted">${esc(x.Email)}</span></td>
-    <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:600">${esc(x.Role)}</span></td>
-    <td>${statusBadge(x.Status)}</td>
-    <td class="actions" style="display:flex;gap:4px;flex-wrap:wrap">
-      <button class="btn btn-soft btn-sm" onclick="openUserEditModal('${esc(x.UserID)}')" title="แก้ไขสิทธิ์และบทบาท"><i class="fa-solid fa-pen-to-square"></i> แก้ไขสิทธิ์</button>
-      ${x.Status !== 'ACTIVE' ? `<button class="btn btn-blue btn-sm" onclick="adminApproveUser('${esc(x.UserID)}')"><i class="fa-solid fa-check"></i> อนุมัติ</button>` : ''}
-      ${x.Status === 'ACTIVE' && x.Role !== 'SUPERADMIN' ? `<button class="btn btn-gold btn-sm" onclick="adminRevokeUser('${esc(x.UserID)}')"><i class="fa-solid fa-ban"></i> พักสิทธิ์</button>` : ''}
-    </td>
-  </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
-  reapplyTableSort($('#userRows')?.closest('table'));
-  refreshTableSortHeaders();
-}
-
 async function loadUsers(forceRefresh = false){
-  let hasRendered = false;
-  if(!forceRefresh){
-    if(window.USERS_LIST_CACHE && window.USERS_LIST_CACHE.length){
-      renderUsersTable(window.USERS_LIST_CACHE);
-      hasRendered = true;
-    } else {
-      const cached = getAdminSessionCache('tuh_cache_users_' + CID);
-      if(cached && cached.length){
-        window.USERS_LIST_CACHE = cached;
-        renderUsersTable(cached);
-        hasRendered = true;
-      }
-    }
-  }
-  const shouldBlock = !hasRendered || forceRefresh;
-  if(shouldBlock) show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผู้ใช้งาน...' : 'กำลังโหลดผู้ใช้งาน');
+  const hasRows = !!(window.USERS_LIST_CACHE && window.USERS_LIST_CACHE.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลผู้ใช้งาน...' : 'กำลังโหลดผู้ใช้งาน');
   try{
     const rows=await rpc('adminListUsers',TOKEN,CID,{ forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     window.USERS_LIST_CACHE = rows || [];
-    setAdminSessionCache('tuh_cache_users_' + CID, window.USERS_LIST_CACHE, 180000);
-    renderUsersTable(window.USERS_LIST_CACHE);
+    $('#userRows').innerHTML=rows.length ? rows.map(x=>`<tr>
+      <td><b>${esc(x.UserID)}</b></td>
+      <td><b>${esc(x.FullName)}</b><br><span class="muted">${esc(x.Email)}</span></td>
+      <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:600">${esc(x.Role)}</span></td>
+      <td>${statusBadge(x.Status)}</td>
+      <td class="actions" style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-soft btn-sm" onclick="openUserEditModal('${esc(x.UserID)}')" title="แก้ไขสิทธิ์และบทบาท"><i class="fa-solid fa-pen-to-square"></i> แก้ไขสิทธิ์</button>
+        ${x.Status !== 'ACTIVE' ? `<button class="btn btn-blue btn-sm" onclick="adminApproveUser('${esc(x.UserID)}')"><i class="fa-solid fa-check"></i> อนุมัติ</button>` : ''}
+        ${x.Status === 'ACTIVE' && x.Role !== 'SUPERADMIN' ? `<button class="btn btn-gold btn-sm" onclick="adminRevokeUser('${esc(x.UserID)}')"><i class="fa-solid fa-ban"></i> พักสิทธิ์</button>` : ''}
+      </td>
+    </tr>`).join('') : '<tr><td colspan="5" class="muted">ไม่พบข้อมูลผู้ใช้งาน</td></tr>';
+    reapplyTableSort($('#userRows')?.closest('table'));
+    refreshTableSortHeaders();
     if(forceRefresh) toast(`รีเฟรชข้อมูลผู้ใช้งานสำเร็จ (${rows.length} คน)`);
   }finally{
-    if(shouldBlock) hide();
+    hide();
   }
 }
 
@@ -5101,40 +4273,20 @@ async function adminRevokeUser(uid){
 }
 
 function foodFilters(){return {q:$('#foodSearch').value,eligibility:$('#foodEligibility').value,paymentStatus:$('#foodPayment').value,sentStatus:$('#foodSent').value}}
-function renderFoodTable(rows){
-  if(!rows) rows = [];
-  $('#foodRows').innerHTML = rows.length ? rows.map(r=>`<tr><td><input class="food-check" type="checkbox" value="${esc(r.RegID)}" ${r.Eligible?'':'disabled'} onchange="updateFoodCount()"></td><td><b>${esc(r.FullName)}</b><br><span class="muted">${esc(r.RegID)}<br>${esc(r.Email)}</span></td><td>${esc(r.ParticipantTypeName)}</td><td>${statusBadge(r.DataCompletenessStatus)}<br>${statusBadge(r.RegistrationStatus)}</td><td>${statusBadge(r.PaymentStatus)}</td><td>${r.Eligible?'<span class="badge ok">พร้อมออกคูปอง</span>':`<span class="badge bad">${esc(r.EligibilityReason)}</span>`}<br><span class="muted">${esc(r.MealPassStatus||'NOT_READY')}</span></td><td><b>${r.DispatchCount}</b> ครั้ง</td><td>${r.LastSentAt?formatBeDateTime(r.LastSentAt):'-'}</td><td class="actions"><button class="btn btn-blue btn-sm" onclick="viewUserScanHistory('${esc(r.RegID)}')">ประวัติ</button> <button class="btn btn-soft btn-sm" ${r.Eligible?'':'disabled'} onclick="previewFood('${esc(r.RegID)}')">ดู QR</button><button class="btn btn-gold btn-sm" ${r.Eligible?'':'disabled'} onclick="sendFood('${esc(r.RegID)}')">สร้างและส่ง</button></td></tr>`).join('') : '<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
-  $('#foodAll').checked=false;
-  updateFoodCount();
-  reapplyTableSort($('#foodRows')?.closest('table'));
-  refreshTableSortHeaders();
-}
-
 async function loadFood(forceRefresh = false){
-  let hasRendered = false;
-  if(!forceRefresh){
-    if(typeof FOOD_ROWS !== 'undefined' && FOOD_ROWS && FOOD_ROWS.length){
-      renderFoodTable(FOOD_ROWS);
-      hasRendered = true;
-    } else {
-      const cached = getAdminSessionCache('tuh_cache_food_' + CID);
-      if(cached && cached.length){
-        FOOD_ROWS = cached;
-        renderFoodTable(cached);
-        hasRendered = true;
-      }
-    }
-  }
-  const shouldBlock = !hasRendered || forceRefresh;
-  if(shouldBlock) show(forceRefresh ? 'กำลังรีเฟรชข้อมูลคูปองอาหาร...' : 'กำลังโหลดคูปองอาหาร');
+  const hasRows = !!(typeof FOOD_ROWS !== 'undefined' && FOOD_ROWS && FOOD_ROWS.length);
+  show(forceRefresh ? 'กำลังรีเฟรชข้อมูลคูปองอาหาร...' : 'กำลังโหลดคูปองอาหาร');
   try{
     const filters = Object.assign({}, foodFilters(), { forceRefresh: !!forceRefresh, refresh: !!forceRefresh });
     FOOD_ROWS = await rpc('adminListMealPasses', TOKEN, CID, filters);
-    setAdminSessionCache('tuh_cache_food_' + CID, FOOD_ROWS, 180000);
-    renderFoodTable(FOOD_ROWS);
+    $('#foodRows').innerHTML = FOOD_ROWS.length ? FOOD_ROWS.map(r=>`<tr><td><input class="food-check" type="checkbox" value="${esc(r.RegID)}" ${r.Eligible?'':'disabled'} onchange="updateFoodCount()"></td><td><b>${esc(r.FullName)}</b><br><span class="muted">${esc(r.RegID)}<br>${esc(r.Email)}</span></td><td>${esc(r.ParticipantTypeName)}</td><td>${statusBadge(r.DataCompletenessStatus)}<br>${statusBadge(r.RegistrationStatus)}</td><td>${statusBadge(r.PaymentStatus)}</td><td>${r.Eligible?'<span class="badge ok">พร้อมออกคูปอง</span>':`<span class="badge bad">${esc(r.EligibilityReason)}</span>`}<br><span class="muted">${esc(r.MealPassStatus||'NOT_READY')}</span></td><td><b>${r.DispatchCount}</b> ครั้ง</td><td>${r.LastSentAt?formatBeDateTime(r.LastSentAt):'-'}</td><td class="actions"><button class="btn btn-blue btn-sm" onclick="viewUserScanHistory('${esc(r.RegID)}')">ประวัติ</button> <button class="btn btn-soft btn-sm" ${r.Eligible?'':'disabled'} onclick="previewFood('${esc(r.RegID)}')">ดู QR</button><button class="btn btn-gold btn-sm" ${r.Eligible?'':'disabled'} onclick="sendFood('${esc(r.RegID)}')">สร้างและส่ง</button></td></tr>`).join('') : '<tr><td colspan="9" class="muted">ไม่พบข้อมูล</td></tr>';
+    $('#foodAll').checked=false;
+    updateFoodCount();
+    reapplyTableSort($('#foodRows')?.closest('table'));
+    refreshTableSortHeaders();
     if(forceRefresh) toast(`รีเฟรชข้อมูลคูปองอาหารสำเร็จ (${FOOD_ROWS.length} รายการ)`);
   }finally{
-    if(shouldBlock) hide();
+    hide();
   }
 }
 
@@ -5257,25 +4409,7 @@ async function viewUserScanHistory(id){
     err(e);
   }
 }
-window.addEventListener('load',async()=>{
-  loadRememberedLogin();
-  TOKEN=currentAdminToken();
-  if(TOKEN){
-    const hasCached = !!localStorage.getItem('tuhAdminBootCache_'+CID);
-    if(!hasCached) show('กำลังตรวจสอบ Session');
-    try{
-      await boot();
-    }catch(e){
-      TOKEN='';
-      localStorage.removeItem('tuhAdminToken');
-      sessionStorage.removeItem('tuhAdminToken');
-      $('#login').style.display='';
-      $('#app').style.display='none';
-    }finally{
-      hide();
-    }
-  }
-});
+window.addEventListener('load',async()=>{loadRememberedLogin();TOKEN=currentAdminToken();if(TOKEN){show('กำลังตรวจสอบ Session');try{await boot();hide()}catch(e){TOKEN='';localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');$('#login').style.display='';$('#app').style.display='none';hide()}}});
 </script>
 <footer style="text-align:center; padding: 20px; font-size: 0.85rem; color: #667a88; margin-top: 40px;">
   © 2026 สงวนลิขสิทธิ์ • แพลตฟอร์มนี้เป็นนวัตกรรมที่พัฒนาขึ้นเพื่อสนับสนุนงานวิชาการ<br>
@@ -5283,6 +4417,5 @@ window.addEventListener('load',async()=>{
   ติดต่อสอบถาม คณะพยาบาลศาสตร์ มหาวิทยาลัยธรรมศาสตร์ •<br><br>
   • ผู้พัฒนาปรับปรุงระบบ : ภญ.อาภัสรี บัวประดิษฐ์ สำนักงานสาธารณสุขจังหวัดนครนายก •
 </footer>
-<div id="tuhPrintContainer"></div>
 </body>
 </html>
