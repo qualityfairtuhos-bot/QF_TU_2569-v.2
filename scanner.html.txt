@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Event Scanner — <?= appName ?></title>
+  <title>Event Scanner — TUH Quality Fair Conference Management</title>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -21,11 +21,33 @@
     .direct-access-bar{position:fixed;right:10px;bottom:10px;z-index:9999;display:none;background:rgba(255,255,255,0.85);border-radius:8px;padding:5px 8px;font-size:0.75rem;}
     .direct-access-bar.show{display:block}
     .direct-access-bar a{color:#64748b;text-decoration:underline;}
+
+    /* Auto Record History & Tabbed Recent/Search */
+    .auto-history-panel{margin-top:14px;border:1px solid #cbd5e1;border-radius:15px;background:#f8fafc;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+    .auto-history-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #e2e8f0;margin-bottom:10px}
+    .auto-history-badge{background:#e0f2fe;color:#0369a1;padding:3px 9px;border-radius:999px;font-size:0.75rem;font-weight:600}
+    .auto-history-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+    .auto-item{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e2e8f0;border-left:4px solid #1b8f5a;border-radius:10px;padding:9px 12px;font-size:0.84rem;box-shadow:0 1px 3px rgba(0,0,0,0.02)}
+    .recent-tabs{display:flex;background:#edf3f5;border-bottom:1px solid #dce5ea;border-radius:18px 18px 0 0;overflow:hidden}
+    .recent-tab-btn{flex:1;border:0;background:transparent;padding:12px 10px;font-size:0.85rem;font-weight:600;color:#64748b;cursor:pointer;transition:all 0.15s;text-align:center}
+    .recent-tab-btn.active{background:#fff;color:var(--navy);border-bottom:3px solid var(--teal)}
+    .recent-filter-row{display:flex;gap:6px;margin-top:8px}
+    .filter-chip{border:1px solid #cbd8df;background:#fff;border-radius:999px;padding:4px 11px;font-size:0.74rem;color:#475569;cursor:pointer;font-weight:500;transition:.15s}
+    .filter-chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .badge-checkin{background:#e0f2fe;color:#0369a1;font-weight:600;border-radius:6px;padding:2px 7px;font-size:0.72rem;display:inline-block}
+    .badge-meal{background:#fef3c7;color:#b45309;font-weight:600;border-radius:6px;padding:2px 7px;font-size:0.72rem;display:inline-block}
+    .badge-food{background:#f3e8ff;color:#7e22ce;font-weight:600;border-radius:6px;padding:3px 8px;font-size:0.74rem;display:inline-block}
+    .badge-ok{background:#dcfce7;color:#15803d;font-weight:600;border-radius:6px;padding:2px 7px;font-size:0.72rem;display:inline-block}
+    .participant-card{background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04)}
+    .match-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .match-chip{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:5px 9px;font-size:0.76rem;cursor:pointer;transition:0.15s;text-align:left}
+    .match-chip:hover{background:#f1f5f9;border-color:var(--teal)}
+    .match-chip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
   </style>
 </head>
 <body>
 <div class="direct-access-bar" id="directAccessBar" role="status">
-  <a id="directAccessNewTab" href="<?= directUrl ?>" target="_blank" rel="noopener noreferrer" title="คัดลอกลิงก์นี้เพื่อเปิดในโหมดไม่ระบุตัวตน (Incognito)">หากจอขาว/เข้าไม่ได้ เปิด Incognito</a>
+  <a id="directAccessNewTab" href="/scanner?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer" title="คัดลอกลิงก์นี้เพื่อเปิดในโหมดไม่ระบุตัวตน (Incognito)">หากจอขาว/เข้าไม่ได้ เปิด Incognito</a>
 </div>
 
 <div class="shell">
@@ -41,7 +63,7 @@
       <label class="remember-row"><input type="checkbox" id="rememberLogin" checked><span>จำ Username และรหัสผ่านบนอุปกรณ์ส่วนตัวนี้<span class="en">Remember credentials on this device</span></span></label>
       <button class="btn btn-primary" type="submit">เข้าสู่ระบบ<span class="en" style="color:#d8eded">Sign in</span></button>
       <div style="display:flex; justify-content:space-between; margin-top:15px;"><a href="#" onclick="forgotPassword()" style="font-size:0.85rem; color:var(--teal); text-decoration:none;">ลืมรหัสผ่าน?</a><a href="#" onclick="signUp()" style="font-size:0.85rem; color:var(--teal); text-decoration:none; font-weight:600;">+ สมัครเข้าใช้งาน</a></div>
-      <div class="login-help">หากเปิดผ่าน Google Sites หรือเบราว์เซอร์ภายในแอปแล้วไม่สำเร็จ ให้ <a href="<?= directUrl ?>" target="_blank" rel="noopener noreferrer">เปิด Web App โดยตรง</a> โดยไม่ต้องออกจากบัญชี Google</div>
+      <div class="login-help">หากเปิดผ่าน Google Sites หรือเบราว์เซอร์ภายในแอปแล้วไม่สำเร็จ ให้ <a href="/scanner?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer">เปิด Web App โดยตรง</a> โดยไม่ต้องออกจากบัญชี Google</div>
     </form>
   </section>
 
@@ -79,20 +101,82 @@
         </div>
 
         <div class="check-card" id="checkResult"><div class="empty-state">ยังไม่มีข้อมูลสำหรับตรวจสอบ</div></div>
+
+        <!-- ช่องแสดงรายการประวัติกรณีเปิดโหมดบันทึกอัตโนมัติ -->
+        <div class="auto-history-panel" id="autoHistoryPanel">
+          <div class="auto-history-head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:1.15rem">⚡</span>
+              <div>
+                <b style="font-size:0.92rem;color:var(--navy)">รายการประวัติโหมดบันทึกอัตโนมัติ (Fast Scan Feed)</b>
+                <span class="en" style="font-size:0.7rem;color:#64748b">บันทึกล่าสุดในเซสชันนี้ • อัปเดตทันทีเมื่อสแกน</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="auto-history-badge" id="autoHistoryCount">0 รายการ</span>
+              <button type="button" class="btn btn-soft" style="padding:4px 8px;font-size:0.75rem" onclick="clearAutoHistory()">ล้างรายการจอ</button>
+            </div>
+          </div>
+          <div class="auto-history-list" id="autoHistoryList">
+            <div class="empty-state" style="padding:14px;font-size:0.82rem">ยังไม่มีประวัติการบันทึกอัตโนมัติในเซสชันนี้ — สแกน QR Code หรือกรอกรหัสแล้วกด Enter เพื่อเริ่มบันทึกอัตโนมัติ</div>
+          </div>
+        </div>
       </section>
 
       <aside class="panel recent-panel">
-        <div class="recent-head"><h2>รายการที่ยืนยันล่าสุด<span class="en">Recent confirmed records</span></h2><span class="recent-count" id="recentCount">0 รายการ</span></div>
-        <div class="recent-list" id="recentList"><div class="empty-state">ยังไม่มีรายการ</div></div>
+        <div class="recent-tabs">
+          <button type="button" class="recent-tab-btn active" id="tabFeedBtn" onclick="switchRecentTab('feed')">📋 ประวัติสแกนวันนี้</button>
+          <button type="button" class="recent-tab-btn" id="tabSearchBtn" onclick="switchRecentTab('search')">🔍 ค้นหาประวัติรายคน</button>
+        </div>
+
+        <!-- Tab 1: Daily Feed -->
+        <div id="recentFeedView">
+          <div class="recent-head" style="padding:14px 16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <h2 style="font-size:0.96rem;margin:0">ประวัติสแกนวันนี้<span class="en">Daily Scan Records</span></h2>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="recent-count" id="recentCount">0 รายการ</span>
+                <button type="button" class="btn btn-soft" style="padding:4px 8px;font-size:0.75rem" onclick="loadRecent()" title="รีเฟรชข้อมูล">🔄</button>
+              </div>
+            </div>
+            <div class="recent-filter-row">
+              <button type="button" class="filter-chip active" id="filterAllDayBtn" onclick="setHistoryFilter('ALL')">ทั้งหมดวันนี้ (เข้างาน+อาหาร)</button>
+              <button type="button" class="filter-chip" id="filterServiceBtn" onclick="setHistoryFilter('SERVICE')">เฉพาะจุดบริการนี้</button>
+            </div>
+          </div>
+          <div class="recent-list" id="recentList"><div class="empty-state">ยังไม่มีรายการ</div></div>
+        </div>
+
+        <!-- Tab 2: Search Participant History -->
+        <div id="recentSearchView" class="hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid #dce5ea;background:#fafbfc;">
+            <h2 style="font-size:0.96rem;margin:0 0 6px">ค้นหาประวัติการสแกนรายบุคคล<span class="en">Participant Scan History</span></h2>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <input id="userHistoryQuery" placeholder="เลขท้าย 3 ตัว เช่น 042 หรือ REG-2026-000042 หรือชื่อ" style="flex:1;border:1px solid #cbd8df;border-radius:9px;padding:9px 11px;font-size:0.84rem;outline:none">
+              <button type="button" class="btn btn-primary" style="padding:9px 14px;font-size:0.84rem;white-space:nowrap" onclick="searchUserHistory()">ค้นหา</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#475569;cursor:pointer">
+                <input type="checkbox" id="userHistoryAllDays">
+                <span>แสดงทุกวันของงาน (Show all days)</span>
+              </label>
+              <button type="button" class="btn btn-soft" style="padding:3px 8px;font-size:0.72rem" onclick="clearUserHistorySearch()">ล้างค้นหา</button>
+            </div>
+            <div class="hint" style="margin-top:6px;font-size:0.72rem">พิมพ์เลขท้าย 3 ตัว เช่น 001, 042 แล้วกด Enter หรือกดค้นหา</div>
+          </div>
+          <div id="userHistoryResult" style="padding:12px;overflow:auto;max-height:680px">
+            <div class="empty-state" style="padding:24px">กรอกเลขท้าย 3 ตัว หรือ RegID เพื่อค้นหาประวัติการเข้างานและรับอาหาร</div>
+          </div>
+        </div>
       </aside>
     </div>
   </main>
 </div>
 <script>
-const CID='<?= conferenceId ?>';
+const CID=''+(new URLSearchParams(location.search).get('conferenceId')||'CONF-TUH-QF-2569')+'';
 
-const APP_BASE_URL='<?= appUrl ?>';
-const DIRECT_ACCESS_URL='<?= directUrl ?>';
+const APP_BASE_URL='';
+const DIRECT_ACCESS_URL='/scanner?conferenceId=CONF-TUH-QF-2569';
 function installDirectAccessGuard(){
   const embedded=window.self!==window.top;
   const fromGoogleSites=/sites\.google\.com/i.test(document.referrer||'');
@@ -100,15 +184,12 @@ function installDirectAccessGuard(){
   const bar=document.getElementById('directAccessBar');
   if(bar&&(embedded||fromGoogleSites||inApp))bar.classList.add('show');
 }
-function canonicalRoute(page){
-  const base=String(APP_BASE_URL||location.href.split('?')[0]).replace(/\/dev(?:$|\?)/i,'/exec').replace(/\/u\/\d+\//g,'/').split('?')[0];
-  const q=[];if(page&&page!=='public')q.push('page='+encodeURIComponent(page));q.push('conferenceId='+encodeURIComponent(CID));return base+'?'+q.join('&');
-}
+function canonicalRoute(page){const routes={public:'/',admin:'/admin',reviewer:'/reviewer',scanner:'/scanner',launcher:'/launcher'};const target=routes[page||'public']||'/';return target+'?conferenceId='+encodeURIComponent(CID)}
 window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 let TOKEN='',TOKEN_SOURCE='',BOOT=null,SELECTED_SERVICE='',PENDING=null,QR=null,CAMERA_ON=false,SCAN_LOCK=false;
-function rpc(name,...args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(r=>r&&r.success?resolve(r.data):reject(new Error(r&&r.message||'เกิดข้อผิดพลาด'))).withFailureHandler(e=>reject(new Error(e&&e.message||String(e))))[name](...args))}
+window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|reviewerBootstrap|adminBootstrap|getPublicBootstrap|lookup|export|inspect|list|verifyWorkAccess|.*Bootstrap)/i.test(n);const isWrite=n!=='verifyWorkAccess'&&/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?30000:60000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 function parseDate(v){const s=String(v||''),m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3],12);const d=new Date(s);return isNaN(d)?null:d}
 function thDate(v){const d=parseDate(v);return d?new Intl.DateTimeFormat('th-TH-u-ca-buddhist',{day:'numeric',month:'long',year:'numeric'}).format(d):String(v||'')}
@@ -117,11 +198,11 @@ function show(t){const el=document.getElementById('loadText');if(el)el.textConte
 function setBusy(on,text){if(on)show(text);else hide();const btn=document.getElementById('inspectBtn');if(btn)btn.disabled=on;const sys=document.getElementById('systemStatus');if(sys)sys.textContent=on?(text||'กำลังประมวลผล...'):'STATUS: READY TO SCAN';const con=document.getElementById('consoleState');if(con)con.textContent=on?'STATUS: PROCESSING':'STATUS: READY TO SCAN'}
 const SCANNER_CRED_KEY='tuhScannerRememberedCredentials';
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
-function loadRememberedLogin(){try{const x=JSON.parse(localStorage.getItem(SCANNER_CRED_KEY)||'null');if(x){$('#loginUser').value=x.username||'';$('#loginPass').value=x.password||'';$('#rememberLogin').checked=true}}catch(e){}}
-function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(SCANNER_CRED_KEY,JSON.stringify({username:$('#loginUser').value.trim(),password:$('#loginPass').value}));else localStorage.removeItem(SCANNER_CRED_KEY)}
-function scannerStoredToken(){return localStorage.getItem('tuhScannerToken')||sessionStorage.getItem('tuhScannerToken')||''}
-function adminStoredToken(){return localStorage.getItem('tuhAdminToken')||sessionStorage.getItem('tuhAdminToken')||''}
-function storeScannerToken(token){if($('#rememberLogin').checked){localStorage.setItem('tuhScannerToken',token);sessionStorage.removeItem('tuhScannerToken')}else{sessionStorage.setItem('tuhScannerToken',token);localStorage.removeItem('tuhScannerToken')}}
+function loadRememberedLogin(){try{const username=localStorage.getItem(SCANNER_CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
+function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(SCANNER_CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(SCANNER_CRED_KEY)}
+function scannerStoredToken(){return '__COOKIE__'}
+function adminStoredToken(){return ''}
+function storeScannerToken(){}
 function sessionError(e){if(/Session|เข้าสู่ระบบใหม่|หมดอายุ/.test(e.message||'')){if(TOKEN_SOURCE==='scanner'){localStorage.removeItem('tuhScannerToken');sessionStorage.removeItem('tuhScannerToken')}if(TOKEN_SOURCE==='admin'){localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken')};TOKEN='';TOKEN_SOURCE='';$('#appView').classList.add('hidden');$('#loginView').classList.remove('hidden');Swal.fire({icon:'warning',title:'Session หมดอายุ',text:'กรุณาเข้าสู่ระบบใหม่'});return true}return false}
 
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();try{setBusy(true,'กำลังเข้าสู่ระบบ');const r=await rpc('loginUser',$('#loginUser').value,$('#loginPass').value,CID,navigator.userAgent);if(!['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FOOD_STAFF'].includes(r.role))throw new Error('บัญชีนี้ไม่มีสิทธิ์ใช้งานหน้าสแกน');TOKEN=r.token;TOKEN_SOURCE='scanner';saveRememberedLogin();storeScannerToken(TOKEN);await bootScanner()}catch(e){Swal.fire({icon:'error',title:'เข้าสู่ระบบไม่สำเร็จ',text:e.message})}finally{setBusy(false)}});
@@ -136,7 +217,7 @@ async function bootScanner(){
   const checkins=(BOOT.services||[]).filter(x=>x.type==='CHECKIN'),meals=(BOOT.services||[]).filter(x=>x.type==='MEAL');
   $('#checkinButtons').innerHTML=checkins.map(x=>`<button class="service-btn" data-code="${esc(x.code)}" onclick="selectService('${esc(x.code)}')">${esc(x.shortTH||x.nameTH)}</button>`).join('');
   $('#mealButtons').innerHTML=meals.map(x=>`<button class="service-btn" data-code="${esc(x.code)}" onclick="selectService('${esc(x.code)}')">${esc(x.shortTH||x.nameTH)}</button>`).join('');
-  SELECTED_SERVICE=(checkins[0]||meals[0]||{}).code||'';selectService(SELECTED_SERVICE);$('#eventDate').onchange=()=>{PENDING=null;renderEmpty();loadRecent()};
+  SELECTED_SERVICE=(checkins[0]||meals[0]||{}).code||'';selectService(SELECTED_SERVICE);$('#eventDate').onchange=()=>{PENDING=null;renderEmpty();loadRecent();if(CURRENT_SEARCH_DATA&&CURRENT_SEARCH_DATA.regId){searchUserHistory(CURRENT_SEARCH_DATA.regId);}};
   } catch (e) {
     $('#appView').classList.add('hidden');
     $('#loginView').classList.remove('hidden');
@@ -236,13 +317,100 @@ function normalizeRegInput(id){
   return s;
 }
 
+const AUTO_RECORD_HISTORY = [];
+function addAutoHistoryItem(r){
+  AUTO_RECORD_HISTORY.unshift({
+    RegID: r.RegID,
+    FullName: r.FullName,
+    Organization: r.Organization,
+    ServiceType: r.ServiceType,
+    ServiceCode: r.ServiceCode,
+    ServiceNameTH: r.ServiceNameTH,
+    EventDate: r.EventDate,
+    ConfirmedAt: r.ConfirmedAt || new Date(),
+    ScannerPoint: r.ScannerPoint
+  });
+  if(AUTO_RECORD_HISTORY.length > 50) AUTO_RECORD_HISTORY.pop();
+  renderAutoHistory();
+}
+
+function clearAutoHistory(){
+  AUTO_RECORD_HISTORY.length = 0;
+  renderAutoHistory();
+}
+
+function renderAutoHistory(){
+  const countEl = $('#autoHistoryCount');
+  if(countEl) countEl.textContent = `${AUTO_RECORD_HISTORY.length} รายการ`;
+  const list = $('#autoHistoryList');
+  if(!list) return;
+  if(!AUTO_RECORD_HISTORY.length){
+    list.innerHTML = '<div class="empty-state" style="padding:14px;font-size:0.82rem">ยังไม่มีประวัติการบันทึกอัตโนมัติในเซสชันนี้ — สแกน QR Code หรือกรอกรหัสแล้วกด Enter เพื่อเริ่มบันทึกอัตโนมัติ</div>';
+    return;
+  }
+  list.innerHTML = AUTO_RECORD_HISTORY.map(x => {
+    const isCheckin = x.ServiceType === 'CHECKIN' || (!x.ServiceType && !/BREAKFAST|LUNCH|AFTERNOON|DINNER/i.test(x.ServiceCode));
+    const typeBadge = isCheckin
+      ? '<span class="badge-checkin">เข้างาน</span>'
+      : '<span class="badge-meal">อาหาร</span>';
+    return `
+      <div class="auto-item">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <b style="color:var(--navy);font-size:0.88rem">${esc(x.FullName || x.RegID)}</b>
+            <span style="font-family:monospace;font-size:0.75rem;color:var(--teal);font-weight:600">${esc(x.RegID)}</span>
+            ${typeBadge}
+          </div>
+          <div style="display:flex;gap:8px;font-size:0.75rem;color:#64748b;margin-top:2px">
+            <span>${esc(x.ServiceNameTH)}</span>
+            <span>•</span>
+            <span>จุด: ${esc(x.ScannerPoint || 'หลัก')}</span>
+            <span>•</span>
+            <span style="color:#15803d;font-weight:600">✓ สำเร็จ</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:0.76rem;font-weight:600;color:#b42318">${esc(timeText(x.ConfirmedAt))}</span>
+          <button type="button" class="btn btn-soft" style="padding:3px 7px;font-size:0.72rem" onclick="quickLookupUser('${esc(x.RegID)}')" title="ดูประวัติคนนี้">🔍</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function addOptimisticRecent(r){
   const list=$('#recentList');if(!list)return;
   const empty=list.querySelector('.empty-state');if(empty)list.innerHTML='';
+  const isCheckin = r.ServiceType === 'CHECKIN' || (!r.ServiceType && !/BREAKFAST|LUNCH|AFTERNOON|DINNER/i.test(r.ServiceCode));
+  const typeBadge = isCheckin
+    ? '<span class="badge-checkin">เข้างาน</span>'
+    : '<span class="badge-meal">อาหาร</span>';
   const item=document.createElement('div');
   item.className='recent-item';
   item.style.borderLeft='4px solid #1b8f5a';
-  item.innerHTML=`<div class="top"><div><b>${esc(r.FullName||r.RegID)}</b><small>${esc(r.RegID)}</small><small>${esc(r.Organization||'')}</small></div><div class="recent-time">${esc(timeText(r.ConfirmedAt||new Date()))}</div></div><span class="recent-tag">${esc(r.ServiceNameTH)}</span>`;
+  item.style.cursor='pointer';
+  item.onclick=()=>quickLookupUser(r.RegID);
+  item.title=`คลิกเพื่อดูประวัติของ ${r.FullName||r.RegID}`;
+  item.innerHTML=`
+    <div class="top">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <b>${esc(r.FullName||r.RegID)}</b>
+          ${typeBadge}
+        </div>
+        <small style="color:var(--teal);font-weight:600;font-family:monospace">${esc(r.RegID)}</small>
+        <small style="color:#64748b">${esc(r.Organization||'')}</small>
+      </div>
+      <div class="recent-time">
+        <div>${esc(timeText(r.ConfirmedAt||new Date()))}</div>
+        <small style="color:#94a3b8;font-size:0.68rem">${esc(r.ScannerPoint||'')}</small>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+      <span class="recent-tag" style="background:#e8f7ef;color:#147548;font-weight:600">${esc(r.ServiceNameTH)}</span>
+      <button type="button" class="btn btn-soft" style="padding:2px 7px;font-size:0.7rem;" onclick="event.stopPropagation();quickLookupUser('${esc(r.RegID)}')">🔍 ดูประวัติ</button>
+    </div>
+  `;
   list.prepend(item);
   const countEl=$('#recentCount');
   if(countEl){
@@ -272,8 +440,9 @@ async function executeFastScan(rawInput){
     if(sys){sys.textContent='STATUS: PASS ✓';sys.style.background='#ecf8f4';sys.style.color='#147548';}
     if(con)con.textContent='STATUS: PASS ✓';
     $('#checkResult').classList.add('success-flash');
-    $('#checkResult').innerHTML=`<div class="message ok" style="text-align:center;padding:14px;border:2px solid #1b8f5a;"><div style="font-size:1.6rem;line-height:1;margin-bottom:4px">✅</div><h2 style="margin:0 0 4px;color:#146c43;font-size:1.25rem;">บันทึกสำเร็จ</h2><b style="font-size:1.1rem">${esc(r.FullName||r.RegID)}</b><div class="regid" style="margin:2px 0 4px">${esc(r.RegID)}</div><div style="color:#2c5282;font-weight:600">${esc(r.ServiceNameTH)}</div><small style="color:#64748b">${esc(thDate(r.EventDate))} เวลา ${esc(timeText(r.ConfirmedAt))}</small></div>`;
+    $('#checkResult').innerHTML=`<div class="message ok" style="text-align:center;padding:14px;border:2px solid #1b8f5a;"><div style="font-size:1.6rem;line-height:1;margin-bottom:4px">✅</div><h2 style="margin:0 0 4px;color:#146c43;font-size:1.25rem;">บันทึกสำเร็จ</h2><b style="font-size:1.1rem">${esc(r.FullName||r.RegID)}</b><div class="regid" style="margin:2px 0 4px">${esc(r.RegID)}</div><div style="color:#2c5282;font-weight:600">${esc(r.ServiceNameTH)}</div><small style="color:#64748b">${esc(thDate(r.EventDate))} เวลา ${esc(timeText(r.ConfirmedAt))}</small><div style="margin-top:8px"><button type="button" class="btn btn-soft" style="padding:4px 10px;font-size:0.75rem" onclick="quickLookupUser('${esc(r.RegID)}')">🔍 ดูประวัติของคนนี้</button></div></div>`;
     addOptimisticRecent(r);
+    addAutoHistoryItem(r);
     PENDING=null;$('#identifier').value='';
     setTimeout(()=>{
       $('#checkResult').classList.remove('success-flash');
@@ -327,8 +496,239 @@ async function inspectRegistration(){
   setBusy(true,'กำลังตรวจสอบสิทธิ์');try{PENDING=await rpc('inspectEventScanner',TOKEN,CID,id,$('#eventDate').value,SELECTED_SERVICE);$('#identifier').value=PENDING.RegID;renderInspection(PENDING)}catch(e){if(!sessionError(e)){PENDING=null;$('#checkResult').innerHTML=`<div class="message bad"><b>ตรวจสอบไม่สำเร็จ</b><br>${esc(e.message)}</div>`}}finally{setBusy(false)}
 }
 function renderInspection(r){const c=r.Checks||{};$('#checkResult').innerHTML=`<div class="person-head"><div><h3>${esc(r.FullName)}</h3><div class="regid">${esc(r.RegID)}</div><div style="margin-top:4px;color:#647987">${esc(r.Organization||'-')}</div></div><div style="text-align:right"><b>${esc(r.ServiceNameTH)}</b><br><small>${esc(thDate(r.EventDate))}</small></div></div><div class="badges">${checkBadge(c.dataComplete,'ข้อมูลครบ')}${checkBadge(c.registrationApproved,'ทะเบียนตรวจผ่าน')}${checkBadge(c.daySelected,'เลือกเข้าร่วมวันนี้')}${checkBadge(c.paymentOkay,'การเงินผ่าน/ไม่ต้องชำระ')}${checkBadge(!r.Duplicate,'ยังไม่ใช้สิทธิ์')}</div><div class="message ${r.CanConfirm?'ok':'bad'}">${esc(r.Message)}</div><div class="confirm-row"><button class="btn btn-soft" onclick="clearScan()">ยกเลิก</button><button class="btn btn-success" ${r.CanConfirm?'':'disabled'} onclick="confirmRecord()">ยืนยันบันทึก</button></div>`}
-async function confirmRecord(){if(!PENDING||!PENDING.CanConfirm)return;const x=await Swal.fire({icon:'question',title:'ยืนยันบันทึก?',html:`<b>${esc(PENDING.FullName)}</b><br>${esc(PENDING.ServiceNameTH)}<br>${esc(thDate(PENDING.EventDate))}`,showCancelButton:true,confirmButtonText:'ยืนยันบันทึก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#1b8f5a'});if(!x.isConfirmed)return;setBusy(true,'กำลังบันทึก');try{const r=await rpc('confirmEventScanner',TOKEN,CID,PENDING.RegID,PENDING.EventDate,PENDING.ServiceCode,$('#scannerPoint').value);$('#checkResult').classList.add('success-flash');$('#checkResult').innerHTML=`<div class="message ok" style="text-align:center"><h2 style="margin:0 0 6px">บันทึกสำเร็จ</h2><b>${esc(r.FullName)}</b><br>${esc(r.ServiceNameTH)}<br>${esc(thDate(r.EventDate))} เวลา ${esc(timeText(r.ConfirmedAt))}</div>`;navigator.vibrate&&navigator.vibrate([120,80,120]);PENDING=null;$('#identifier').value='';await loadRecent()}catch(e){if(!sessionError(e))Swal.fire({icon:'error',title:'บันทึกไม่สำเร็จ',text:e.message})}finally{setBusy(false);setTimeout(()=>$('#checkResult').classList.remove('success-flash'),800)}}
-async function loadRecent(){if(!TOKEN||!SELECTED_SERVICE||!$('#eventDate').value)return;try{setBusy(true, 'กำลังโหลดข้อมูล...');const d=await rpc('getEventScannerRecent',TOKEN,CID,$('#eventDate').value,SELECTED_SERVICE,80);$('#recentCount').textContent=`${d.count||0} รายการ`;$('#recentList').innerHTML=(d.rows||[]).length?(d.rows||[]).map(r=>`<div class="recent-item"><div class="top"><div><b>${esc(r.FullName||r.RegID)}</b><small>${esc(r.RegID)}</small><small>${esc(r.Organization||'')}</small></div><div class="recent-time">${esc(timeText(r.RecordedAt))}</div></div><span class="recent-tag">${esc(r.ServiceNameTH)}</span></div>`).join(''):'<div class="empty-state">ยังไม่มีรายการสำหรับวันและบริการที่เลือก</div>'}catch(e){if(!sessionError(e))$('#recentList').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`}finally{setBusy(false)}}
+async function confirmRecord(){if(!PENDING||!PENDING.CanConfirm)return;const x=await Swal.fire({icon:'question',title:'ยืนยันบันทึก?',html:`<b>${esc(PENDING.FullName)}</b><br>${esc(PENDING.ServiceNameTH)}<br>${esc(thDate(PENDING.EventDate))}`,showCancelButton:true,confirmButtonText:'ยืนยันบันทึก',cancelButtonText:'ยกเลิก',confirmButtonColor:'#1b8f5a'});if(!x.isConfirmed)return;setBusy(true,'กำลังบันทึก');try{const r=await rpc('confirmEventScanner',TOKEN,CID,PENDING.RegID,PENDING.EventDate,PENDING.ServiceCode,$('#scannerPoint').value);$('#checkResult').classList.add('success-flash');$('#checkResult').innerHTML=`<div class="message ok" style="text-align:center"><h2 style="margin:0 0 6px">บันทึกสำเร็จ</h2><b>${esc(r.FullName)}</b><br>${esc(r.ServiceNameTH)}<br>${esc(thDate(r.EventDate))} เวลา ${esc(timeText(r.ConfirmedAt))}<div style="margin-top:8px"><button type="button" class="btn btn-soft" style="padding:4px 10px;font-size:0.75rem" onclick="quickLookupUser('${esc(r.RegID)}')">🔍 ดูประวัติของคนนี้</button></div></div>`;navigator.vibrate&&navigator.vibrate([120,80,120]);addOptimisticRecent(r);addAutoHistoryItem(r);PENDING=null;$('#identifier').value='';await loadRecent()}catch(e){if(!sessionError(e))Swal.fire({icon:'error',title:'บันทึกไม่สำเร็จ',text:e.message})}finally{setBusy(false);setTimeout(()=>$('#checkResult').classList.remove('success-flash'),800)}}
+
+/* History Feed & Search Tabs */
+let CURRENT_HISTORY_FILTER = 'ALL';
+let CURRENT_SEARCH_DATA = null;
+
+function setHistoryFilter(f){
+  CURRENT_HISTORY_FILTER = f;
+  const allBtn = $('#filterAllDayBtn'), srvBtn = $('#filterServiceBtn');
+  if(allBtn) allBtn.classList.toggle('active', f === 'ALL');
+  if(srvBtn) srvBtn.classList.toggle('active', f === 'SERVICE');
+  loadRecent();
+}
+
+function switchRecentTab(tab){
+  const feedView = $('#recentFeedView');
+  const searchView = $('#recentSearchView');
+  const feedBtn = $('#tabFeedBtn');
+  const searchBtn = $('#tabSearchBtn');
+  if(tab === 'search'){
+    if(feedView) feedView.classList.add('hidden');
+    if(searchView) searchView.classList.remove('hidden');
+    if(feedBtn) feedBtn.classList.remove('active');
+    if(searchBtn) searchBtn.classList.add('active');
+    const qInput = $('#userHistoryQuery');
+    if(qInput) qInput.focus();
+  } else {
+    if(searchView) searchView.classList.add('hidden');
+    if(feedView) feedView.classList.remove('hidden');
+    if(searchBtn) searchBtn.classList.remove('active');
+    if(feedBtn) feedBtn.classList.add('active');
+  }
+}
+
+function renderRecentRow(r){
+  const isCheckin = r.ServiceType === 'CHECKIN' || (!r.ServiceType && !/BREAKFAST|LUNCH|AFTERNOON|DINNER/i.test(r.ServiceCode));
+  const typeBadge = isCheckin
+    ? '<span class="badge-checkin">เข้างาน</span>'
+    : '<span class="badge-meal">อาหาร</span>';
+  return `
+    <div class="recent-item" style="cursor:pointer;" onclick="quickLookupUser('${esc(r.RegID)}')" title="คลิกเพื่อดูประวัติของ ${esc(r.FullName||r.RegID)}">
+      <div class="top">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <b>${esc(r.FullName || r.RegID)}</b>
+            ${typeBadge}
+          </div>
+          <small style="color:var(--teal);font-weight:600;font-family:monospace">${esc(r.RegID)}</small>
+          <small style="color:#64748b">${esc(r.Organization || '')}</small>
+        </div>
+        <div class="recent-time">
+          <div>${esc(timeText(r.RecordedAt))}</div>
+          <small style="color:#94a3b8;font-size:0.68rem">${esc(r.ScannerPoint || '')}</small>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <span class="recent-tag" style="background:#f1f5f9;color:var(--navy);font-weight:500">${esc(r.ServiceNameTH || r.ServiceCode)}</span>
+        <button type="button" class="btn btn-soft" style="padding:2px 7px;font-size:0.7rem;" onclick="event.stopPropagation();quickLookupUser('${esc(r.RegID)}')">🔍 ดูประวัติ</button>
+      </div>
+    </div>
+  `;
+}
+
+async function loadRecent(){
+  if(!TOKEN||!$('#eventDate')||!$('#eventDate').value)return;
+  try{
+    const filter = CURRENT_HISTORY_FILTER || 'ALL';
+    let d;
+    if(filter === 'ALL'){
+      d = await rpc('getEventScannerDailyAll', TOKEN, CID, $('#eventDate').value, 150);
+    } else {
+      if(!SELECTED_SERVICE) return;
+      d = await rpc('getEventScannerRecent', TOKEN, CID, $('#eventDate').value, SELECTED_SERVICE, 80);
+    }
+    const countEl = $('#recentCount');
+    if(countEl) countEl.textContent = `${d.count||(d.rows||[]).length||0} รายการ`;
+    const list = $('#recentList');
+    if(!list) return;
+    if(!(d.rows||[]).length){
+      list.innerHTML = `<div class="empty-state">ยังไม่มีรายการ${filter==='ALL'?'สำหรับวันนี้':'สำหรับวันและบริการที่เลือก'}</div>`;
+      return;
+    }
+    list.innerHTML = d.rows.map(r => renderRecentRow(r)).join('');
+  }catch(e){
+    if(!sessionError(e)){
+      const list = $('#recentList');
+      if(list) list.innerHTML = `<div class="empty-state">${esc(e.message)}</div>`;
+    }
+  }
+}
+
+async function quickLookupUser(regId){
+  if(!regId) return;
+  switchRecentTab('search');
+  const qInput = $('#userHistoryQuery');
+  if(qInput) qInput.value = regId;
+  await searchUserHistory(regId);
+}
+
+async function searchUserHistory(customQuery){
+  const q = (typeof customQuery === 'string' ? customQuery : ($('#userHistoryQuery') ? $('#userHistoryQuery').value : '')).trim();
+  if(!q){
+    return Swal.fire({icon:'warning',title:'กรุณาระบุเลขท้าย 3 ตัว หรือ RegID หรือชื่อ'});
+  }
+  const showAll = $('#userHistoryAllDays') ? $('#userHistoryAllDays').checked : false;
+  const eventDate = $('#eventDate') ? $('#eventDate').value : '';
+  const resultEl = $('#userHistoryResult');
+  if(resultEl) resultEl.innerHTML = '<div class="message" style="text-align:center"><span class="spin"></span> กำลังค้นหาข้อมูลประวัติ...</div>';
+  try{
+    const r = await rpc('getEventScannerUserHistory', TOKEN, CID, q, eventDate, showAll);
+    CURRENT_SEARCH_DATA = r;
+    renderUserHistoryResult(r);
+  }catch(e){
+    CURRENT_SEARCH_DATA = null;
+    if(resultEl){
+      resultEl.innerHTML = `<div class="message bad" style="text-align:center;padding:16px;"><b>ค้นหาไม่พบ</b><br><span style="font-size:0.85rem">${esc(e.message||String(e))}</span></div>`;
+    }
+  }
+}
+
+function clearUserHistorySearch(){
+  const qInput = $('#userHistoryQuery');
+  if(qInput) qInput.value = '';
+  CURRENT_SEARCH_DATA = null;
+  const resultEl = $('#userHistoryResult');
+  if(resultEl){
+    resultEl.innerHTML = '<div class="empty-state" style="padding:24px">กรอกเลขท้าย 3 ตัว หรือ RegID เพื่อค้นหาประวัติการเข้างานและรับอาหาร</div>';
+  }
+}
+
+function renderUserHistoryResult(r){
+  const resultEl = $('#userHistoryResult');
+  if(!resultEl) return;
+
+  // Multiple match selector
+  let multiHtml = '';
+  if(r.matchedList && r.matchedList.length > 1){
+    multiHtml = `
+      <div style="margin-bottom:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px">
+        <div style="font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:6px">พบรหัสที่ตรงกัน ${r.matchedCount} คน (คลิกเลือกดู):</div>
+        <div class="match-chips">
+          ${r.matchedList.map(m => `
+            <button type="button" class="match-chip ${m.regId === r.regId ? 'active' : ''}" onclick="searchUserHistory('${esc(m.regId)}')">
+              <b>${esc(m.regId)}</b> ${esc(m.fullName)}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Food type badge
+  const food = r.foodType || 'ไม่ระบุ';
+  let foodBadgeClass = 'badge-food';
+  let foodIcon = '🍲';
+  if(/ฮาลาล|HALAL/i.test(food)) { foodIcon = '🕌'; }
+  else if(/มังสวิรัติ|เจ|VEGETARIAN|VEGAN/i.test(food)) { foodIcon = '🥗'; }
+
+  // Participant Profile Card
+  const profileCard = `
+    <div class="participant-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <span style="display:inline-block;background:#0c385b;color:#fff;font-family:monospace;font-weight:700;font-size:0.85rem;padding:3px 9px;border-radius:6px;margin-bottom:4px">${esc(r.regId)}</span>
+          <h3 style="margin:2px 0 4px;font-size:1.1rem;color:var(--ink)">${esc(r.fullName)}</h3>
+          <div style="font-size:0.82rem;color:#64748b">${esc(r.organization || '-')}</div>
+        </div>
+        <button type="button" class="btn btn-outline" style="padding:5px 9px;font-size:0.75rem;white-space:nowrap" onclick="applyUserToScanner('${esc(r.regId)}')">🎯 ยิงสิทธิ์รหัสนี้</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+        <span class="${foodBadgeClass}" style="display:inline-flex;align-items:center;gap:4px">
+          ${foodIcon} <b>อาหาร:</b> ${esc(food)}
+        </span>
+        ${r.participantType ? `<span class="badge" style="background:#e2e8f0;color:#334155;border-radius:6px;padding:3px 8px;font-size:0.74rem;font-weight:600">${esc(r.participantType)}</span>` : ''}
+        <span class="badge-ok" style="padding:3px 8px;font-size:0.74rem">ประวัติรวม ${r.totalCount} รายการ</span>
+      </div>
+    </div>
+  `;
+
+  // Logs Timeline
+  let logsHtml = '';
+  if(!r.logs || !r.logs.length){
+    logsHtml = `
+      <div class="empty-state" style="padding:18px;border:1px dashed #cbd5e1;border-radius:10px;font-size:0.84rem">
+        ยังไม่มีประวัติการเช็คอินหรือรับอาหาร${r.isAllDays ? '' : 'ในวันที่เลือก'}
+        ${!r.isAllDays ? '<br><a href="#" onclick="$(\'#userHistoryAllDays\').checked=true;searchUserHistory(\'' + esc(r.regId) + '\');return false;" style="color:var(--teal);font-weight:600;text-decoration:underline">คลิกเพื่อดูทุกวันของงาน</a>' : ''}
+      </div>
+    `;
+  } else {
+    logsHtml = `
+      <div style="margin-top:10px">
+        <div style="font-size:0.82rem;font-weight:600;color:var(--navy);margin-bottom:8px">ประวัติการสแกน (${r.isAllDays ? 'ทุกวัน' : 'วันที่ ' + esc(thDate(r.filterDay))}):</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${r.logs.map(log => {
+            const isCheckin = log.type === 'CHECKIN';
+            const typeBadge = isCheckin
+              ? '<span class="badge-checkin">เข้างาน</span>'
+              : '<span class="badge-meal">อาหาร</span>';
+            return `
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.03)">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    ${typeBadge}
+                    <b style="font-size:0.88rem;color:var(--navy)">${esc(log.serviceName || log.service)}</b>
+                  </div>
+                  <span style="font-size:0.75rem;font-weight:600;color:#b42318">${esc(timeText(log.timestamp))}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:0.76rem;color:#64748b">
+                  <span>จุดสแกน: ${esc(log.point || '-')}</span>
+                  <span>วันงาน: ${esc(thDate(log.date))}</span>
+                  <span style="color:#15803d;font-weight:600">✓ ${esc(log.status)}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  resultEl.innerHTML = multiHtml + profileCard + logsHtml;
+}
+
+function applyUserToScanner(regId){
+  $('#identifier').value = regId;
+  const isFast = $('#fastScanMode') ? $('#fastScanMode').checked : true;
+  if(isFast){
+    executeFastScan(regId);
+  } else {
+    inspectRegistration();
+  }
+}
+
 $('#identifier').addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     e.preventDefault();
@@ -340,6 +740,26 @@ $('#identifier').addEventListener('keydown',e=>{
     }
   }
 });
+
+const histQ = document.getElementById('userHistoryQuery');
+if(histQ){
+  histQ.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      searchUserHistory();
+    }
+  });
+}
+
+const histAllDays = document.getElementById('userHistoryAllDays');
+if(histAllDays){
+  histAllDays.addEventListener('change', () => {
+    if(CURRENT_SEARCH_DATA && CURRENT_SEARCH_DATA.regId){
+      searchUserHistory(CURRENT_SEARCH_DATA.regId);
+    }
+  });
+}
+
 autoBoot();
 </script>
 <div class="loading" id="loading"><div class="loading-box"><span class="spin"></span><b id="loadText">กำลังประมวลผล</b></div></div>

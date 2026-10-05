@@ -5777,6 +5777,127 @@ function getEventScannerRecent(token,conferenceId,eventDate,serviceCode,limit){
     return serialize_({count:rows.length,rows:rows.slice(0,max)});
   });
 }
+function getEventScannerUserHistory(token,conferenceId,query,filterDay,showAllDays){
+  return runSafely_('getEventScannerUserHistory',function(){
+    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FOOD_STAFF'],conferenceId);
+    const q=clean_(query);
+    if(!q)throw new Error('กรุณาระบุรหัสลงทะเบียน หรือเลขท้าย 3 ตัว');
+    let matchedRegs=[];
+    const allRegs=findMany_('Registrations',{ConferenceID:conferenceId});
+    if(/^\d{1,6}$/.test(q)){
+      const pad=q.padStart(6,'0');
+      const exactId='REG-2026-'+pad;
+      matchedRegs=allRegs.filter(function(r){
+        return upper_(r.RegID)===upper_(exactId) || (q.length>=3 && String(r.RegID||'').endsWith(q));
+      });
+    }else if(/^REG-[A-Z0-9-]+$/i.test(q)){
+      matchedRegs=allRegs.filter(function(r){return upper_(r.RegID)===upper_(q);});
+    }else{
+      matchedRegs=allRegs.filter(function(r){
+        return String(r.RegID||'').toLowerCase().indexOf(q.toLowerCase())>=0 ||
+               String(r.FullName||'').toLowerCase().indexOf(q.toLowerCase())>=0;
+      });
+    }
+    if(!matchedRegs.length)throw new Error('ไม่พบข้อมูลผู้ลงทะเบียนตามรหัส "'+q+'"');
+    const reg=matchedRegs[0];
+    const regId=reg.RegID;
+    const isAllDays = showAllDays===true || showAllDays==='true' || showAllDays==='1';
+    const targetDate=filterDay ? scannerDateKey_(filterDay) : '';
+    const logs=[];
+    findMany_('AttendanceCheckIns',{ConferenceID:conferenceId,RegID:regId}).forEach(function(x){
+      const d=scannerDateKey_(x.EventDate);
+      if(isAllDays || !targetDate || d===targetDate){
+        logs.push({type:'CHECKIN',timestamp:x.CheckInAt,status:x.Status,point:x.CheckInPoint,service:x.CheckInSession||x.Note,by:x.CheckedBy,date:d});
+      }
+    });
+    findMany_('MealScans',{ConferenceID:conferenceId,RegID:regId}).forEach(function(x){
+      const d=scannerDateKey_(x.EventDate);
+      if(isAllDays || !targetDate || d===targetDate){
+        logs.push({type:'MEAL',timestamp:x.ScanAt,status:x.Result,point:x.ScannerPoint,service:x.MealCode,by:x.ScannerUserID,date:d});
+      }
+    });
+    logs.sort(function(a,b){return new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime();});
+    const services = scannerServiceDefinitions_(conferenceId);
+    logs.forEach(function(log){
+      const def = services.find(function(s){return s.code===log.service});
+      if(def) log.serviceName = def.nameTH;
+      else log.serviceName = log.service;
+    });
+    return serialize_({
+      regId:regId,
+      fullName:reg.FullName||[reg.Prefix,reg.FirstName,reg.LastName].filter(Boolean).join(' '),
+      organization:reg.Institution||reg.OrganizationUnit||reg.OrganizationGroup||'',
+      phone:reg.Phone||'',
+      participantType:reg.ParticipantType||'',
+      foodType:reg.FoodType||'',
+      isAllDays:isAllDays,
+      filterDay:targetDate,
+      logs:logs,
+      totalCount:logs.length,
+      matchedCount:matchedRegs.length,
+      matchedList:matchedRegs.slice(0,10).map(function(m){
+        return {regId:m.RegID,fullName:m.FullName||[m.Prefix,m.FirstName,m.LastName].filter(Boolean).join(' '),org:m.Institution||m.OrganizationUnit||''};
+      })
+    });
+  });
+}
+function getEventScannerDailyAll(token,conferenceId,eventDate,limit){
+  return runSafely_('getEventScannerDailyAll',function(){
+    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FOOD_STAFF'],conferenceId);
+    const date=scannerDateKey_(eventDate);
+    const max=Math.min(Math.max(num_(limit,100),1),300);
+    const regs={};
+    findMany_('Registrations',{ConferenceID:conferenceId}).forEach(function(r){regs[r.RegID]=r;});
+    const services = scannerServiceDefinitions_(conferenceId);
+    const serviceMap = {};
+    services.forEach(function(s){ serviceMap[s.code] = s.nameTH; });
+    const allRows=[];
+    findMany_('AttendanceCheckIns',{ConferenceID:conferenceId}).filter(function(x){
+      return (!date || scannerDateKey_(x.EventDate)===date) && upper_(x.Status)==='SUCCESS';
+    }).forEach(function(x){
+      const r=regs[x.RegID]||{};
+      const code=x.CheckInSession||x.Note;
+      allRows.push({
+        RecordID:x.CheckInID,
+        RegID:x.RegID,
+        FullName:r.FullName||'',
+        Organization:r.Institution||r.OrganizationUnit||'',
+        ParticipantType:r.ParticipantType||'',
+        ServiceType:'CHECKIN',
+        ServiceCode:code,
+        ServiceNameTH:serviceMap[code] || code,
+        EventDate:scannerDateKey_(x.EventDate),
+        RecordedAt:x.CheckInAt,
+        RecordedBy:x.CheckedBy,
+        ScannerPoint:x.CheckInPoint,
+        Result:x.Status
+      });
+    });
+    findMany_('MealScans',{ConferenceID:conferenceId}).filter(function(x){
+      return (!date || scannerDateKey_(x.EventDate)===date) && upper_(x.Result)==='SUCCESS';
+    }).forEach(function(x){
+      const r=regs[x.RegID]||{};
+      const code=x.MealCode;
+      allRows.push({
+        RecordID:x.ScanID,
+        RegID:x.RegID,
+        FullName:r.FullName||'',
+        Organization:r.Institution||r.OrganizationUnit||'',
+        ParticipantType:r.ParticipantType||'',
+        ServiceType:'MEAL',
+        ServiceCode:code,
+        ServiceNameTH:serviceMap[code] || code,
+        EventDate:scannerDateKey_(x.EventDate),
+        RecordedAt:x.ScanAt,
+        RecordedBy:x.ScannerUserID,
+        ScannerPoint:x.ScannerPoint,
+        Result:x.Result
+      });
+    });
+    allRows.sort(function(a,b){return new Date(b.RecordedAt).getTime()-new Date(a.RecordedAt).getTime();});
+    return serialize_({count:allRows.length,rows:allRows.slice(0,max)});
+  });
+}
 function upgradeTuhEventScannerV18(){
   return runSafely_('upgradeTuhEventScannerV18',function(){
     const added=ensureSheetColumns_('AttendanceCheckIns',['CheckInSession','CheckInSessionName']);
@@ -7892,6 +8013,8 @@ const API_ACTIONS = Object.freeze({
   getAdminSettings: getAdminSettings,
   getEventScannerBootstrap: getEventScannerBootstrap,
   getEventScannerRecent: getEventScannerRecent,
+  getEventScannerUserHistory: getEventScannerUserHistory,
+  getEventScannerDailyAll: getEventScannerDailyAll,
   getMealPass: getMealPass,
   getPublicBootstrap: getPublicBootstrap,
   inspectEventScanner: inspectEventScanner,
@@ -7942,7 +8065,7 @@ const API_PERMISSION_MAP = Object.freeze({
   REVIEWER: Object.freeze(['reviewerBootstrap','reviewerGetAssignment','reviewerSaveReview']),
   SCANNER: Object.freeze([
     'getEventScannerBootstrap','inspectEventScanner','confirmEventScanner',
-    'getEventScannerRecent'
+    'getEventScannerRecent','getEventScannerUserHistory','getEventScannerDailyAll'
   ])
 });
 

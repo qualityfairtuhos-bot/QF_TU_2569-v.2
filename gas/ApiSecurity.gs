@@ -8,7 +8,7 @@ const API_PERMISSION_MAP = Object.freeze({
   REVIEWER: Object.freeze(['reviewerBootstrap','reviewerGetAssignment','reviewerSaveReview']),
   SCANNER: Object.freeze([
     'getEventScannerBootstrap','inspectEventScanner','confirmEventScanner',
-    'getEventScannerRecent'
+    'getEventScannerRecent','getEventScannerUserHistory','getEventScannerDailyAll'
   ])
 });
 
