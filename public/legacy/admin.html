@@ -79,6 +79,40 @@
         <div class="card" style="margin-bottom:0;"><canvas id="chartWorksByCategoryCanvas" style="max-height:280px; width:100%;"></canvas></div>
         <div class="card" style="margin-bottom:0;"><canvas id="chartWorksByStatusCanvas" style="max-height:280px; width:100%;"></canvas></div>
       </div>
+
+      <!-- ส่วนแสดงรายชื่อเจาะลึกเมื่อคลิกที่แท่งกราฟ (Chart Drilldown Detail) -->
+      <div id="dashChartDrilldown" class="card" style="display:none; margin-top:20px; border:2px solid var(--teal); background:#ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.08); transition:all 0.3s ease;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--teal); display:flex; align-items:center; gap:8px;">
+              <i class="fa-solid fa-table-list"></i>
+              <span id="drilldownTitle">รายชื่อผู้ลงทะเบียน / ผลงาน</span>
+              <span id="drilldownCountBadge" class="badge" style="background:#006D70; color:#fff; font-size:0.85rem; padding:3px 10px; border-radius:12px;">0 รายการ</span>
+            </h3>
+            <p id="drilldownSub" style="margin:4px 0 0; font-size:0.85rem; color:#64748b;">คลิกแท่งกราฟเพื่อดูรายชื่อที่เกี่ยวข้อง</p>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="position:relative;">
+              <input type="text" id="drilldownSearch" placeholder="🔍 ค้นหาในตารางนี้..." style="padding:6px 10px 6px 12px; font-size:0.85rem; border:1px solid #cbd5e1; border-radius:6px; width:190px;">
+            </div>
+            <button class="btn btn-sm btn-soft" id="drilldownExportBtn" onclick="exportDrilldownData()" title="คัดลอกรายชื่อทั้งหมดไปวางใน Excel"><i class="fa-solid fa-copy"></i> คัดลอกรายชื่อ (Excel)</button>
+            <button class="btn btn-sm" style="background:#f1f5f9; color:#475569;" onclick="closeDrilldown()" title="ปิดตาราง"><i class="fa-solid fa-xmark"></i> ปิด</button>
+          </div>
+        </div>
+
+        <!-- กล่องแจ้งเตือนพิเศษเมื่อเป็นกลุ่ม 'ไม่ระบุ' -->
+        <div id="drilldownNoticeUnspecified" style="display:none; background:#fffbeb; border-left:4px solid #f59e0b; padding:10px 14px; border-radius:4px; margin-bottom:12px; font-size:0.85rem; color:#92400e;">
+          <i class="fa-solid fa-circle-info" style="color:#d97706; margin-right:6px;"></i>
+          <b>คำแนะนำสำหรับรายการที่ไม่ระบุ:</b> สามารถดูรหัส <b>RegID</b> หรือ <b>ชื่อ-นามสกุล</b> ในตารางด้านล่าง เพื่อนำไปค้นหาใน Google Sheet และตรวจสอบ/แก้ไขช่อง <b>ParticipantType (ประเภท)</b> ได้ทันทีค่ะ (เมื่อแก้ไขใน Google Sheet แล้ว ให้กดปุ่ม <b>"รีเฟรชข้อมูล"</b> บนเมนูด้านบน ข้อมูลจะอัปเดตทันที)
+        </div>
+
+        <div style="overflow-x:auto; max-height:480px;">
+          <table class="table table-bordered table-hover" style="margin:0; width:100%; font-size:0.85rem;">
+            <thead id="drilldownTableHead" style="position:sticky; top:0; background:#f8fafc; z-index:2; border-bottom:2px solid #cbd5e1;"></thead>
+            <tbody id="drilldownTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <section class="page" id="page-settings">
@@ -512,7 +546,309 @@ async function refreshPage(){
 }async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
 let chartRegByType, chartWorksIntent, chartWorksByStatus, chartWorksByCategory, chartDailyQuota;
 if (window.ChartDataLabels) Chart.register(ChartDataLabels);
+
+let CURRENT_DRILLDOWN_CONFIG = null;
+let CURRENT_DRILLDOWN_ITEMS = [];
+
+function closeDrilldown(){
+  const card = $('#dashChartDrilldown');
+  if(card) card.style.display = 'none';
+  CURRENT_DRILLDOWN_CONFIG = null;
+  CURRENT_DRILLDOWN_ITEMS = [];
+}
+
+async function ensureDashItems(){
+  if(window.DASH_ITEMS_REG && window.DASH_ITEMS_REG.length) return;
+  try {
+    show('กำลังโหลดข้อมูลรายชื่อสำหรับแสดงผล...');
+    const [regs, works] = await Promise.all([
+      rpc('adminListRegistrations', TOKEN, CID, {}),
+      rpc('adminListWorks', TOKEN, CID, {})
+    ]);
+    const typeMap = {};
+    (regs || []).forEach(r => {
+      typeMap[r.RegID] = r.ParticipantType || 'ไม่ระบุ';
+      if(r.RegID) typeMap[String(r.RegID).trim()] = r.ParticipantType || 'ไม่ระบุ';
+    });
+    window.DASH_ITEMS_REG = (regs || []).map(r => ({
+      RegID: r.RegID || '',
+      FullName: r.FullName || ((r.Prefix || '') + (r.FirstName || '') + ' ' + (r.LastName || '')).trim() || 'ไม่ระบุชื่อ',
+      ParticipantType: r.ParticipantType || '',
+      Organization: [r.OrganizationGroup, r.Institution || r.OrganizationUnit].filter(Boolean).join(' / ') || '-',
+      Day1: !!(r.AttendanceDay1 && r.AttendanceDay1 !== 'FALSE'),
+      Day2: !!(r.AttendanceDay2 && r.AttendanceDay2 !== 'FALSE'),
+      Day3: !!(r.AttendanceDay3 && r.AttendanceDay3 !== 'FALSE'),
+      WantsSubmitWork: !!(r.WantsSubmitWork && r.WantsSubmitWork !== 'FALSE'),
+      PaymentStatus: r.PaymentStatus || '',
+      RegistrationStatus: r.RegistrationStatus || ''
+    }));
+    window.DASH_ITEMS_WORKS = (works || []).map(w => {
+      const wReg = String(w.RegID || '').trim();
+      const pt = typeMap[wReg] || typeMap[w.RegID] || 'ไม่ระบุ';
+      return {
+        WorkID: w.WorkID || '',
+        RegID: w.RegID || '',
+        Title: w.TitleTH || w.TitleEN || w.Title || w.WorkTitle || 'ไม่ระบุชื่อผลงาน',
+        Category: formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.CategoryID) || 'ไม่ระบุ',
+        ParticipantType: pt,
+        Status: w.Status || ''
+      };
+    });
+  } catch(e) {
+    console.warn('ensureDashItems error:', e);
+  } finally {
+    hide();
+  }
+}
+
+function showDrilldown(cfg){
+  CURRENT_DRILLDOWN_CONFIG = cfg;
+  CURRENT_DRILLDOWN_ITEMS = cfg.items || [];
+  const card = $('#dashChartDrilldown');
+  if(!card) return;
+  card.style.display = 'block';
+  $('#drilldownTitle').textContent = cfg.title;
+  $('#drilldownCountBadge').textContent = `${CURRENT_DRILLDOWN_ITEMS.length} รายการ`;
+  $('#drilldownSub').textContent = cfg.sub || '';
+  
+  const notice = $('#drilldownNoticeUnspecified');
+  if(notice) {
+    notice.style.display = cfg.isUnspecified ? 'block' : 'none';
+  }
+  
+  if($('#drilldownSearch')) {
+    $('#drilldownSearch').value = '';
+    $('#drilldownSearch').oninput = (e) => {
+      const q = (e.target.value || '').trim().toLowerCase();
+      if(!CURRENT_DRILLDOWN_CONFIG) return;
+      const all = CURRENT_DRILLDOWN_CONFIG.items || [];
+      if(!q){
+        renderDrilldownTableRows(all, CURRENT_DRILLDOWN_CONFIG.type);
+        $('#drilldownCountBadge').textContent = `${all.length} รายการ`;
+        return;
+      }
+      const filtered = all.filter(item => {
+        return Object.values(item).some(v => String(v || '').toLowerCase().includes(q));
+      });
+      renderDrilldownTableRows(filtered, CURRENT_DRILLDOWN_CONFIG.type);
+      $('#drilldownCountBadge').textContent = `${filtered.length}/${all.length} รายการ`;
+    };
+  }
+  renderDrilldownTableRows(CURRENT_DRILLDOWN_ITEMS, cfg.type);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderDrilldownTableRows(items, type){
+  const thead = $('#drilldownTableHead');
+  const tbody = $('#drilldownTableBody');
+  if(!thead || !tbody) return;
+
+  if (type === 'regs') {
+    thead.innerHTML = `
+      <tr>
+        <th style="width:45px; text-align:center;">#</th>
+        <th style="width:120px;">รหัส RegID</th>
+        <th>ชื่อ-นามสกุล</th>
+        <th>ประเภทบุคลากร (ParticipantType)</th>
+        <th>สังกัด / หน่วยงาน</th>
+        <th style="text-align:center;">วันเข้าร่วม</th>
+        <th style="text-align:center;">สถานะชำระเงิน</th>
+        <th style="width:100px; text-align:center;">จัดการ</th>
+      </tr>
+    `;
+    if(!items.length){
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#94a3b8;">ไม่พบรายชื่อในกลุ่มนี้</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = items.map((r, idx) => {
+      const isUnspec = normalizePersonnelGroup(r.ParticipantType) === 'ไม่ระบุ';
+      const typeBadge = isUnspec
+        ? `<span class="badge" style="background:#fee2e2; color:#b91c1c; font-weight:700; padding:4px 8px; border-radius:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ไม่ระบุ (ในชีต: "${esc(r.ParticipantType || 'เว้นว่าง')}")</span>`
+        : `<span class="badge" style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px;">${esc(r.ParticipantType)}</span>`;
+      const days = [
+        r.Day1 && '<span class="badge" style="background:#f0fdf4; color:#166534; font-size:0.75rem;">Day 1</span>',
+        r.Day2 && '<span class="badge" style="background:#f0fdf4; color:#166534; font-size:0.75rem;">Day 2</span>',
+        r.Day3 && '<span class="badge" style="background:#f0fdf4; color:#166534; font-size:0.75rem;">Day 3</span>'
+      ].filter(Boolean).join(' ') || '<span style="color:#94a3b8;">-</span>';
+      const statusBadge = r.PaymentStatus === 'APPROVED' 
+        ? '<span class="badge" style="background:#dcfce7; color:#15803d;">ชำระแล้ว</span>' 
+        : (r.PaymentStatus ? `<span class="badge" style="background:#fef9c3; color:#a16207;">${esc(r.PaymentStatus)}</span>` : '<span class="badge" style="background:#f1f5f9; color:#475569;">ปกติ</span>');
+
+      return `
+        <tr style="${isUnspec ? 'background:#fffdfa;' : ''}">
+          <td style="text-align:center; color:#64748b; font-weight:600;">${idx + 1}</td>
+          <td><b style="color:var(--teal);">${esc(r.RegID)}</b></td>
+          <td><b>${esc(r.FullName)}</b></td>
+          <td>${typeBadge}</td>
+          <td>${esc(r.Organization || r.Org || '-')}</td>
+          <td style="text-align:center;">${days}</td>
+          <td style="text-align:center;">${statusBadge}</td>
+          <td style="text-align:center;">
+            <button class="btn btn-sm btn-primary" onclick="viewRegistration('${esc(r.RegID)}')" style="padding:4px 8px; font-size:0.8rem;" title="ดูข้อมูลผู้สมัคร"><i class="fa-solid fa-eye"></i> ดูข้อมูล</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    thead.innerHTML = `
+      <tr>
+        <th style="width:45px; text-align:center;">#</th>
+        <th style="width:120px;">รหัสผลงาน</th>
+        <th style="width:120px;">รหัส RegID</th>
+        <th>ชื่อผลงาน (Title)</th>
+        <th>หมวดหมู่ผลงาน (Category)</th>
+        <th>ประเภทบุคลากรผู้ส่ง</th>
+        <th style="text-align:center;">สถานะผลงาน</th>
+        <th style="width:100px; text-align:center;">จัดการ</th>
+      </tr>
+    `;
+    if(!items.length){
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#94a3b8;">ไม่พบผลงานในกลุ่มนี้</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = items.map((w, idx) => {
+      const isUnspec = normalizePersonnelGroup(w.ParticipantType) === 'ไม่ระบุ';
+      const typeBadge = isUnspec
+        ? `<span class="badge" style="background:#fee2e2; color:#b91c1c; font-weight:700; padding:4px 8px; border-radius:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ไม่ระบุ (RegID: ${esc(w.RegID || 'ว่าง')})</span>`
+        : `<span class="badge" style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px;">${esc(w.ParticipantType)}</span>`;
+
+      return `
+        <tr style="${isUnspec ? 'background:#fffdfa;' : ''}">
+          <td style="text-align:center; color:#64748b; font-weight:600;">${idx + 1}</td>
+          <td><b style="color:var(--teal);">${esc(w.WorkID)}</b></td>
+          <td><b>${esc(w.RegID || '-')}</b></td>
+          <td><b>${esc(w.Title)}</b></td>
+          <td><span class="badge" style="background:#f3e8ff; color:#6b21a8; padding:3px 8px; border-radius:4px;">${esc(w.Category)}</span></td>
+          <td>${typeBadge}</td>
+          <td style="text-align:center;"><span class="badge" style="background:#f1f5f9; color:#334155;">${esc(w.Status || '-')}</span></td>
+          <td style="text-align:center;">
+            ${w.RegID ? `<button class="btn btn-sm btn-primary" onclick="viewRegistration('${esc(w.RegID)}')" style="padding:4px 8px; font-size:0.8rem;" title="ดูข้อมูลผู้ส่งผลงาน"><i class="fa-solid fa-user"></i> ดูผู้สมัคร</button>` : '-'}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+}
+
+function exportDrilldownData(){
+  if(!CURRENT_DRILLDOWN_CONFIG || !CURRENT_DRILLDOWN_CONFIG.items || !CURRENT_DRILLDOWN_CONFIG.items.length){
+    toast('ไม่มีข้อมูลสำหรับคัดลอก');
+    return;
+  }
+  const isReg = CURRENT_DRILLDOWN_CONFIG.type === 'regs';
+  const headers = isReg 
+    ? ['ลำดับ', 'RegID', 'ชื่อ-นามสกุล', 'ประเภทบุคลากร', 'สังกัด/หน่วยงาน', 'Day1', 'Day2', 'Day3', 'สถานะการชำระเงิน']
+    : ['ลำดับ', 'WorkID', 'RegID', 'ชื่อผลงาน', 'หมวดหมู่', 'ประเภทบุคลากรผู้ส่ง', 'สถานะผลงาน'];
+  
+  const rows = CURRENT_DRILLDOWN_CONFIG.items.map((item, idx) => {
+    if(isReg){
+      return [
+        idx + 1,
+        item.RegID || '',
+        item.FullName || '',
+        item.ParticipantType || '',
+        item.Organization || item.Org || '',
+        item.Day1 ? 'ใช่' : 'ไม่',
+        item.Day2 ? 'ใช่' : 'ไม่',
+        item.Day3 ? 'ใช่' : 'ไม่',
+        item.PaymentStatus || ''
+      ];
+    } else {
+      return [
+        idx + 1,
+        item.WorkID || '',
+        item.RegID || '',
+        item.Title || '',
+        item.Category || '',
+        item.ParticipantType || '',
+        item.Status || ''
+      ];
+    }
+  });
+
+  const tsv = [headers.join('\t'), ...rows.map(r => r.map(x => String(x).replace(/[\t\n\r]/g, ' ')).join('\t'))].join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(tsv).then(() => {
+      toast(`คัดลอกรายชื่อ ${rows.length} รายการเรียบร้อยแล้ว (สามารถกด Ctrl+V ใน Excel ได้ทันที)`);
+    }).catch(() => {
+      prompt('คัดลอกข้อมูลด้านล่างนี้ได้เลยค่ะ:', tsv);
+    });
+  } else {
+    prompt('คัดลอกข้อมูลด้านล่างนี้ได้เลยค่ะ:', tsv);
+  }
+}
+
+async function handleChartDrilldown(chartKey, index, datasetIndex, label, datasetLabel){
+  await ensureDashItems();
+  const regs = window.DASH_ITEMS_REG || [];
+  const works = window.DASH_ITEMS_WORKS || [];
+
+  if (chartKey === 'dailyQuota') {
+    const dayField = index === 0 ? 'Day1' : (index === 1 ? 'Day2' : 'Day3');
+    const targetGroup = datasetIndex === 0 ? 'บุคลากรภายใน (INTERNAL)' : 'บุคคลภายนอก (EXTERNAL)';
+    const filtered = regs.filter(r => !!r[dayField] && normalizePersonnelGroup(r.ParticipantType) === targetGroup);
+    showDrilldown({
+      title: `ผู้ลงทะเบียน ${label} - ${datasetIndex === 0 ? 'บุคลากรภายใน' : 'บุคคลภายนอก'}`,
+      sub: `รายชื่อผู้ลงทะเบียนที่เลือกเข้าร่วมประชุมใน ${label} กลุ่ม${datasetIndex === 0 ? 'บุคลากรภายใน' : 'บุคคลภายนอก'} (${filtered.length} คน)`,
+      type: 'regs',
+      items: filtered,
+      isUnspecified: false
+    });
+  } else if (chartKey === 'regByType') {
+    const filtered = regs.filter(r => normalizePersonnelGroup(r.ParticipantType) === label);
+    showDrilldown({
+      title: `ผู้สมัคร: ${label}`,
+      sub: `รายชื่อผู้ลงทะเบียนในกลุ่ม "${label}" (${filtered.length} คน)`,
+      type: 'regs',
+      items: filtered,
+      isUnspecified: label === 'ไม่ระบุ'
+    });
+  } else if (chartKey === 'worksIntent') {
+    if (datasetIndex === 0) {
+      const filtered = regs.filter(r => normalizePersonnelGroup(r.ParticipantType) === label && !!r.WantsSubmitWork);
+      showDrilldown({
+        title: `แจ้งส่งผลงาน: ${label}`,
+        sub: `รายชื่อผู้สมัครกลุ่ม "${label}" ที่ระบุความประสงค์แจ้งส่งผลงาน (${filtered.length} คน)`,
+        type: 'regs',
+        items: filtered,
+        isUnspecified: label === 'ไม่ระบุ'
+      });
+    } else {
+      const filtered = works.filter(w => normalizePersonnelGroup(w.ParticipantType) === label);
+      showDrilldown({
+        title: `ส่งผลงานจริง: ${label}`,
+        sub: `รายการผลงานวิชาการที่ส่งจริงในกลุ่ม "${label}" (${filtered.length} ผลงาน)`,
+        type: 'works',
+        items: filtered,
+        isUnspecified: label === 'ไม่ระบุ'
+      });
+    }
+  } else if (chartKey === 'worksByCategory') {
+    const filtered = works.filter(w => (formatWorkCategory(w.Category) || 'ไม่ระบุประเภท') === label || w.Category === label);
+    showDrilldown({
+      title: `หมวดหมู่ผลงาน: ${label}`,
+      sub: `รายการผลงานวิชาการในหมวดหมู่ "${label}" (${filtered.length} ผลงาน)`,
+      type: 'works',
+      items: filtered,
+      isUnspecified: label.includes('ไม่ระบุ')
+    });
+  } else if (chartKey === 'worksByStatus') {
+    const filtered = works.filter(w => normalizePersonnelGroup(w.ParticipantType) === label || w.ParticipantType === label);
+    showDrilldown({
+      title: `ผลงานแยกตามประเภทบุคลากร: ${label}`,
+      sub: `รายการผลงานวิชาการที่ส่งโดยผู้สมัครกลุ่ม "${label}" (${filtered.length} ผลงาน)`,
+      type: 'works',
+      items: filtered,
+      isUnspecified: label === 'ไม่ระบุ'
+    });
+  }
+}
+
 function renderDashboardUi(d, filterType){
+  if (d.itemsReg) window.DASH_ITEMS_REG = d.itemsReg;
+  if (d.itemsWorks) window.DASH_ITEMS_WORKS = d.itemsWorks;
+  window.CURRENT_DASH_DATA = d;
+
   if ($('#dashFilterType') && $('#dashFilterType').options.length <= 1) {
     const opts = ['<option value="">ทุกประเภทบุคลากร</option>'];
     (d.participantTypes||[]).forEach(t => opts.push(`<option value="${esc(t)}">${esc(t)}</option>`));
@@ -520,7 +856,13 @@ function renderDashboardUi(d, filterType){
     $('#dashFilterType').value = filterType;
   }
   $('#kpis').innerHTML=[['ผู้ลงทะเบียน',d.totalRegistrations||0,'fa-users','#E3F2FD','#1565C0'],['ข้อมูลไม่ครบ',d.incompleteCount||0,'fa-user-xmark','#FFEBEE','#C62828'],['ชำระผ่าน',d.paidCount||0,'fa-circle-check','#E8F5E9','#2E7D32'],['รายรับ',Number(d.totalRevenue||0).toLocaleString('th-TH')+' บาท','fa-sack-dollar','#FFF8E1','#F57F17'],['ผลงาน',d.totalWorks||0,'fa-file-lines','#F3E5F5','#4A148C'],['อยู่ระหว่างประเมิน',d.underReviewCount||0,'fa-spinner','#FFF3E0','#E65100'],['ประเมินเสร็จ',d.completedReviews||0,'fa-check-double','#E0F7FA','#006064'],['ใช้สิทธิ์อาหาร',d.mealRedeemedCount||0,'fa-utensils','#FCE4EC','#AD1457']].map(x=>`<div class="kpi" style="background:${x[3]};border-color:${x[3]}"><div class="kpi-icon" style="color:${x[4]};background:rgba(255,255,255,0.7)"><i class="fa-solid ${x[2]}"></i></div><div class="kpi-content"><span>${x[0]}</span><b style="color:${x[4]}">${x[1]}</b></div></div>`).join('');
-  const commonOptions = { responsive: true, plugins: { datalabels: { anchor: 'end', align: 'end', font: { weight: 'bold' }, formatter: (value) => value > 0 ? value : '' } }, onClick: (e, elements, chart) => { if(elements.length > 0) { const index = elements[0].index; const label = chart.data.labels[index]; if ($('#dashFilterType')) { $('#dashFilterType').value = label; loadDashboard(); } } } };
+  const commonOptions = { 
+    responsive: true, 
+    onHover: (e, activeEls, chart) => { chart.canvas.style.cursor = activeEls.length ? 'pointer' : 'default'; },
+    plugins: { 
+      datalabels: { anchor: 'end', align: 'end', font: { weight: 'bold' }, formatter: (value) => value > 0 ? value : '' } 
+    }
+  };
   if(d.dailyQuota) {
     const internal = d.dailyQuota.internal || { max: 400, day1: 0, day2: 0, day3: 0 };
     const external = d.dailyQuota.external || { max: 200, day1: 0, day2: 0, day3: 0 };
@@ -559,6 +901,16 @@ function renderDashboardUi(d, filterType){
         },
         options: {
           ...commonOptions,
+          onClick: async (e, elements, chart) => {
+            if(elements.length > 0) {
+              const el = elements[0];
+              const index = el.index;
+              const datasetIndex = el.datasetIndex;
+              const label = chart.data.labels[index];
+              const datasetLabel = chart.data.datasets[datasetIndex]?.label || '';
+              await handleChartDrilldown('dailyQuota', index, datasetIndex, label, datasetLabel);
+            }
+          },
           scales: { y: { beginAtZero: true, title: { display: true, text: 'จำนวนคน' } } },
           plugins: {
             datalabels: {
@@ -568,7 +920,7 @@ function renderDashboardUi(d, filterType){
                 return val > 0 ? `${val}/${max}` : `0/${max}`;
               }
             },
-            title: { display: true, text: 'จำนวนผู้ลงทะเบียนแยกตามวันเข้าร่วมประชุม (เปรียบเทียบโควตารายวัน)' }
+            title: { display: true, text: 'จำนวนผู้ลงทะเบียนแยกตามวันเข้าร่วมประชุม (คลิกแท่งเพื่อดูรายชื่อ)' }
           }
         }
       });
@@ -597,7 +949,17 @@ function renderDashboardUi(d, filterType){
         chartRegByType = new Chart(canvas, {
           type: 'bar',
           data: { labels: labels, datasets: [{ label: 'จำนวนผู้สมัคร', data: data, backgroundColor: ['#fbb4ae', '#b3cde3', '#ccebc5'] }] },
-          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'ผู้สมัครแยกตามประเภทบุคลากร (INTERNAL/EXTERNAL)' } } }
+          options: { 
+            ...commonOptions, 
+            onClick: async (e, elements, chart) => {
+              if(elements.length > 0) {
+                const index = elements[0].index;
+                const label = chart.data.labels[index];
+                await handleChartDrilldown('regByType', index, elements[0].datasetIndex, label);
+              }
+            },
+            plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'ผู้สมัครแยกตามประเภทบุคลากร (คลิกแท่งเพื่อดูรายชื่อ)' } } 
+          }
         });
       }
     } catch(e) { console.error('chartRegByType error:', e); }
@@ -624,7 +986,20 @@ function renderDashboardUi(d, filterType){
         chartWorksIntent = new Chart(canvas, {
           type: 'bar',
           data: { labels: labels, datasets: [ { label: 'แจ้งส่งผลงาน', data: dataIntent, backgroundColor: '#fdcdac' }, { label: 'ส่งผลงานจริง', data: dataActual, backgroundColor: '#b3e2cd' } ]},
-          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'การส่งผลงานแยกรายประเภทบุคลากร (INTERNAL/EXTERNAL)' } } }
+          options: { 
+            ...commonOptions, 
+            onClick: async (e, elements, chart) => {
+              if(elements.length > 0) {
+                const el = elements[0];
+                const index = el.index;
+                const datasetIndex = el.datasetIndex;
+                const label = chart.data.labels[index];
+                const datasetLabel = chart.data.datasets[datasetIndex]?.label || '';
+                await handleChartDrilldown('worksIntent', index, datasetIndex, label, datasetLabel);
+              }
+            },
+            plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'การส่งผลงานแยกรายประเภทบุคลากร (คลิกแท่งเพื่อดูรายชื่อ/ผลงาน)' } } 
+          }
         });
       }
     } catch(e) { console.error('chartWorksIntent error:', e); }
@@ -639,7 +1014,18 @@ function renderDashboardUi(d, filterType){
         chartWorksByStatus = new Chart(canvas, {
           type: 'bar',
           data: { labels: labels, datasets: [{ label: 'จำนวนผลงาน', data: data, backgroundColor: ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2'] }] },
-          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทบุคลากร (INTERNAL/EXTERNAL)' } } }
+          options: { 
+            ...commonOptions, 
+            onClick: async (e, elements, chart) => {
+              if(elements.length > 0) {
+                const el = elements[0];
+                const index = el.index;
+                const label = chart.data.labels[index];
+                await handleChartDrilldown('worksByStatus', index, el.datasetIndex, label);
+              }
+            },
+            plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทบุคลากร (คลิกแท่งเพื่อดูรายการผลงาน)' } } 
+          }
         });
       }
     } catch(e) { console.error('chartWorksByStatus error:', e); }
@@ -668,7 +1054,18 @@ function renderDashboardUi(d, filterType){
         chartWorksByCategory = new Chart(canvas, {
           type: 'bar',
           data: { labels: labels, datasets: [{ label: 'จำนวนผลงาน', data: data, backgroundColor: ['#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2','#fbb4ae','#b3cde3','#ccebc5'] }] },
-          options: { ...commonOptions, plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทผลงาน (Work Category)' } } }
+          options: { 
+            ...commonOptions, 
+            onClick: async (e, elements, chart) => {
+              if(elements.length > 0) {
+                const el = elements[0];
+                const index = el.index;
+                const label = chart.data.labels[index];
+                await handleChartDrilldown('worksByCategory', index, el.datasetIndex, label);
+              }
+            },
+            plugins: { datalabels: commonOptions.plugins.datalabels, title: { display: true, text: 'จำนวนผลงานแยกตามประเภทผลงาน (คลิกแท่งเพื่อดูรายการผลงาน)' } } 
+          }
         });
       }
     } catch(e) { console.error('chartWorksByCategory error:', e); }

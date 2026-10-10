@@ -6766,6 +6766,7 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       var t = r.ParticipantType || 'ไม่ระบุ';
       if (participantTypes.indexOf(t) < 0) participantTypes.push(t);
       regTypeMap[r.RegID] = t;
+      if (r.RegID) regTypeMap[String(r.RegID).trim()] = t;
       
       // Chart 1: Reg by type
       if (!chartRegByType[t]) chartRegByType[t] = 0;
@@ -6808,7 +6809,8 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     // Chart 3: Works by INTERNAL / EXTERNAL
     var chartWorksByStatus = { 'บุคลากรภายใน (INTERNAL)': 0, 'บุคคลภายนอก (EXTERNAL)': 0 };
     worksData.forEach(function(w) {
-      var pt = regTypeMap[w.RegID] || 'ไม่ระบุ';
+      var wReg = String(w.RegID || '').trim();
+      var pt = regTypeMap[wReg] || regTypeMap[w.RegID] || 'ไม่ระบุ';
       var s = pt.toUpperCase().indexOf('INTERNAL') >= 0 ? 'บุคลากรภายใน (INTERNAL)' : (pt.toUpperCase().indexOf('EXTERNAL') >= 0 ? 'บุคคลภายนอก (EXTERNAL)' : pt);
       if (chartWorksByStatus[s] === undefined) chartWorksByStatus[s] = 0;
       chartWorksByStatus[s]++;
@@ -6820,9 +6822,40 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       chartWorksByCategory[cat]++;
       
       // Actual works by type
-      var t = regTypeMap[w.RegID] || 'ไม่ระบุ';
+      var t = regTypeMap[wReg] || regTypeMap[w.RegID] || 'ไม่ระบุ';
       if (!worksIntentByType[t]) worksIntentByType[t] = { intent: 0, actual: 0 };
       worksIntentByType[t].actual++;
+    });
+
+    // Prepare drilldown items for instant interactive charts
+    var allRegsList = regs.map(function(r) {
+      return {
+        RegID: r.RegID || '',
+        FullName: r.FullName || ((r.Prefix || '') + (r.FirstName || '') + ' ' + (r.LastName || '')).trim() || 'ไม่ระบุชื่อ',
+        ParticipantType: r.ParticipantType || '',
+        Organization: [r.OrganizationGroup, r.Institution || r.OrganizationUnit].filter(Boolean).join(' / ') || '-',
+        Day1: bool_(r.AttendanceDay1),
+        Day2: bool_(r.AttendanceDay2),
+        Day3: bool_(r.AttendanceDay3),
+        WantsSubmitWork: bool_(r.WantsSubmitWork),
+        PaymentStatus: r.PaymentStatus || '',
+        RegistrationStatus: r.RegistrationStatus || ''
+      };
+    });
+
+    var allWorksList = worksData.map(function(w) {
+      var wReg = String(w.RegID || '').trim();
+      var pt = regTypeMap[wReg] || regTypeMap[w.RegID] || 'ไม่ระบุ';
+      var rawCat = w.CategoryName || w.CategoryNameTH || (w.CategoryID ? (categories[w.CategoryID] ? (categories[w.CategoryID].CategoryNameTH || categories[w.CategoryID].CategoryNameEN) : w.CategoryID) : 'ไม่ระบุ');
+      var cat = resolveCategoryName_(rawCat) || 'ไม่ระบุ';
+      return {
+        WorkID: w.WorkID || '',
+        RegID: w.RegID || '',
+        Title: w.TitleTH || w.TitleEN || w.Title || w.WorkTitle || 'ไม่ระบุชื่อผลงาน',
+        Category: cat,
+        ParticipantType: pt,
+        Status: w.Status || ''
+      };
     });
 
     // Now apply filters to `regs` to calculate KPIs for the selected type
@@ -6881,7 +6914,9 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
       chartWorksIntent: worksIntentByType,
       chartWorksByStatus: chartWorksByStatus,
       chartWorksByCategory: chartWorksByCategory,
-      dailyQuota: getDailyQuotaStatus_(cid)
+      dailyQuota: getDailyQuotaStatus_(cid),
+      itemsReg: allRegsList,
+      itemsWorks: allWorksList
     };
 
     try { cachePutLarge_(cacheKey, result, 120); } catch (ignore) {}
