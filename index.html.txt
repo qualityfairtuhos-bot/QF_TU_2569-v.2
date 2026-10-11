@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <!-- TUH public v1.7 configurable options + meal pass -->
-<title><?= appName ?></title>
+<title>TUH Quality Fair Conference Management</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="direct-access-bar" id="directAccessBar" role="status">
-  <a id="directAccessNewTab" href="<?= directUrl ?>" target="_blank" rel="noopener noreferrer" title="คัดลอกลิงก์นี้เพื่อเปิดในโหมดไม่ระบุตัวตน (Incognito)">หากจอขาว/เข้าไม่ได้ เปิด Incognito</a>
+  <a id="directAccessNewTab" href="/?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer" title="คัดลอกลิงก์นี้เพื่อเปิดในโหมดไม่ระบุตัวตน (Incognito)">หากจอขาว/เข้าไม่ได้ เปิด Incognito</a>
 </div>
 
 <header class="top">
@@ -482,10 +482,10 @@
 </template>
 <div class="loading" id="loading"><div class="loading-box"><div class="spin"></div><b id="loadingText">กำลังประมวลผล</b><span class="en">Processing</span></div></div>
 <script>
-const CID='<?= conferenceId ?>';
+const CID=''+(new URLSearchParams(location.search).get('conferenceId')||'CONF-TUH-QF-2569')+'';
 
-const APP_BASE_URL='<?= appUrl ?>';
-const DIRECT_ACCESS_URL='<?= directUrl ?>';
+const APP_BASE_URL='';
+const DIRECT_ACCESS_URL='/?conferenceId=CONF-TUH-QF-2569';
 function installDirectAccessGuard(){
   const embedded=window.self!==window.top;
   const fromGoogleSites=/sites\.google\.com/i.test(document.referrer||'');
@@ -493,10 +493,7 @@ function installDirectAccessGuard(){
   const bar=document.getElementById('directAccessBar');
   if(bar&&(embedded||fromGoogleSites||inApp))bar.classList.add('show');
 }
-function canonicalRoute(page){
-  const base=String(APP_BASE_URL||location.href.split('?')[0]).replace(/\/dev(?:$|\?)/i,'/exec').replace(/\/u\/\d+\//g,'/').split('?')[0];
-  const q=[];if(page&&page!=='public')q.push('page='+encodeURIComponent(page));q.push('conferenceId='+encodeURIComponent(CID));return base+'?'+q.join('&');
-}
+function canonicalRoute(page){const routes={public:'/',admin:'/admin',reviewer:'/reviewer',scanner:'/scanner',launcher:'/launcher'};const target=routes[page||'public']||'/';return target+'?conferenceId='+encodeURIComponent(CID)}
 window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
 const DEFAULT_LOGO='/images/tuh-logo.png';
@@ -504,7 +501,7 @@ const HACC_LOGO='/images/hacc-logo.png';
 let BOOT=null;
 let HERO_INDEX=0,HERO_TIMER=null,PDPA_READ=false;
 const $=s=>document.querySelector(s);
-function rpc(n,...a){return new Promise((res,rej)=>google.script.run.withSuccessHandler(r=>r&&r.success?res(r.data):rej(new Error(r&&r.message||'เกิดข้อผิดพลาด'))).withFailureHandler(e=>rej(new Error(e.message||e)))[n](...a))}
+window._rpcCache=window._rpcCache||new Map();window._rpcInFlight=window._rpcInFlight||new Map();async function rpc(n,...a){const isRead=/^(get|adminList|adminGet|reviewerGet|reviewerBootstrap|adminBootstrap|getPublicBootstrap|lookup|export|inspect|list|verifyWorkAccess|.*Bootstrap)/i.test(n);const isWrite=n!=='verifyWorkAccess'&&/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(n);if(isWrite&&window._rpcCache){window._rpcCache.clear()}const cacheKey=n+':'+JSON.stringify(a);if(isRead&&window._rpcCache&&window._rpcCache.has(cacheKey)){const item=window._rpcCache.get(cacheKey);if(item&&item.exp>Date.now())return item.data;window._rpcCache.delete(cacheKey)}if(window._rpcInFlight&&window._rpcInFlight.has(cacheKey)){return window._rpcInFlight.get(cacheKey)}const promise=(async()=>{const maxRetries=isRead?2:1;let lastErr=null;for(let attempt=0;attempt<maxRetries;attempt++){if(attempt>0)await new Promise(r=>setTimeout(r,300));try{const response=await fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({action:n,args:a,requestId:crypto.randomUUID(),timestamp:Date.now()})});let result;try{const text=await response.text();result=JSON.parse(text)}catch(e){throw new Error('การตอบกลับจากระบบไม่ถูกต้อง')}if(!response.ok||!result.success){throw new Error(result.message||'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')}if(isRead&&window._rpcCache){const cTtl=/Bootstrap/i.test(n)?30000:60000;window._rpcCache.set(cacheKey,{data:result.data,exp:Date.now()+cTtl})}return result.data}catch(err){lastErr=err;const msg=String(err&&err.message||'');if(msg.includes('Session')||msg.includes('สิทธิ์')||msg.includes('ไม่อนุญาต')||msg.includes('401')||msg.includes('403')){break}if(attempt+1>=maxRetries)throw err}}throw lastErr||new Error('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ')})();if(window._rpcInFlight){window._rpcInFlight.set(cacheKey,promise)}try{return await promise}finally{if(window._rpcInFlight){window._rpcInFlight.delete(cacheKey)}}}
 function load(t){$('#loadingText').textContent=t||'กำลังประมวลผล';$('#loading').classList.add('show')}
 function done(){$('#loading').classList.remove('show')}
 function alertErr(e){done();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
@@ -666,15 +663,13 @@ function renderHeroBanners(){
     bannerList = [];
   }
   
-  const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false);
+  const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false && !String(b.imageUrl).includes('tuh-banner-cqi.jpg') && !String(b.imageUrl).includes('tuh-banner-var.jpg'));
   const carousel = $('#heroCarousel');
   if(!carousel) return;
 
-  // Default banners if none configured, ensuring immediate visual display without re-uploading
+  // Fixed default banner matching official TUH Quality Fair conference theme
   const bannersToRender = activeBanners.length > 0 ? activeBanners : [
-    { title: 'งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19', subtitle: 'TUH Quality Fair & HA-Regional Forum 2026', imageUrl: '/images/tuh-banner-main.jpg', active: true },
-    { title: 'CQI, Research & Innovation', subtitle: 'ส่งเสริมการพัฒนานวัตกรรมและคุณภาพอย่างต่อเนื่อง', imageUrl: '/images/tuh-banner-cqi.jpg', active: true },
-    { title: 'HACC นครจตุรศรีปทุมทอง เขต 4', subtitle: 'Value and Reliability for Healthcare Sustainability', imageUrl: '/images/tuh-banner-var.jpg', active: true }
+    { title: '', subtitle: '', imageUrl: '/images/tuh-banner-main.jpg', active: true }
   ];
 
   if(bannersToRender.length > 0) {
@@ -683,11 +678,12 @@ function renderHeroBanners(){
       const normalizedUrl = normalizeBannerImageUrl(b.imageUrl);
       const cursorStyle = b.linkUrl ? 'cursor:pointer;' : '';
       const clickAttr = b.linkUrl ? `onclick="window.open('${esc(b.linkUrl)}','_blank')"` : '';
+      const showOverlay = (b.title && !b.title.startsWith('ภาพ Banner') && b.title !== 'งานมหกรรมคุณภาพ ครั้งที่ 19') || b.subtitle;
       html += `
         <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
           <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
             <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" onerror="this.onerror=null; this.src='/images/tuh-banner-main.jpg';">
-            ${(b.title || b.subtitle) ? `
+            ${showOverlay ? `
               <div class="custom-banner-overlay">
                 <div class="custom-banner-card">
                   ${b.title ? `<div style="font-size:1.15rem; font-weight:800; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,0.6);">${esc(b.title)}</div>` : ''}
@@ -786,7 +782,7 @@ async function init(){
       const parsed=JSON.parse(rawCache);
       if(parsed&&parsed.conference){
         const banStr = typeof parsed.settings?.BANNER_SLIDES_JSON === 'string' ? parsed.settings.BANNER_SLIDES_JSON : JSON.stringify(parsed.settings?.BANNER_SLIDES_JSON || '');
-        if(banStr.includes('tuh-banner-var.jpg') || banStr.includes('tuh-banner-main.jpg')){
+        if(banStr.includes('tuh-banner-cqi.jpg') || banStr.includes('tuh-banner-var.jpg')){
           try { localStorage.removeItem('TUH_BOOT_CACHE_'+CID); } catch(e){}
         } else {
           applyBootData(parsed);

@@ -758,10 +758,15 @@ async function loadSettings(forceRefresh = false){
     // โหลดภาพ Banner
     try {
       const rawB = sm.BANNER_SLIDES_JSON || '[]';
-      window.BANNER_LIST = typeof rawB === 'string' ? JSON.parse(rawB) : rawB;
-      if (!Array.isArray(window.BANNER_LIST)) window.BANNER_LIST = [];
+      let parsedB = typeof rawB === 'string' ? JSON.parse(rawB) : rawB;
+      if (!Array.isArray(parsedB)) parsedB = [];
+      parsedB = parsedB.filter(b => b && b.imageUrl && !String(b.imageUrl).includes('tuh-banner-cqi.jpg') && !String(b.imageUrl).includes('tuh-banner-var.jpg'));
+      if (!parsedB.length) {
+        parsedB = [{ title: 'ภาพ Banner #1', imageUrl: '/images/tuh-banner-main.jpg', subtitle: '', linkUrl: '', active: true }];
+      }
+      window.BANNER_LIST = parsedB;
     } catch(e) {
-      window.BANNER_LIST = [];
+      window.BANNER_LIST = [{ title: 'ภาพ Banner #1', imageUrl: '/images/tuh-banner-main.jpg', subtitle: '', linkUrl: '', active: true }];
     }
     renderBannerList();
 

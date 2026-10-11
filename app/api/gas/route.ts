@@ -74,7 +74,7 @@ const DEFAULT_CONFERENCE_BOOT = {
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
-    BANNER_SLIDES_JSON: '[{"title":"งานมหกรรมคุณภาพ ครั้งที่ 19","imageUrl":"/images/tuh-banner-main.jpg","link":"","active":true},{"title":"CQI & Best Practice","imageUrl":"/images/tuh-banner-cqi.jpg","link":"","active":true},{"title":"VAR for Sustainability Healthcare","imageUrl":"/images/tuh-banner-var.jpg","link":"","active":true}]'
+    BANNER_SLIDES_JSON: '[{"title":"ภาพ Banner #1","imageUrl":"/images/tuh-banner-main.jpg","link":"","active":true}]'
   },
   organizationUnits: [
     { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
