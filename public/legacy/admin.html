@@ -757,7 +757,7 @@ async function loadSettings(forceRefresh = false){
     
     // โหลดภาพ Banner
     try {
-      const rawB = sm.BANNER_SLIDES_JSON || '[]';
+      const rawB = sm.BANNER_SLIDES_JSON || localStorage.getItem('TUH_ACTIVE_BANNER_LIST') || '[]';
       let parsedB = typeof rawB === 'string' ? JSON.parse(rawB) : rawB;
       if (!Array.isArray(parsedB)) parsedB = [];
       parsedB = parsedB.filter(b => b && b.imageUrl && !String(b.imageUrl).includes('tuh-banner-cqi.jpg') && !String(b.imageUrl).includes('tuh-banner-var.jpg'));
@@ -765,6 +765,7 @@ async function loadSettings(forceRefresh = false){
         parsedB = [{ title: 'ภาพ Banner #1', imageUrl: '/images/tuh-banner-main.jpg', subtitle: '', linkUrl: '', active: true }];
       }
       window.BANNER_LIST = parsedB;
+      try { localStorage.setItem('TUH_ACTIVE_BANNER_LIST', JSON.stringify(parsedB)); } catch(e){}
     } catch(e) {
       window.BANNER_LIST = [{ title: 'ภาพ Banner #1', imageUrl: '/images/tuh-banner-main.jpg', subtitle: '', linkUrl: '', active: true }];
     }
@@ -838,6 +839,7 @@ async function autoSaveBannerList(){
     if($('#BANNER_SLIDES_JSON_INPUT')) {
       $('#BANNER_SLIDES_JSON_INPUT').value = JSON.stringify(list);
     }
+    try { localStorage.setItem('TUH_ACTIVE_BANNER_LIST', JSON.stringify(list)); } catch(e){}
     await rpc('saveAdminSettings', TOKEN, CID, {
       settings: {
         BANNER_SLIDES_JSON: JSON.stringify(list)
@@ -1052,6 +1054,7 @@ $('#settingsForm').onsubmit=async e=>{
     settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
     OPTION_KEYS.forEach(k=>settings[k]=listTextToJson(o[k]));
     settings.BANNER_SLIDES_JSON=JSON.stringify(window.BANNER_LIST || []);
+    try { localStorage.setItem('TUH_ACTIVE_BANNER_LIST', JSON.stringify(window.BANNER_LIST || [])); } catch(e){}
     show('กำลังบันทึกการตั้งค่า');
     await rpc('saveAdminSettings',TOKEN,CID,{conference:conf,settings});
     if(window._rpcCache) window._rpcCache.clear();

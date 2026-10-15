@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import {randomUUID} from "node:crypto";
 import {NextRequest,NextResponse} from "next/server";
 import {ALLOWED_ACTIONS,READ_ACTIONS,SESSION_ACTIONS} from "@/lib/actions";
@@ -7,6 +9,30 @@ import type {ApiResponse,RpcRequest} from "@/lib/types";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
+
+const PERSISTED_FILE = path.join(process.cwd(), "persisted_settings.json");
+
+function getPersistedSettings(): Record<string, string> {
+  try {
+    if (fs.existsSync(PERSISTED_FILE)) {
+      return JSON.parse(fs.readFileSync(PERSISTED_FILE, "utf-8"));
+    }
+  } catch (e) {
+    console.error("Failed to read persisted_settings.json", e);
+  }
+  return {};
+}
+
+function savePersistedSettings(settings: Record<string, string>) {
+  try {
+    const current = getPersistedSettings();
+    const updated = { ...current, ...settings };
+    fs.writeFileSync(PERSISTED_FILE, JSON.stringify(updated, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to write persisted_settings.json", e);
+  }
+}
+
 const buckets=new Map<string,{count:number;reset:number}>();
 
 // Fast in-memory cache for read-heavy responses
@@ -93,6 +119,11 @@ const DEFAULT_CONFERENCE_BOOT = {
     external: { max: 200, day1: 0, day2: 0, day3: 0 }
   }
 };
+
+const initPersisted = getPersistedSettings();
+if (Object.keys(initPersisted).length > 0) {
+  DEFAULT_CONFERENCE_BOOT.settings = { ...DEFAULT_CONFERENCE_BOOT.settings, ...initPersisted };
+}
 
 const preseededBoot: ApiResponse<unknown> = {
   success: true,
@@ -313,9 +344,25 @@ export async function POST(request:NextRequest){
         }
       }
     } else {
+      if(action === "saveAdminSettings" && args.length >= 3 && args[2] && typeof args[2] === "object"){
+        const payload = args[2] as { settings?: Record<string, string> };
+        if(payload.settings && typeof payload.settings === "object"){
+          savePersistedSettings(payload.settings);
+          if(DEFAULT_CONFERENCE_BOOT.settings){
+            DEFAULT_CONFERENCE_BOOT.settings = { ...DEFAULT_CONFERENCE_BOOT.settings, ...payload.settings };
+          }
+        }
+      }
       result = await callGas(outbound, isRetryableAction ? 2 : 1);
     }
     if(result.success){
+      if(action === "getPublicBootstrap" && result.data && typeof result.data === "object"){
+        const d = result.data as Record<string, unknown>;
+        const persisted = getPersistedSettings();
+        if(d.settings && typeof d.settings === "object"){
+          d.settings = { ...(d.settings as Record<string, string>), ...persisted };
+        }
+      }
       setCachedResponse(action,args,result);
       invalidateServerCache(action);
     }
@@ -367,6 +414,13 @@ export async function POST(request:NextRequest){
     // If upstream call fails, check if we have a last known good cached response for read actions
     if(lastKnownGood.has(cacheKey)){
       const fallback=lastKnownGood.get(cacheKey)!;
+      if(fallback.data && typeof fallback.data === "object"){
+        const d = fallback.data as Record<string, unknown>;
+        const persisted = getPersistedSettings();
+        if(d.settings && typeof d.settings === "object"){
+          d.settings = { ...(d.settings as Record<string, string>), ...persisted };
+        }
+      }
       return NextResponse.json(fallback,{status:200,headers:{"X-Fallback":"true"}});
     }
     return failure(`ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ (${errorMsg})`,"UPSTREAM_ERROR",502,requestId);
