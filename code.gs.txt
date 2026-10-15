@@ -311,8 +311,9 @@ function defaultSettings_(){ return {
 function seedRegistrationTypes_(cid){
   const rows = [
     ['INTERNAL','บุคลากรโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ','TUH Staff',true,0,400,false,false,1],
-    ['EXTERNAL_2500','บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน / สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป','General Public / Academic Institute / Private / Provincial Health / Regional & General Hospital',false,2500,200,true,true,2],
-    ['EXTERNAL_1500','โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.','Community hospital / District public health / Health promoting hospital',false,1500,200,true,true,3]
+    ['EXT_PROV_CTR_GEN','สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป','Provincial Health / Regional Hospital / General Hospital',false,2500,200,true,true,2],
+    ['EXT_COMMUNITY','โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.','Community hospital / District public health / Health promoting hospital',false,1500,200,true,true,3],
+    ['EXT_GENERAL_ACAD_PRIV','บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน','General Public / Academic Institute / Private Sector',false,2500,200,true,true,4]
   ];
   rows.forEach(function(r){
     const existing = findOne_('RegistrationTypes',{ConferenceID:cid,TypeCode:r[0]});

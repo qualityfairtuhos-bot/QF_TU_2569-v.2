@@ -249,7 +249,7 @@
         <button type="button" class="announcement-link" onclick="go('schedule')"><i class="fa-regular fa-calendar-days"></i> กำหนดการจัดงาน › คลิกอ่าน</button>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;">
         <!-- กรอบกำหนดการสำคัญ -->
         <div style="background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1;">
           <div style="font-weight:700; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><i class="fa-regular fa-clock"></i> กำหนดการสำคัญ</div>
@@ -265,13 +265,17 @@
         <div style="background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1;">
           <div style="font-weight:700; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-tags"></i> อัตราค่าลงทะเบียน (Registration Fees)</div>
           <div id="announceFees" style="display:grid; gap:6px;">
-            <div class="fee-row" style="display:flex; justify-content:space-between; font-size:0.86rem; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
-              <span>สสจ. / รพศ. / รพท. (รัฐและเอกชน)</span>
-              <strong style="color:#006D70;">2,500 บาท/ท่าน</strong>
+            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.81rem; padding:4px 0; border-bottom:1px dashed #e2e8f0; white-space:nowrap; gap:8px;">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป">สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป</span>
+              <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">2,500 บาท/ท่าน</strong>
             </div>
-            <div class="fee-row" style="display:flex; justify-content:space-between; font-size:0.86rem; padding:4px 0;">
-              <span>รพช. / สสอ. / รพ.สต.</span>
-              <strong style="color:#006D70;">1,500 บาท/ท่าน</strong>
+            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.81rem; padding:4px 0; border-bottom:1px dashed #e2e8f0; white-space:nowrap; gap:8px;">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.">โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.</span>
+              <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">1,500 บาท/ท่าน</strong>
+            </div>
+            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.81rem; padding:4px 0; white-space:nowrap; gap:8px;">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน">บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน</span>
+              <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">2,500 บาท/ท่าน</strong>
             </div>
           </div>
         </div>
@@ -592,10 +596,42 @@ function renderAnnouncement(){
   if(payClose&&c.PaymentCloseAt)payClose.textContent=formatThaiDate(c.PaymentCloseAt);
   if(resultDate&&c.ResultAnnouncementAt)resultDate.textContent=formatThaiDate(c.ResultAnnouncementAt);
   if(subClose&&c.SubmissionCloseAt)subClose.textContent=formatThaiDate(c.SubmissionCloseAt);
-  const external=(BOOT.registrationTypes||[]).filter(x=>Number(x.FeeAmount||0)>0).sort((a,b)=>Number(b.FeeAmount||0)-Number(a.FeeAmount||0));
   const host=$('#announceFees');
-  if(host&&external.length){
-    host.innerHTML=external.map(x=>`<div class="fee-row" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:0.86rem;"><span>${esc(x.TypeNameTH||x.TypeCode)}</span><strong style="color:#006D70;">${Number(x.FeeAmount||0).toLocaleString('th-TH')} บาท/ท่าน</strong></div>`).join('');
+  if(host){
+    const targetOrder = [
+      { key: 'EXT_PROV_CTR_GEN', name: 'สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป', fee: 2500 },
+      { key: 'EXT_COMMUNITY', name: 'โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.', fee: 1500 },
+      { key: 'EXT_GENERAL_ACAD_PRIV', name: 'บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน', fee: 2500 }
+    ];
+    let items = [];
+    if(Array.isArray(BOOT.registrationTypes) && BOOT.registrationTypes.length){
+      const externalList = BOOT.registrationTypes.filter(x => Number(x.FeeAmount || 0) > 0);
+      if(externalList.length){
+        targetOrder.forEach(target => {
+          const match = externalList.find(x => {
+            const code = String(x.TypeCode || '').toUpperCase();
+            const name = String(x.TypeNameTH || '');
+            if(target.key === 'EXT_COMMUNITY' && (code.includes('COMMUNITY') || name.includes('ชุมชน'))) return true;
+            if(target.key === 'EXT_PROV_CTR_GEN' && (code.includes('PROV') || (name.includes('สาธารณสุขจังหวัด') && !name.includes('บุคคลภายนอก')))) return true;
+            if(target.key === 'EXT_GENERAL_ACAD_PRIV' && (code.includes('GENERAL') || code.includes('ACAD') || name.includes('บุคคลภายนอก'))) return true;
+            return false;
+          });
+          if(match){
+            items.push({ name: target.name, fee: Number(match.FeeAmount || target.fee) });
+          } else {
+            items.push(target);
+          }
+        });
+      }
+    }
+    if(!items.length) items = targetOrder;
+
+    host.innerHTML = items.map((x, idx) => `
+      <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; ${idx < items.length - 1 ? 'border-bottom:1px dashed #e2e8f0;' : ''} font-size:0.81rem; white-space:nowrap; gap:8px;">
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${esc(x.name)}">${esc(x.name)}</span>
+        <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">${Number(x.fee || 0).toLocaleString('th-TH')} บาท/ท่าน</strong>
+      </div>
+    `).join('');
   }
 }
 function dateObject(v){if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),12,0,0);const d=new Date(s);return isNaN(d)?null:d}
@@ -663,14 +699,11 @@ function renderHeroBanners(){
     bannerList = [];
   }
   
-  const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false && !String(b.imageUrl).includes('tuh-banner-cqi.jpg') && !String(b.imageUrl).includes('tuh-banner-var.jpg'));
+  const activeBanners = bannerList.filter(b => b && b.imageUrl && b.active !== false);
   const carousel = $('#heroCarousel');
   if(!carousel) return;
 
-  // Fixed default banner matching official TUH Quality Fair conference theme
-  const bannersToRender = activeBanners.length > 0 ? activeBanners : [
-    { title: '', subtitle: '', imageUrl: '/images/tuh-banner-main.jpg', active: true }
-  ];
+  const bannersToRender = activeBanners;
 
   if(bannersToRender.length > 0) {
     let html = '';
@@ -682,7 +715,7 @@ function renderHeroBanners(){
       html += `
         <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
           <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
-            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" onerror="this.onerror=null; this.src='/images/tuh-banner-main.jpg';">
+            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img">
             ${showOverlay ? `
               <div class="custom-banner-overlay">
                 <div class="custom-banner-card">
@@ -781,13 +814,8 @@ async function init(){
     if(rawCache){
       const parsed=JSON.parse(rawCache);
       if(parsed&&parsed.conference){
-        const banStr = typeof parsed.settings?.BANNER_SLIDES_JSON === 'string' ? parsed.settings.BANNER_SLIDES_JSON : JSON.stringify(parsed.settings?.BANNER_SLIDES_JSON || '');
-        if(banStr.includes('tuh-banner-cqi.jpg') || banStr.includes('tuh-banner-var.jpg')){
-          try { localStorage.removeItem('TUH_BOOT_CACHE_'+CID); } catch(e){}
-        } else {
-          applyBootData(parsed);
-          hasCachedBoot=true;
-        }
+        applyBootData(parsed);
+        hasCachedBoot=true;
       }
     }
   }catch(e){}

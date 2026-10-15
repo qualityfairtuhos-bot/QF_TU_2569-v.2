@@ -82,9 +82,10 @@ const DEFAULT_CONFERENCE_BOOT = {
     SecondaryColor: "#006D70"
   },
   registrationTypes: [
-    { TypeCode: "INTERNAL", TypeNameTH: "บุคลากรโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ", FeeAmount: 0 },
-    { TypeCode: "EXTERNAL_EARLY", TypeNameTH: "บุคคลภายนอก (Early Bird)", FeeAmount: 1800 },
-    { TypeCode: "EXTERNAL_REGULAR", TypeNameTH: "บุคคลภายนอก (ทั่วไป)", FeeAmount: 2200 }
+    { TypeCode: "EXT_PROV_CTR_GEN", TypeNameTH: "สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป", FeeAmount: 2500 },
+    { TypeCode: "EXT_COMMUNITY", TypeNameTH: "โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.", FeeAmount: 1500 },
+    { TypeCode: "EXT_GENERAL_ACAD_PRIV", TypeNameTH: "บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน", FeeAmount: 2500 },
+    { TypeCode: "INTERNAL", TypeNameTH: "บุคลากรโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ", FeeAmount: 0 }
   ],
   workCategories: [
     { CategoryID: "CAT-1", CategoryCode: "RESEARCH", CategoryNameTH: "ผลงานวิจัยด้านคุณภาพและความปลอดภัย" },
@@ -100,7 +101,7 @@ const DEFAULT_CONFERENCE_BOOT = {
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
-    BANNER_SLIDES_JSON: '[{"title":"ภาพ Banner #1","imageUrl":"/images/tuh-banner-main.jpg","link":"","active":true}]'
+    BANNER_SLIDES_JSON: '[]'
   },
   organizationUnits: [
     { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
@@ -344,15 +345,79 @@ export async function POST(request:NextRequest){
         }
       }
     } else {
-      if(action === "saveAdminSettings" && args.length >= 3 && args[2] && typeof args[2] === "object"){
-        const payload = args[2] as { settings?: Record<string, string> };
-        if(payload.settings && typeof payload.settings === "object"){
-          savePersistedSettings(payload.settings);
-          if(DEFAULT_CONFERENCE_BOOT.settings){
-            DEFAULT_CONFERENCE_BOOT.settings = { ...DEFAULT_CONFERENCE_BOOT.settings, ...payload.settings };
+      if(action === "adminUploadBanner"){
+        const file = args[2] as { base64?: string; type?: string; fileName?: string; name?: string } | undefined;
+        if(!file || !file.base64){
+          return failure("ไม่พบข้อมูลไฟล์ภาพ", "INVALID_FILE", 400, requestId);
+        }
+        const rawExt = (file.name || file.fileName || "").split(".").pop()?.toLowerCase();
+        const ext = rawExt && /^(jpg|jpeg|png|webp|gif)$/.test(rawExt) ? rawExt : (file.type?.includes("png") ? "png" : "jpg");
+        const safeName = `banner_${Date.now()}.${ext}`;
+        const uploadsDir = path.join(process.cwd(), "public", "uploads");
+        if(!fs.existsSync(uploadsDir)){
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        const filePath = path.join(uploadsDir, safeName);
+        const buffer = Buffer.from(file.base64, "base64");
+        fs.writeFileSync(filePath, buffer);
+        const localFileUrl = `/uploads/${safeName}`;
+
+        let upstreamFileUrl = localFileUrl;
+        try {
+          const urls = getGasExecUrls();
+          if(urls.length > 0){
+            const upRes = await callGas(outbound, 1);
+            if(upRes.success && (upRes.data as { fileUrl?: string })?.fileUrl){
+              upstreamFileUrl = (upRes.data as { fileUrl: string }).fileUrl;
+            }
+          }
+        } catch {
+          // Keep localFileUrl
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            fileId: `banner_${Date.now()}`,
+            fileUrl: upstreamFileUrl,
+            fileName: file.name || file.fileName || safeName
+          }
+        });
+      }
+
+      if(action === "saveAdminSettings"){
+        if(args.length >= 3 && args[2] && typeof args[2] === "object"){
+          const payload = args[2] as { settings?: Record<string, string>; conference?: Record<string, unknown> };
+          if(payload.settings && typeof payload.settings === "object"){
+            savePersistedSettings(payload.settings);
+            if(DEFAULT_CONFERENCE_BOOT.settings){
+              DEFAULT_CONFERENCE_BOOT.settings = { ...DEFAULT_CONFERENCE_BOOT.settings, ...payload.settings };
+            }
           }
         }
+        invalidateServerCache("saveAdminSettings");
+        memoryCache.clear();
+        lastKnownGood.clear();
+
+        try {
+          const urls = getGasExecUrls();
+          if(urls.length > 0){
+            const upRes = await callGas(outbound, 1);
+            if(upRes.success) return NextResponse.json(upRes);
+          }
+        } catch(e) {
+          console.log("Upstream saveAdminSettings skipped or failed, saved locally:", e);
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            savedLocally: true,
+            message: "บันทึกการตั้งค่าเรียบร้อยแล้ว"
+          }
+        });
       }
+
       result = await callGas(outbound, isRetryableAction ? 2 : 1);
     }
     if(result.success){
@@ -422,6 +487,19 @@ export async function POST(request:NextRequest){
         }
       }
       return NextResponse.json(fallback,{status:200,headers:{"X-Fallback":"true"}});
+    }
+    if(action === "getPublicBootstrap"){
+      const persisted = getPersistedSettings();
+      const bootData = JSON.parse(JSON.stringify(DEFAULT_CONFERENCE_BOOT));
+      if(persisted && Object.keys(persisted).length > 0){
+        bootData.settings = { ...(bootData.settings || {}), ...persisted };
+      }
+      return NextResponse.json({ success: true, data: bootData }, { status: 200, headers: { "X-Fallback": "true" } });
+    }
+    if(action === "getAdminSettings"){
+      const persisted = getPersistedSettings();
+      const settingsData = { ...(DEFAULT_CONFERENCE_BOOT.settings || {}), ...persisted };
+      return NextResponse.json({ success: true, data: { conference: DEFAULT_CONFERENCE_BOOT.conference, settings: settingsData } }, { status: 200, headers: { "X-Fallback": "true" } });
     }
     return failure(`ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ (${errorMsg})`,"UPSTREAM_ERROR",502,requestId);
   }
