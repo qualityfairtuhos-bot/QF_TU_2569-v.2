@@ -6234,7 +6234,10 @@ function exportWorksToExcel(token,conferenceId){
       if(upper_(c.Status)!=='CANCELLED'&&upper_(c.Status)!=='DECLINED'){
         if(!a[c.WorkID])a[c.WorkID]={a:0,c:0,t:0};
         a[c.WorkID].a++;
-        if(['COMPLETE','LOCKED'].indexOf(upper_(c.Status))>=0){
+        var st1 = upper_(c.Status);
+        var hasValidScore1 = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore)) && Number(c.TotalScore) >= 0 && st1 !== 'ASSIGNED' && st1 !== 'OPENED');
+        var isCompleted1 = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st1) >= 0 || hasValidScore1 || (c.CompletedAt && st1 !== 'ASSIGNED' && st1 !== 'OPENED');
+        if(isCompleted1){
           a[c.WorkID].c++;
           var sc = num_(c.TotalScore);
           if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
@@ -7085,7 +7088,10 @@ function adminListWorks(token, conferenceId, filters) {
         if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
           if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
           acc[c.WorkID].a++;
-          if (['COMPLETE', 'LOCKED'].indexOf(upper_(c.Status)) >= 0) {
+          var st2 = upper_(c.Status);
+          var hasValidScore2 = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore)) && Number(c.TotalScore) >= 0 && st2 !== 'ASSIGNED' && st2 !== 'OPENED');
+          var isCompleted2 = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st2) >= 0 || hasValidScore2 || (c.CompletedAt && st2 !== 'ASSIGNED' && st2 !== 'OPENED');
+          if (isCompleted2) {
             acc[c.WorkID].c++;
             var sc = num_(c.TotalScore);
             if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
@@ -7438,10 +7444,19 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
       var myScores = scores.filter(function(s){ return s.AssignmentID === a.AssignmentID; });
       if (myScores.length > 0) {
         var recalculatedTotal = Math.round(myScores.reduce(function(sum, s){ return sum + num_(s.Score); }, 0) * 100) / 100;
+        var patch = {};
         if (num_(a.TotalScore) !== recalculatedTotal) {
           a.TotalScore = recalculatedTotal;
+          patch.TotalScore = recalculatedTotal;
+        }
+        if (['ASSIGNED', 'OPENED'].indexOf(upper_(a.Status)) >= 0) {
+          a.Status = 'COMPLETE';
+          patch.Status = 'COMPLETE';
+        }
+        if (Object.keys(patch).length > 0) {
+          patch.UpdatedAt = new Date();
           try {
-            updateRecord_('ReviewAssignments', a.__row, { TotalScore: recalculatedTotal, UpdatedAt: new Date() });
+            updateRecord_('ReviewAssignments', a.__row, patch);
           } catch(e) {}
         }
       } else if (num_(a.TotalScore) > 100) {
