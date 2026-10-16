@@ -1682,8 +1682,8 @@ function getPublicBootstrap(conferenceId){
     const presentations=findMany_('PresentationTypes',{ConferenceID:cid}).filter(function(x){return bool_(x.Active);});
     const units=findMany_('OrganizationUnits',{ConferenceID:cid}).filter(function(x){return bool_(x.Active);});
     const settings=settingsMap_(cid);
-    if (!settings.BANNER_SLIDES_JSON || settings.BANNER_SLIDES_JSON === '[]' || settings.BANNER_SLIDES_JSON.indexOf('tuh-banner-cqi.jpg') >= 0 || settings.BANNER_SLIDES_JSON.indexOf('tuh-banner-var.jpg') >= 0) {
-      settings.BANNER_SLIDES_JSON = '[{"title":"ภาพ Banner #1","imageUrl":"/images/tuh-banner-main.jpg","link":"","active":true}]';
+    if (!settings.BANNER_SLIDES_JSON || settings.BANNER_SLIDES_JSON === '[]') {
+      settings.BANNER_SLIDES_JSON = '[{\"id\":\"b_tuh_var\",\"title\":\"มหกรรมคุณภาพ ครั้งที่ 19\",\"imageUrl\":\"/images/tuh-banner-var.jpg\",\"link\":\"\",\"active\":true}]';
     }
     const publicConference=serialize_(conf);
     publicConference.LogoUrl=clean_(publicConference.LogoUrl)||APP.DEFAULT_LOGO_URL;

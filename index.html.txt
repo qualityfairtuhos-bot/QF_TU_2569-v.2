@@ -28,7 +28,8 @@
     .hero-logo.left img{max-width:165px}.hero-logo.right img{max-width:150px}
     .hero h1{font-size:clamp(1.4rem,2.8vw,2.2rem);line-height:1.15;margin:0 0 8px}.hero-title-fixed{font-size:clamp(1.35rem,2.4vw,2.1rem)!important;line-height:1.15!important;letter-spacing:-.025em;margin:0 0 8px!important}.hero-title-fixed span{display:block;white-space:nowrap}.hero p{max-width:760px;opacity:.95;font-size:0.9rem;line-height:1.45;margin:0 0 6px}
     .pill{display:inline-block;border:1px solid rgba(255,255,255,.3);padding:4px 10px;border-radius:999px;margin:2px 4px;background:rgba(255,255,255,.12);font-size:0.82rem}
-    .page{display:none;max-width:1080px;margin:24px auto;padding:0 18px}.page.active{display:block}
+    @media(min-width:900px){.announcement-grid{grid-template-columns:1fr 1.25fr !important;}}
+.page{display:none;max-width:1080px;margin:24px auto;padding:0 18px}.page.active{display:block}
     .card{background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 10px 28px rgba(12,56,91,.06);padding:22px;margin-bottom:18px}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
     .grid-full{grid-column:1/-1}
@@ -163,64 +164,9 @@
 </header>
 <section class="hero" id="homeHero" aria-label="ข้อมูลงานประชุม">
   <div class="hero-carousel" id="heroCarousel">
-    <!-- Default Conference Banner Slide (Shown if no custom admin banner is uploaded) -->
     <article class="hero-slide active" data-hero-slide="0" aria-hidden="false">
-      <div class="banner-stage">
-        <!-- Left: TUH 19th Star Emblem -->
-        <div class="banner-side left">
-          <div class="banner-star-badge">
-            <div class="star-emblem-wrap">
-              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#fff4cc"/>
-                    <stop offset="35%" stop-color="#f59e0b"/>
-                    <stop offset="70%" stop-color="#b45309"/>
-                    <stop offset="100%" stop-color="#fef08a"/>
-                  </linearGradient>
-                  <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="3" result="blur"/>
-                    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-                  </filter>
-                </defs>
-                <polygon points="50,5 64,36 98,36 70,57 81,90 50,70 19,90 30,57 2,36 36,36" fill="url(#goldGrad)" stroke="#fff" stroke-width="1.5" filter="url(#glow)"/>
-              </svg>
-            </div>
-            <div class="star-content-wrap">
-              <div class="tuh-brand">TUH <span>19<sup>th</sup></span></div>
-              <div class="qf-brand">QUALITY FAIR</div>
-            </div>
-            <img class="tuh-logo-mini" id="heroLeftLogo" src="/images/tuh-logo.png" alt="TUH Logo" referrerpolicy="no-referrer">
-          </div>
-        </div>
-
-        <!-- Center: Headline & Info Pills -->
-        <div class="banner-center">
-          <h1 class="banner-title" id="confName">
-            <span>งานมหกรรมคุณภาพ</span>
-            <span>โรงพยาบาล ครั้งที่ 19 และ</span>
-            <span>งาน HA-Regional Forum</span>
-            <span>ครั้งที่ 1 ประจำปี 2569</span>
-          </h1>
-          <p class="banner-sub" id="confDesc">ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ</p>
-          <div class="banner-pills" id="confMeta">
-            <div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</span></div>
-            <div class="banner-pill"><i class="fa-regular fa-calendar-days"></i> <span>18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 <small>(18 - 20 Nov 2026)</small></span></div>
-          </div>
-        </div>
-
-        <!-- Right: HACC 4 Badge -->
-        <div class="banner-side right">
-          <div class="banner-hacc-badge">
-            <div class="hacc-circle-wrap">
-              <img id="heroRightLogo" src="/images/hacc-logo.png" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
-            </div>
-            <div class="hacc-caption-text">
-              <b>HACC นครจตุรศรีปทุมทอง</b>
-              <span>HA Regional Forum เขต 4</span>
-            </div>
-          </div>
-        </div>
+      <div class="banner-img-container">
+        <img src="/images/tuh-banner-var.jpg" alt="งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19" class="banner-responsive-img">
       </div>
     </article>
   </div>
@@ -249,7 +195,7 @@
         <button type="button" class="announcement-link" onclick="go('schedule')"><i class="fa-regular fa-calendar-days"></i> กำหนดการจัดงาน › คลิกอ่าน</button>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));" class="announcement-grid gap:14px;">
         <!-- กรอบกำหนดการสำคัญ -->
         <div style="background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1;">
           <div style="font-weight:700; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><i class="fa-regular fa-clock"></i> กำหนดการสำคัญ</div>
@@ -264,18 +210,18 @@
         <!-- กรอบอัตราค่าลงทะเบียน -->
         <div style="background:#fff; padding:14px; border-radius:10px; border:1px solid #ccfbf1;">
           <div style="font-weight:700; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><i class="fa-solid fa-tags"></i> อัตราค่าลงทะเบียน (Registration Fees)</div>
-          <div id="announceFees" style="display:grid; gap:6px;">
-            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.81rem; padding:4px 0; border-bottom:1px dashed #e2e8f0; white-space:nowrap; gap:8px;">
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป">สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป</span>
-              <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">2,500 บาท/ท่าน</strong>
+          <div id="announceFees" style="display:grid; gap:4px;">
+            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:clamp(0.72rem, 1.1vw, 0.81rem); letter-spacing:-0.15px; padding:6px 0; border-bottom:1px dashed #e2e8f0; white-space:nowrap; gap:8px;">
+              <span class="fee-name" style="white-space:nowrap; overflow:hidden; flex:1; min-width:0; color:#1e293b; font-weight:500;" title="สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป">สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป</span>
+              <strong class="fee-amount" style="color:#006D70; white-space:nowrap; flex-shrink:0; font-weight:700;">2,500 บาท/ท่าน</strong>
             </div>
-            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.81rem; padding:4px 0; border-bottom:1px dashed #e2e8f0; white-space:nowrap; gap:8px;">
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.">โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.</span>
-              <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">1,500 บาท/ท่าน</strong>
+            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:clamp(0.72rem, 1.1vw, 0.81rem); letter-spacing:-0.15px; padding:6px 0; border-bottom:1px dashed #e2e8f0; white-space:nowrap; gap:8px;">
+              <span class="fee-name" style="white-space:nowrap; overflow:hidden; flex:1; min-width:0; color:#1e293b; font-weight:500;" title="โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.">โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.</span>
+              <strong class="fee-amount" style="color:#006D70; white-space:nowrap; flex-shrink:0; font-weight:700;">1,500 บาท/ท่าน</strong>
             </div>
-            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:0.81rem; padding:4px 0; white-space:nowrap; gap:8px;">
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน">บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน</span>
-              <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">2,500 บาท/ท่าน</strong>
+            <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:clamp(0.72rem, 1.1vw, 0.81rem); letter-spacing:-0.15px; padding:6px 0; white-space:nowrap; gap:8px;">
+              <span class="fee-name" style="white-space:nowrap; overflow:hidden; flex:1; min-width:0; color:#1e293b; font-weight:500;" title="บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน">บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน</span>
+              <strong class="fee-amount" style="color:#006D70; white-space:nowrap; flex-shrink:0; font-weight:700;">2,500 บาท/ท่าน</strong>
             </div>
           </div>
         </div>
@@ -598,38 +544,15 @@ function renderAnnouncement(){
   if(subClose&&c.SubmissionCloseAt)subClose.textContent=formatThaiDate(c.SubmissionCloseAt);
   const host=$('#announceFees');
   if(host){
-    const targetOrder = [
-      { key: 'EXT_PROV_CTR_GEN', name: 'สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป', fee: 2500 },
-      { key: 'EXT_COMMUNITY', name: 'โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.', fee: 1500 },
-      { key: 'EXT_GENERAL_ACAD_PRIV', name: 'บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน', fee: 2500 }
+    const items = [
+      { name: 'สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป', fee: 2500 },
+      { name: 'โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.', fee: 1500 },
+      { name: 'บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน', fee: 2500 }
     ];
-    let items = [];
-    if(Array.isArray(BOOT.registrationTypes) && BOOT.registrationTypes.length){
-      const externalList = BOOT.registrationTypes.filter(x => Number(x.FeeAmount || 0) > 0);
-      if(externalList.length){
-        targetOrder.forEach(target => {
-          const match = externalList.find(x => {
-            const code = String(x.TypeCode || '').toUpperCase();
-            const name = String(x.TypeNameTH || '');
-            if(target.key === 'EXT_COMMUNITY' && (code.includes('COMMUNITY') || name.includes('ชุมชน'))) return true;
-            if(target.key === 'EXT_PROV_CTR_GEN' && (code.includes('PROV') || (name.includes('สาธารณสุขจังหวัด') && !name.includes('บุคคลภายนอก')))) return true;
-            if(target.key === 'EXT_GENERAL_ACAD_PRIV' && (code.includes('GENERAL') || code.includes('ACAD') || name.includes('บุคคลภายนอก'))) return true;
-            return false;
-          });
-          if(match){
-            items.push({ name: target.name, fee: Number(match.FeeAmount || target.fee) });
-          } else {
-            items.push(target);
-          }
-        });
-      }
-    }
-    if(!items.length) items = targetOrder;
-
     host.innerHTML = items.map((x, idx) => `
-      <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; ${idx < items.length - 1 ? 'border-bottom:1px dashed #e2e8f0;' : ''} font-size:0.81rem; white-space:nowrap; gap:8px;">
-        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${esc(x.name)}">${esc(x.name)}</span>
-        <strong style="color:#006D70; white-space:nowrap; flex-shrink:0;">${Number(x.fee || 0).toLocaleString('th-TH')} บาท/ท่าน</strong>
+      <div class="fee-row" style="display:flex; justify-content:space-between; align-items:center; font-size:clamp(0.72rem, 1.1vw, 0.81rem); letter-spacing:-0.15px; padding:6px 0; ${idx < items.length - 1 ? 'border-bottom:1px dashed #e2e8f0;' : ''} white-space:nowrap; gap:8px;">
+        <span class="fee-name" style="white-space:nowrap; overflow:hidden; flex:1; min-width:0; color:#1e293b; font-weight:500;" title="${esc(x.name)}">${esc(x.name)}</span>
+        <strong class="fee-amount" style="color:#006D70; white-space:nowrap; flex-shrink:0; font-weight:700;">${Number(x.fee || 0).toLocaleString('th-TH')} บาท/ท่าน</strong>
       </div>
     `).join('');
   }
@@ -711,7 +634,7 @@ function renderHeroBanners(){
       const normalizedUrl = normalizeBannerImageUrl(b.imageUrl);
       const cursorStyle = b.linkUrl ? 'cursor:pointer;' : '';
       const clickAttr = b.linkUrl ? `onclick="window.open('${esc(b.linkUrl)}','_blank')"` : '';
-      const showOverlay = (b.title && !b.title.startsWith('ภาพ Banner') && b.title !== 'งานมหกรรมคุณภาพ ครั้งที่ 19') || b.subtitle;
+      const showOverlay = !!b.subtitle || (b.title && !b.title.startsWith('ภาพ Banner') && !b.title.includes('มหกรรมคุณภาพ') && b.showOverlay === true);
       html += `
         <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
           <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
@@ -747,55 +670,11 @@ function renderHeroBanners(){
       clearInterval(HERO_TIMER);
     }
   } else {
-    // Fallback single conference header when no admin banners are uploaded
+    // Fallback banner
     carousel.innerHTML = `
       <article class="hero-slide active" data-hero-slide="0" aria-hidden="false">
-        <div class="banner-stage">
-          <div class="banner-side left">
-            <div class="banner-star-badge">
-              <div class="star-emblem-wrap">
-                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="#fff4cc"/>
-                      <stop offset="35%" stop-color="#f59e0b"/>
-                      <stop offset="70%" stop-color="#b45309"/>
-                      <stop offset="100%" stop-color="#fef08a"/>
-                    </linearGradient>
-                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="3" result="blur"/>
-                      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-                    </filter>
-                  </defs>
-                  <polygon points="50,5 64,36 98,36 70,57 81,90 50,70 19,90 30,57 2,36 36,36" fill="url(#goldGrad)" stroke="#fff" stroke-width="1.5" filter="url(#glow)"/>
-                </svg>
-              </div>
-              <div class="star-content-wrap">
-                <div class="tuh-brand">TUH <span>19<sup>th</sup></span></div>
-                <div class="qf-brand">QUALITY FAIR</div>
-              </div>
-              <img class="tuh-logo-mini" id="heroLeftLogo" src="${BOOT?.conference?.LogoUrl || DEFAULT_LOGO}" alt="TUH Logo" referrerpolicy="no-referrer">
-            </div>
-          </div>
-          <div class="banner-center">
-            <h1 class="banner-title" id="confName">${esc(BOOT?.conference?.ConferenceNameTH || 'งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569')}</h1>
-            <p class="banner-sub" id="confDesc">${esc(BOOT?.conference?.DescriptionTH || 'ระบบลงทะเบียน ส่งผลงาน ประเมินผลงาน และบริหารจัดการงานประชุมวิชาการ')}</p>
-            <div class="banner-pills" id="confMeta">
-              <div class="banner-pill"><i class="fa-solid fa-location-dot"></i> <span>${esc(BOOT?.conference?.Venue || 'อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')}</span></div>
-              ${eventRangeHtml(getEventDates())}
-            </div>
-          </div>
-          <div class="banner-side right">
-            <div class="banner-hacc-badge">
-              <div class="hacc-circle-wrap">
-                <img id="heroRightLogo" src="${HACC_LOGO}" alt="HACC Region 4 Logo" referrerpolicy="no-referrer">
-              </div>
-              <div class="hacc-caption-text">
-                <b>HACC นครจตุรศรีปทุมทอง</b>
-                <span>HA Regional Forum เขต 4</span>
-              </div>
-            </div>
-          </div>
+        <div class="banner-img-container">
+          <img src="/images/tuh-banner-var.jpg" alt="งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19" class="banner-responsive-img">
         </div>
       </article>
     `;

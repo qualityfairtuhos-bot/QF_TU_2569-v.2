@@ -28,6 +28,12 @@ function savePersistedSettings(settings: Record<string, string>) {
     const current = getPersistedSettings();
     const updated = { ...current, ...settings };
     fs.writeFileSync(PERSISTED_FILE, JSON.stringify(updated, null, 2), "utf-8");
+    const standaloneDir = path.join(process.cwd(), ".next", "standalone");
+    if (fs.existsSync(standaloneDir)) {
+      try {
+        fs.writeFileSync(path.join(standaloneDir, "persisted_settings.json"), JSON.stringify(updated, null, 2), "utf-8");
+      } catch {}
+    }
   } catch (e) {
     console.error("Failed to write persisted_settings.json", e);
   }
@@ -101,7 +107,7 @@ const DEFAULT_CONFERENCE_BOOT = {
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
-    BANNER_SLIDES_JSON: '[]'
+    BANNER_SLIDES_JSON: '[{\"id\":\"b_tuh_var\",\"title\":\"มหกรรมคุณภาพ ครั้งที่ 19\",\"imageUrl\":\"/images/tuh-banner-var.jpg\",\"linkUrl\":\"\",\"active\":true}]'
   },
   organizationUnits: [
     { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
@@ -351,7 +357,8 @@ export async function POST(request:NextRequest){
           return failure("ไม่พบข้อมูลไฟล์ภาพ", "INVALID_FILE", 400, requestId);
         }
         const rawExt = (file.name || file.fileName || "").split(".").pop()?.toLowerCase();
-        const ext = rawExt && /^(jpg|jpeg|png|webp|gif)$/.test(rawExt) ? rawExt : (file.type?.includes("png") ? "png" : "jpg");
+        const fileMime = file.type || (file as { mimeType?: string }).mimeType || "";
+        const ext = rawExt && /^(jpg|jpeg|png|webp|gif)$/.test(rawExt) ? rawExt : (fileMime.includes("png") ? "png" : "jpg");
         const safeName = `banner_${Date.now()}.${ext}`;
         const uploadsDir = path.join(process.cwd(), "public", "uploads");
         if(!fs.existsSync(uploadsDir)){
@@ -499,7 +506,23 @@ export async function POST(request:NextRequest){
     if(action === "getAdminSettings"){
       const persisted = getPersistedSettings();
       const settingsData = { ...(DEFAULT_CONFERENCE_BOOT.settings || {}), ...persisted };
-      return NextResponse.json({ success: true, data: { conference: DEFAULT_CONFERENCE_BOOT.conference, settings: settingsData } }, { status: 200, headers: { "X-Fallback": "true" } });
+      const settingsList = Object.entries(settingsData).map(([SettingKey, SettingValue]) => ({ SettingKey, SettingValue }));
+      return NextResponse.json({
+        success: true,
+        data: {
+          conference: DEFAULT_CONFERENCE_BOOT.conference,
+          settings: settingsList,
+          settingsMap: settingsData,
+          optionConfig: {
+            prefixes: ["นาย","นาง","นางสาว","นพ.","พญ.","ทพ.","ทพญ.","ภก.","ภญ."],
+            positions: [],
+            professions: ["แพทย์","ทันตแพทย์","เภสัชกร","พยาบาล","นักวิชาการ"],
+            organizationGroups: [],
+            organizations: [],
+            foodTypes: ["ปกติ","อิสลาม","มังสวิรัติ","แพ้อาหาร"]
+          }
+        }
+      }, { status: 200, headers: { "X-Fallback": "true" } });
     }
     return failure(`ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ (${errorMsg})`,"UPSTREAM_ERROR",502,requestId);
   }
