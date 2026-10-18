@@ -291,10 +291,18 @@
       </div>
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-          <h3 style="margin:0">ตั้งค่ารอบประเมินและเกณฑ์คะแนน</h3>
-          <button class="btn btn-warning" onclick="setupCategoryCriteria()" style="font-size:0.85rem; padding:8px 14px; background:#d97706; color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer;">
-            <i class="fa-solid fa-sliders"></i> ตั้งค่าเกณฑ์คะแนนแยก 2 แบบ (วิจัย/นวัตกรรม vs CQI/Service/Primary)
-          </button>
+          <div>
+            <h3 style="margin:0; color:#0C385B;"><i class="fa-solid fa-clipboard-list" style="color:#006D70;"></i> กำหนดเกณฑ์คะแนนประเมินผลงาน (Scoring Criteria)</h3>
+            <div class="muted" style="font-size:0.84rem; margin-top:2px;">กำหนดหัวข้อการให้คะแนน จำนวนข้อ และคะแนนเต็มแต่ละข้อ (รวม 100 คะแนน) สำหรับรอบประเมินผลงานและรอบตัดสิน</div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="openCriterionModal(null)" style="font-size:0.85rem; padding:8px 14px; font-weight:600;">
+              <i class="fa-solid fa-plus"></i> เพิ่มข้อเกณฑ์คะแนนใหม่
+            </button>
+            <button class="btn btn-warning" onclick="setupCategoryCriteriaModal()" style="font-size:0.85rem; padding:8px 14px; background:#d97706; color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer;">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> ตั้งค่าเกณฑ์มาตรฐาน (100 คะแนน)
+            </button>
+          </div>
         </div>
         <div id="reviewConfig"></div>
       </div>
@@ -3478,7 +3486,7 @@ async function printCombinedWorkScoreSummary(wid) {
     else if (work.Round) roundText = String(work.Round);
 
     const workCode = esc(work.WorkCode || work.WorkID || '-');
-    const docTitle = `ใบสรุปผลการให้คะแนน_${roundText}_${workCode}`;
+    const docTitle = `ใบสรุปผลการให้คะแนน_${workCode}`;
 
     const pInfo = getWorkPresenterDisplay(work);
     const authorNames = (authors || []).map(x => esc(x.FullName || [x.Prefix, x.FirstName, x.LastName].filter(Boolean).join(' ') || x.FirstName)).filter(Boolean).join(', ') || esc(pInfo.name);
@@ -3649,7 +3657,7 @@ async function printCombinedWorkScoreSummary(wid) {
         <img src="/images/hacc-logo.png" alt="Logo" onerror="this.src='/images/tuh-logo.png'">
       </td>
       <td class="header-center">
-        <h1>ใบสรุปผลการให้คะแนนการนำเสนอผลงานวิชาการ (${esc(roundText)})</h1>
+        <h1>ใบสรุปผลการให้คะแนนการนำเสนอผลงานวิชาการ</h1>
         <h2>งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569</h2>
         <p>วันที่ 18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 ณ อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</p>
       </td>
@@ -4415,87 +4423,362 @@ async function openReviewerForm(id){
     loadReviewers();
   } catch(e) { err(e); }
 }
-async function loadReviewConfig(forceRefresh = false){
-  if($('#reviewConfig')?.children?.length && !forceRefresh) return;
-  const d = await rpc('adminGetReviewConfig', TOKEN, CID);
-  const roundsHtml = '<h4>รอบประเมิน</h4>' + (d.rounds || []).map(r=>`<div class="card" style="box-shadow:none; padding:10px; margin-bottom:8px; border:1px solid #e2e8f0; border-radius:8px;"><b>${r.RoundNo}. ${esc(r.RoundNameTH)}</b> | สถานะ: <span class="badge" style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px;">${esc(r.Status)}</span> | Reviewer ${r.MinReviewers}-${r.MaxReviewers} ท่าน</div>`).join('');
-  
-  const critList = d.criteria || [];
-  const researchCrit = critList.filter(c => String(c.CriteriaID||'').includes('RESEARCH') || String(c.WorkCategory||'').includes('RESEARCH') || String(c.WorkCategory||'').includes('INNOVATION'));
-  const cqiCrit = critList.filter(c => String(c.CriteriaID||'').includes('CQI') || String(c.WorkCategory||'').includes('CQI') || String(c.WorkCategory||'').includes('SERVICE') || String(c.WorkCategory||'').includes('PRIMARY'));
-  const otherCrit = critList.filter(c => !researchCrit.includes(c) && !cqiCrit.includes(c));
-  
-  const renderCritGroup = (title, badgeColor, items) => {
-    if (!items.length) return '';
-    const sum = items.reduce((acc, x) => acc + (Number(x.MaxScore) || 0), 0);
-    return `
-      <div style="margin-top:14px; border:1px solid #cbd5e1; border-radius:10px; padding:14px; background:#fff;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
-          <b style="color:${badgeColor}; font-size:0.95rem;">${title} (${items.length} ข้อ)</b>
-          <span style="font-weight:700; color:#006D70; background:#e8f4f9; padding:2px 10px; border-radius:999px; font-size:0.85rem;">เต็ม ${sum} คะแนน</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          ${items.map(c => `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:8px 10px; background:#f8fafc; border-radius:6px; font-size:0.88rem; gap:10px;">
-              <div>
-                <span style="font-weight:600; color:#1e293b;">ข้อ ${esc(c.ItemNo)}. ${esc(c.CriteriaNameTH || c.CriteriaName)}</span>
-                ${c.DescriptionTH ? `<div style="font-size:0.8rem; color:#64748b; margin-top:2px;">${esc(c.DescriptionTH).substring(0, 100)}${String(c.DescriptionTH).length > 100 ? '...' : ''}</div>` : ''}
-              </div>
-              <span style="font-weight:700; color:#006D70; white-space:nowrap;">${c.MaxScore} คะแนน</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  };
-  
-  let critHtml = '<h4 style="margin-top:18px">เกณฑ์คะแนนประเมิน</h4>';
-  if (researchCrit.length > 0 || cqiCrit.length > 0) {
-    critHtml += renderCritGroup('🔬 เกณฑ์แบบที่ 1: ผลงานวิจัย / ผลงานนวัตกรรม', '#0369a1', researchCrit);
-    critHtml += renderCritGroup('🏥 เกณฑ์แบบที่ 2: ผลงาน CQI / Service Excellence / Primary Care', '#d97706', cqiCrit);
-    if (otherCrit.length > 0) critHtml += renderCritGroup('📋 เกณฑ์ทั่วไป / เกณฑ์เดิม', '#475569', otherCrit);
-  } else {
-    critHtml += renderCritGroup('📋 เกณฑ์คะแนนที่ใช้งานอยู่', '#006D70', critList);
-  }
-  
-  $('#reviewConfig').innerHTML = roundsHtml + critHtml;
-}
+let CURRENT_REVIEW_CONFIG = null;
+let SELECTED_REVIEW_ROUND_ID = "";
 
-async function setupCategoryCriteria() {
-  const confirm = await Swal.fire({
-    title: 'ตั้งค่าเกณฑ์คะแนนแยก 2 แบบ?',
-    html: `
-      <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
-        ระบบจะทำการกำหนดเกณฑ์ประเมินคะแนนแยกตามประเภทผลงาน:
-        <ul style="margin:8px 0 8px 18px;">
-          <li><b>แบบที่ 1 (วิจัย / นวัตกรรม)</b>: 7 หัวข้อ รวม 100 คะแนน</li>
-          <li><b>แบบที่ 2 (CQI / Service Excellence / Primary Care)</b>: 6 หัวข้อ รวม 100 คะแนน</li>
-        </ul>
-        <span style="color:#166534; font-weight:600;">✓ คะแนนและผลงานเดิมที่กรรมการประเมินไปแล้วจะยังคงอยู่และไม่สูญหาย</span>
-      </div>
-    `,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'ยืนยันตั้งค่าเกณฑ์คะแนน',
-    cancelButtonText: 'ยกเลิก',
-    confirmButtonColor: '#006D70'
-  });
-  if (!confirm.isConfirmed) return;
-  
-  show('กำลังตั้งค่าเกณฑ์คะแนน...');
+async function loadReviewConfig(forceRefresh = false){
+  if(CURRENT_REVIEW_CONFIG && !forceRefresh){
+    renderReviewConfigView();
+    return;
+  }
+  show("กำลังโหลดการตั้งค่ารอบและเกณฑ์คะแนน...");
   try {
-    const res = await rpc('adminSetupCategoryScoringCriteria', TOKEN, CID);
+    const d = await rpc("adminGetReviewConfig", TOKEN, CID);
     hide();
-    await Swal.fire({
-      icon: 'success',
-      title: 'ตั้งค่าเกณฑ์คะแนนสำเร็จ',
-      text: res.message || 'บันทึกเกณฑ์คะแนนแยกประเภทเรียบร้อยแล้ว'
-    });
-    loadReviewConfig(true);
+    CURRENT_REVIEW_CONFIG = d;
+    if(!SELECTED_REVIEW_ROUND_ID){
+      const r1 = (d.rounds || []).find(r => Number(r.RoundNo) === 1);
+      SELECTED_REVIEW_ROUND_ID = r1 ? r1.ReviewRoundID : (d.rounds && d.rounds[0] ? d.rounds[0].ReviewRoundID : "");
+    }
+    renderReviewConfigView();
   } catch(e) {
     hide();
     err(e);
   }
+}
+
+function selectReviewRound(roundId){
+  SELECTED_REVIEW_ROUND_ID = roundId;
+  renderReviewConfigView();
+}
+
+function renderReviewConfigView(){
+  const container = $("#reviewConfig");
+  if(!container) return;
+  const d = CURRENT_REVIEW_CONFIG || { rounds: [], criteria: [], categories: [] };
+  const rounds = d.rounds || [];
+  
+  if(!SELECTED_REVIEW_ROUND_ID && rounds.length > 0){
+    SELECTED_REVIEW_ROUND_ID = rounds[0].ReviewRoundID;
+  }
+  
+  const activeRound = rounds.find(r => r.ReviewRoundID === SELECTED_REVIEW_ROUND_ID) || rounds[0] || {};
+  const isRound2 = Number(activeRound.RoundNo) === 2 || String(activeRound.RoundNameTH || "").includes("ตัดสิน");
+
+  const tabsHtml = `
+    <div style="display:flex; gap:10px; border-bottom:2px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+      <span style="font-weight:700; color:#475569; font-size:0.9rem; margin-right:4px;"><i class="fa-solid fa-layer-group"></i> เลือกรอบการประเมิน:</span>
+      ${rounds.map(r => {
+        const isSel = r.ReviewRoundID === SELECTED_REVIEW_ROUND_ID;
+        const isR2 = Number(r.RoundNo) === 2 || String(r.RoundNameTH || "").includes("ตัดสิน");
+        const icon = isR2 ? "fa-trophy" : "fa-clipboard-check";
+        const color = isSel ? (isR2 ? "#92400e" : "#006D70") : "#475569";
+        const bg = isSel ? (isR2 ? "#fef3c7" : "#e0f2fe") : "#f8fafc";
+        const border = isSel ? (isR2 ? "#f59e0b" : "#0284c7") : "#cbd5e1";
+        return `
+          <button type="button" class="btn btn-sm" onclick="selectReviewRound('${esc(r.ReviewRoundID)}')" 
+            style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; border:1.5px solid ${border}; background:${bg}; color:${color}; font-weight:${isSel ? "700" : "600"}; font-size:0.9rem; cursor:pointer; box-shadow:${isSel ? "0 2px 6px rgba(0,0,0,0.06)" : "none"};">
+            <i class="fa-solid ${icon}"></i>
+            <span>รอบที่ ${r.RoundNo}: ${esc(r.RoundNameTH)}</span>
+            <span class="badge" style="background:${isSel ? "#fff" : "#e2e8f0"}; color:${color}; font-size:0.75rem; padding:2px 8px; border-radius:999px;">${esc(r.Status || "OPEN")}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  const roundInfoBanner = `
+    <div style="background:${isRound2 ? "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)" : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"}; border:1px solid ${isRound2 ? "#fde68a" : "#bbf7d0"}; border-radius:10px; padding:14px 16px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div style="flex:1; min-width:260px;">
+        <div style="font-weight:700; font-size:0.98rem; color:${isRound2 ? "#92400e" : "#166534"}; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid ${isRound2 ? "fa-award" : "fa-list-check"}" style="font-size:1.1rem;"></i>
+          <span>${esc(activeRound.RoundNameTH || "รอบประเมิน")} (รอบที่ ${activeRound.RoundNo || 1})</span>
+        </div>
+        <div style="font-size:0.84rem; color:${isRound2 ? "#78350f" : "#14532d"}; margin-top:4px; line-height:1.4;">
+          ${isRound2 
+            ? "🏆 <b>รอบตัดสินผลงาน (วันงานจริง):</b> สำหรับผลงานที่ผ่านรอบแรก โดย Admin สามารถ Assign กรรมการ 2-3 ท่านประเมินในวันจริง มีเกณฑ์คะแนนด้านการนำเสนอและการตอบข้อซักถาม รวมเต็ม 100 คะแนน"
+            : "📝 <b>รอบประเมินผลงาน (คัดกรองเนื้อหา):</b> กรรมการ 2-3 ท่านประเมินเนื้อหา ความสมบูรณ์ และประสิทธิผลของผลงานผ่านระบบก่อนวันงานจริง รวมเต็ม 100 คะแนน"}
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-sm btn-primary" onclick="openCriterionModal(null, '${esc(SELECTED_REVIEW_ROUND_ID)}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:0.84rem; padding:8px 14px;">
+          <i class="fa-solid fa-plus"></i> เพิ่มข้อเกณฑ์ในรอบนี้
+        </button>
+        <button type="button" class="btn btn-sm btn-gold" onclick="setupCategoryCriteriaModal('${esc(SELECTED_REVIEW_ROUND_ID)}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:0.84rem; padding:8px 14px;">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> ตั้งค่าเกณฑ์มาตรฐานรอบนี้ (100 คะแนน)
+        </button>
+      </div>
+    </div>
+  `;
+
+  const critList = (d.criteria || []).filter(c => {
+    if(!bool(c.Active)) return false;
+    const cRound = String(c.ReviewRoundID || "").trim();
+    if(isRound2){
+      return cRound === activeRound.ReviewRoundID || cRound === "RR-2026-000002" || cRound.includes("2");
+    } else {
+      return cRound === activeRound.ReviewRoundID || cRound === "RR-2026-000001" || !cRound || cRound === "ALL";
+    }
+  });
+
+  const researchCrit = critList.filter(c => {
+    const cat = String(c.CategoryID || "").toUpperCase();
+    return cat === "RESEARCH_INNOVATION" || cat.includes("RESEARCH") || cat.includes("INNOVATION");
+  }).sort((a,b) => (Number(a.ItemNo)||0) - (Number(b.ItemNo)||0));
+
+  const cqiCrit = critList.filter(c => {
+    const cat = String(c.CategoryID || "").toUpperCase();
+    return cat === "SERVICE_CQI_PRIMARY" || cat === "CQI" || cat === "SERVICE" || cat === "PRIMARY" || cat.includes("CQI") || cat.includes("SERVICE") || cat.includes("PRIMARY");
+  }).sort((a,b) => (Number(a.ItemNo)||0) - (Number(b.ItemNo)||0));
+
+  const otherCrit = critList.filter(c => !researchCrit.includes(c) && !cqiCrit.includes(c)).sort((a,b) => (Number(a.ItemNo)||0) - (Number(b.ItemNo)||0));
+
+  const renderCritGroup = (title, icon, badgeColor, items, catId) => {
+    const sum = items.reduce((acc, x) => acc + (Number(x.MaxScore) || 0), 0);
+    const isComplete100 = sum === 100;
+    return `
+      <div style="margin-bottom:18px; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.03);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; border-bottom:1.5px solid #e2e8f0; padding-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.15rem;">${icon}</span>
+            <b style="color:${badgeColor}; font-size:1rem;">${title}</b>
+            <span class="badge" style="background:#f1f5f9; color:#475569; font-size:0.75rem; padding:2px 8px; border-radius:999px;">${items.length} ข้อ</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="badge" style="background:${isComplete100 ? "#dcfce7" : "#fee2e2"}; color:${isComplete100 ? "#15803d" : "#991b1b"}; border:1px solid ${isComplete100 ? "#86efac" : "#fca5a5"}; font-size:0.84rem; padding:4px 10px; font-weight:700; border-radius:999px;">
+              ${isComplete100 ? "✓ คะแนนรวมเต็ม 100 คะแนน" : `⚠️ คะแนนรวม ${sum} / 100 คะแนน (ยังไม่ครบ 100)`}
+            </span>
+            <button type="button" class="btn btn-sm btn-soft" onclick="openCriterionModal(null, '${esc(SELECTED_REVIEW_ROUND_ID)}', '${esc(catId)}')" style="font-size:0.78rem; padding:4px 10px;">
+              <i class="fa-solid fa-plus"></i> เพิ่มข้อ
+            </button>
+          </div>
+        </div>
+        ${items.length === 0 ? `
+          <div style="text-align:center; padding:20px; color:#94a3b8; font-size:0.86rem; background:#f8fafc; border-radius:8px; border:1px dashed #cbd5e1;">
+            ยังไม่มีข้อเกณฑ์สำหรับกลุ่มนี้ในรอบนี้ สามารถกด "+ เพิ่มข้อ" หรือ "⚡ ตั้งค่าเกณฑ์มาตรฐานรอบนี้"
+          </div>
+        ` : `
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${items.map(c => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:0.88rem; gap:12px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:700; color:#0f172a;">ข้อ ${esc(c.ItemNo)}.</span>
+                    <span style="font-weight:600; color:#1e293b;">${esc(c.CriteriaNameTH || c.CriteriaName)}</span>
+                  </div>
+                  ${c.DescriptionTH ? `<div style="font-size:0.8rem; color:#64748b; margin-top:3px; line-height:1.35;">${esc(c.DescriptionTH)}</div>` : ""}
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+                  <span style="font-weight:800; color:#006D70; background:#e0f2fe; padding:4px 10px; border-radius:6px; font-size:0.9rem; min-width:65px; text-align:center;">
+                    ${c.MaxScore} คะแนน
+                  </span>
+                  <button type="button" class="btn btn-sm btn-gold" onclick="openCriterionModal(${JSON.stringify(c).replace(/"/g, "&quot;")}, '${esc(SELECTED_REVIEW_ROUND_ID)}')" title="แก้ไขข้อนี้" style="padding:4px 8px; font-size:0.78rem;">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-soft" onclick="deleteCriterion('${esc(c.CriteriaID)}', '${esc(c.CriteriaNameTH || c.CriteriaName || "")}')" title="ลบข้อนี้" style="padding:4px 8px; font-size:0.78rem; color:#dc2626;">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `}
+      </div>
+    `;
+  };
+
+  let critHtml = "";
+  critHtml += renderCritGroup("ผลงานวิจัย / ผลงานนวัตกรรม (Research & Innovation)", "🔬", "#0C385B", researchCrit, "RESEARCH_INNOVATION");
+  critHtml += renderCritGroup("ผลงาน CQI / Service Excellence / Primary Care", "🏥", "#006D70", cqiCrit, "SERVICE_CQI_PRIMARY");
+  if(otherCrit.length > 0){
+    critHtml += renderCritGroup("เกณฑ์อื่นๆ เพิ่มเติม", "📋", "#475569", otherCrit, "ALL");
+  }
+
+  container.innerHTML = tabsHtml + roundInfoBanner + critHtml;
+}
+
+async function openCriterionModal(crit = null, defaultRoundId = "", defaultCatId = ""){
+  const isEdit = !!(crit && crit.CriteriaID);
+  const rounds = (CURRENT_REVIEW_CONFIG && CURRENT_REVIEW_CONFIG.rounds) || [];
+  const targetRoundId = crit ? (crit.ReviewRoundID || defaultRoundId) : (defaultRoundId || SELECTED_REVIEW_ROUND_ID);
+  const targetCatId = crit ? (crit.CategoryID || defaultCatId) : (defaultCatId || "SERVICE_CQI_PRIMARY");
+
+  const roundOptions = rounds.map(r => `
+    <option value="${esc(r.ReviewRoundID)}" ${r.ReviewRoundID === targetRoundId ? "selected" : ""}>
+      รอบที่ ${r.RoundNo}: ${esc(r.RoundNameTH)}
+    </option>
+  `).join("");
+
+  const catOptions = `
+    <option value="SERVICE_CQI_PRIMARY" ${targetCatId === "SERVICE_CQI_PRIMARY" ? "selected" : ""}>🏥 CQI / Service Excellence / Primary Care</option>
+    <option value="RESEARCH_INNOVATION" ${targetCatId === "RESEARCH_INNOVATION" ? "selected" : ""}>🔬 ผลงานวิจัย / ผลงานนวัตกรรม (Research & Innovation)</option>
+    <option value="ALL" ${targetCatId === "ALL" ? "selected" : ""}>📋 ทุกประเภทผลงาน (General / All)</option>
+  `;
+
+  const itemNoVal = crit ? (crit.ItemNo || 1) : 1;
+  const nameVal = crit ? (crit.CriteriaNameTH || crit.CriteriaName || "") : "";
+  const descVal = crit ? (crit.DescriptionTH || "") : "";
+  const scoreVal = crit ? (crit.MaxScore || 15) : 15;
+
+  const html = `
+    <div style="text-align:left; font-size:0.88rem;">
+      <div style="margin-bottom:12px;">
+        <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">รอบการประเมิน:</label>
+        <select id="modalCritRound" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem;">
+          ${roundOptions}
+        </select>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">กลุ่ม / ประเภทผลงาน:</label>
+        <select id="modalCritCat" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem;">
+          ${catOptions}
+        </select>
+      </div>
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div style="width:110px;">
+          <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">ลำดับข้อที่:</label>
+          <input type="number" id="modalCritItemNo" min="1" max="20" value="${esc(itemNoVal)}" style="width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem; font-weight:700;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">คะแนนเต็ม (Max Score):</label>
+          <input type="number" id="modalCritMaxScore" min="1" max="100" value="${esc(scoreVal)}" style="width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem; font-weight:700; color:#006D70;">
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">ชื่อหัวข้อเกณฑ์ประเมิน:</label>
+        <input type="text" id="modalCritName" value="${esc(nameVal)}" placeholder="เช่น ความสำคัญของปัญหา หรือ ทักษะการนำเสนอ" style="width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">คำอธิบายเกณฑ์ / รายละเอียดการพิจารณา:</label>
+        <textarea id="modalCritDesc" rows="3" placeholder="ระบุแนวทางการให้คะแนน รายละเอียดที่ต้องพิจารณา..." style="width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; resize:vertical;">${esc(descVal)}</textarea>
+      </div>
+    </div>
+  `;
+
+  const result = await Swal.fire({
+    title: `<span style="font-size:1.15rem; color:#0C385B;"><i class="fa-solid ${isEdit ? "fa-pen-to-square" : "fa-plus"}"></i> ${isEdit ? "แก้ไขข้อเกณฑ์คะแนน" : "เพิ่มข้อเกณฑ์คะแนนใหม่"}</span>`,
+    html: html,
+    width: "540px",
+    showCancelButton: true,
+    confirmButtonText: isEdit ? "บันทึกการแก้ไข" : "บันทึกเกณฑ์คะแนน",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#006D70",
+    preConfirm: () => {
+      const name = ($("#modalCritName").value || "").trim();
+      const score = Number($("#modalCritMaxScore").value);
+      const itemNo = Number($("#modalCritItemNo").value);
+      if(!name){
+        Swal.showValidationMessage("กรุณากรอกชื่อหัวข้อเกณฑ์ประเมิน");
+        return false;
+      }
+      if(!score || score <= 0 || score > 100){
+        Swal.showValidationMessage("กรุณาระบุคะแนนเต็มให้ถูกต้อง (1-100)");
+        return false;
+      }
+      return {
+        CriteriaID: isEdit ? crit.CriteriaID : "",
+        ReviewRoundID: $("#modalCritRound").value,
+        CategoryID: $("#modalCritCat").value,
+        ItemNo: itemNo || 1,
+        CriteriaNameTH: name,
+        DescriptionTH: ($("#modalCritDesc").value || "").trim(),
+        MaxScore: score,
+        Active: true
+      };
+    }
+  });
+
+  if(result.isConfirmed){
+    show("กำลังบันทึกเกณฑ์คะแนน...");
+    try {
+      await rpc("adminSaveScoringCriterion", TOKEN, CID, result.value);
+      hide();
+      toast("บันทึกเกณฑ์คะแนนสำเร็จ");
+      await loadReviewConfig(true);
+    } catch(e) {
+      hide();
+      err(e);
+    }
+  }
+}
+
+async function deleteCriterion(critId, name){
+  const confirm = await Swal.fire({
+    title: "ยืนยันลบข้อเกณฑ์คะแนนนี้?",
+    text: name ? `ต้องการลบหัวข้อ: "${name}" ใช่หรือไม่?` : "ต้องการลบข้อเกณฑ์นี้ใช่หรือไม่?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "ยืนยันลบ",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#dc2626"
+  });
+  if(!confirm.isConfirmed) return;
+  show("กำลังลบเกณฑ์คะแนน...");
+  try {
+    await rpc("adminSaveScoringCriterion", TOKEN, CID, { CriteriaID: critId, Active: false });
+    hide();
+    toast("ลบเกณฑ์คะแนนสำเร็จ");
+    await loadReviewConfig(true);
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
+
+async function setupCategoryCriteriaModal(roundId = ""){
+  const rounds = (CURRENT_REVIEW_CONFIG && CURRENT_REVIEW_CONFIG.rounds) || [];
+  const targetId = roundId || SELECTED_REVIEW_ROUND_ID || (rounds[0] ? rounds[0].ReviewRoundID : "");
+  const activeRound = rounds.find(r => r.ReviewRoundID === targetId) || rounds[0] || {};
+  const isR2 = Number(activeRound.RoundNo) === 2 || String(activeRound.RoundNameTH || "").includes("ตัดสิน");
+
+  const title = isR2 ? "รอบตัดสินผลงาน (รวมการนำเสนอและตอบข้อซักถาม)" : "รอบประเมินผลงาน (คัดกรองเนื้อหา)";
+  const detail = isR2 ? `
+    <ul style="margin:8px 0 8px 18px;">
+      <li><b>แบบที่ 1 (วิจัย/นวัตกรรม)</b>: 7 หัวข้อ รวม 100 คะแนน (มีเกณฑ์การนำเสนอ 15 คะแนน และตอบข้อซักถาม 15 คะแนน)</li>
+      <li><b>แบบที่ 2 (CQI/Service/Primary)</b>: 6 หัวข้อ รวม 100 คะแนน (มีเกณฑ์การนำเสนอ 15 คะแนน และตอบข้อซักถาม 15 คะแนน)</li>
+    </ul>
+  ` : `
+    <ul style="margin:8px 0 8px 18px;">
+      <li><b>แบบที่ 1 (วิจัย/นวัตกรรม)</b>: 7 หัวข้อ รวม 100 คะแนน</li>
+      <li><b>แบบที่ 2 (CQI/Service/Primary)</b>: 6 หัวข้อ รวม 100 คะแนน</li>
+    </ul>
+  `;
+
+  const confirm = await Swal.fire({
+    title: `ตั้งค่าเกณฑ์มาตรฐาน ${title}?`,
+    html: `
+      <div style="text-align:left; font-size:0.9rem; line-height:1.6;">
+        ระบบจะทำการกำหนดเกณฑ์ประเมินคะแนนมาตรฐานสำหรับ <b>${esc(activeRound.RoundNameTH || "รอบที่เลือก")}</b>:
+        ${detail}
+        <span style="color:#166534; font-weight:600;">✓ คะแนนเดิมและผลงานของรอบอื่นๆ จะไม่ได้รับผลกระทบใดๆ</span>
+      </div>
+    `,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "ยืนยันตั้งค่าเกณฑ์มาตรฐาน",
+    cancelButtonText: "ยกเลิก",
+    confirmButtonColor: "#006D70"
+  });
+  if(!confirm.isConfirmed) return;
+
+  show("กำลังตั้งค่าเกณฑ์คะแนนมาตรฐาน...");
+  try {
+    const res = await rpc("adminSetupCategoryScoringCriteria", TOKEN, CID, targetId);
+    hide();
+    await Swal.fire({
+      icon: "success",
+      title: "ตั้งค่าสำเร็จ",
+      text: (res && res.message) || "บันทึกเกณฑ์คะแนนมาตรฐานเรียบร้อยแล้ว"
+    });
+    await loadReviewConfig(true);
+  } catch(e) {
+    hide();
+    err(e);
+  }
+}
+
+function setupCategoryCriteria(){
+  setupCategoryCriteriaModal(SELECTED_REVIEW_ROUND_ID);
 }
 
 function switchUploadTab(t){
