@@ -213,7 +213,10 @@
       <div class="card">
         <div class="actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between">
           <h3 style="margin:0">จัดการผลงานวิชาการ</h3>
-          <div style="display:flex; gap:10px">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-primary" onclick="openAllWorksEvaluationReport()" style="background:#006D70; color:#fff; font-weight:600; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 5px rgba(0,109,112,0.25);">
+              <i class="fa-solid fa-file-invoice"></i> ใบรายงานรวมทุกผลงาน
+            </button>
             <button class="btn btn-blue" onclick="openAssignByCategoryModal()"><i class="fa-solid fa-users-gear"></i> Assign ตามสาขา</button>
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
@@ -5160,6 +5163,579 @@ async function viewUserScanHistory(id){
   }
 }
 window.addEventListener('load',async()=>{loadRememberedLogin();TOKEN=currentAdminToken();if(TOKEN){show('กำลังตรวจสอบ Session');try{await boot();hide()}catch(e){TOKEN='';localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');$('#login').style.display='';$('#app').style.display='none';hide()}}});
+
+
+// ==================== ใบรายงานรวมทุกผลงานวิจัย / ผลงานวิชาการ ====================
+
+function prepareEnrichedWorksForReport(worksList) {
+  return (worksList || []).map(w => {
+    const revs = (w.reviewers || []).slice();
+    const validScores = [];
+    const revSlots = [null, null, null];
+
+    revs.forEach((r, idx) => {
+      if (idx < 3) revSlots[idx] = r;
+      if (r && r.TotalScore !== null && r.TotalScore !== undefined && !isNaN(Number(r.TotalScore)) && Number(r.TotalScore) >= 0) {
+        validScores.push(Number(r.TotalScore));
+      }
+    });
+
+    let mean = 0;
+    let sd = 0;
+    let meanSdText = '-';
+    if (validScores.length > 0) {
+      mean = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+      if (validScores.length >= 2) {
+        const variance = validScores.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (validScores.length - 1);
+        sd = Math.sqrt(variance);
+        meanSdText = `${mean.toFixed(2)} ± ${sd.toFixed(2)}`;
+      } else {
+        meanSdText = `${mean.toFixed(2)}`;
+      }
+    } else if (w.AverageScore && Number(w.AverageScore) > 0) {
+      mean = Number(w.AverageScore);
+      meanSdText = `${mean.toFixed(2)}`;
+    }
+
+    const st = String(w.Status || w.CurrentStatus || '').toUpperCase();
+    let resultText = 'รอผลประเมิน';
+    let resultColor = '#64748b';
+    let resultBg = '#f1f5f9';
+
+    if (['PASS', 'PASSED', 'ACCEPTED', 'APPROVED'].includes(st)) {
+      resultText = 'ผ่าน';
+      resultColor = '#15803d';
+      resultBg = '#dcfce7';
+    } else if (['REJECT', 'REJECTED'].includes(st)) {
+      resultText = 'ไม่ผ่าน';
+      resultColor = '#b91c1c';
+      resultBg = '#fee2e2';
+    } else if (['REVISION', 'REVISE'].includes(st)) {
+      resultText = 'แก้ไข';
+      resultColor = '#b45309';
+      resultBg = '#fef3c7';
+    } else if (validScores.length > 0) {
+      const assignedCount = Number(w.ReviewerAssignedCount) || 3;
+      if (validScores.length >= assignedCount || validScores.length >= 2) {
+        if (mean >= 60) {
+          resultText = 'ผ่าน (รอยืนยัน)';
+          resultColor = '#15803d';
+          resultBg = '#dcfce7';
+        } else {
+          resultText = 'ไม่ผ่าน (รอยืนยัน)';
+          resultColor = '#b91c1c';
+          resultBg = '#fee2e2';
+        }
+      } else {
+        resultText = `ประเมินแล้ว ${validScores.length}/${assignedCount}`;
+        resultColor = '#0369a1';
+        resultBg = '#e0f2fe';
+      }
+    }
+
+    const pInfo = getWorkPresenterDisplay(w);
+    const authorNames = (w.authors || []).map(x => esc(x.FullName || [x.Prefix, x.FirstName, x.LastName].filter(Boolean).join(' ') || x.FirstName)).filter(Boolean).join(', ') || esc(pInfo.name);
+
+    const remarksList = [];
+    if (w.PresentationTypeName) remarksList.push(w.PresentationTypeName);
+    revs.forEach(r => {
+      if (r && (r.RecommendationToAuthor || r.InternalComment)) {
+        const c = String(r.RecommendationToAuthor || r.InternalComment).trim();
+        if (c && !remarksList.includes(c)) remarksList.push(c);
+      }
+    });
+
+    const catName = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || 'ผลงานทั่วไป');
+
+    return {
+      raw: w,
+      workId: w.WorkID,
+      workCode: String(w.WorkCode || w.WorkID || '-').trim(),
+      titleTH: w.TitleTH || w.ThaiTitle || '',
+      titleEN: w.TitleEN || w.EnglishTitle || '',
+      categoryName: catName,
+      authors: authorNames,
+      presenter: pInfo.name,
+      institution: pInfo.inst || w.Institution || (w.authors && w.authors[0] && w.authors[0].Organization) || '',
+      reviewer1: revSlots[0],
+      reviewer2: revSlots[1],
+      reviewer3: revSlots[2],
+      validScores: validScores,
+      mean: mean,
+      sd: sd,
+      meanSdText: meanSdText,
+      resultText: resultText,
+      resultColor: resultColor,
+      resultBg: resultBg,
+      remarks: remarksList.join('; ')
+    };
+  });
+}
+
+function groupAndSortWorks(enrichedWorks) {
+  const groups = {};
+  enrichedWorks.forEach(w => {
+    if (!groups[w.categoryName]) groups[w.categoryName] = [];
+    groups[w.categoryName].push(w);
+  });
+
+  const catNames = Object.keys(groups).sort((a, b) => {
+    const order = ['วิจัย', 'นวัตกรรม', 'SERVICE', 'CQI', 'PRIMARY'];
+    const idxA = order.findIndex(o => a.toUpperCase().includes(o));
+    const idxB = order.findIndex(o => b.toUpperCase().includes(o));
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  catNames.forEach(cat => {
+    groups[cat].sort((a, b) => String(a.workCode).localeCompare(String(b.workCode), undefined, { numeric: true, sensitivity: 'base' }));
+  });
+
+  return { catNames, groups };
+}
+
+window._REPORT_ACTIVE_FILTER = { cat: '', status: '', q: '' };
+
+async function openAllWorksEvaluationReport() {
+  if (!window.WORK_ROWS || !window.WORK_ROWS.length) {
+    show('กำลังโหลดข้อมูลผลงาน...');
+    await loadWorks();
+    hide();
+  }
+  const allWorks = window.WORK_ROWS || [];
+  if (!allWorks.length) {
+    return Swal.fire({ icon: 'info', title: 'ไม่พบข้อมูลผลงาน', text: 'ยังไม่มีผลงานในระบบ' });
+  }
+
+  const enrichedWorks = prepareEnrichedWorksForReport(allWorks);
+  const { catNames, groups } = groupAndSortWorks(enrichedWorks);
+
+  window._CURRENT_REPORT_DATA = { allWorks, enrichedWorks, catNames, groups };
+  window._REPORT_ACTIVE_FILTER = { cat: '', status: '', q: '' };
+
+  renderAllWorksReportModalView();
+}
+
+function renderAllWorksReportModalView() {
+  const data = window._CURRENT_REPORT_DATA;
+  if (!data) return;
+  const { enrichedWorks, catNames, groups } = data;
+  const filter = window._REPORT_ACTIVE_FILTER;
+
+  let filteredList = enrichedWorks.filter(w => {
+    if (filter.cat && w.categoryName !== filter.cat) return false;
+    if (filter.status === 'PASS' && !w.resultText.includes('ผ่าน')) return false;
+    if (filter.status === 'REVISION' && !w.resultText.includes('แก้ไข')) return false;
+    if (filter.status === 'REJECT' && !w.resultText.includes('ไม่ผ่าน')) return false;
+    if (filter.status === 'WAIT' && !w.resultText.includes('รอ')) return false;
+    if (filter.q) {
+      const q = filter.q.toLowerCase();
+      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const { catNames: filteredCatNames, groups: filteredGroups } = groupAndSortWorks(filteredList);
+
+  const totalWorks = filteredList.length;
+  const passedWorks = filteredList.filter(w => w.resultText.includes('ผ่าน')).length;
+  const waitingWorks = filteredList.filter(w => w.resultText.includes('รอ')).length;
+
+  const html = `
+    <div style="text-align:left; font-size:0.88rem; max-height:75vh; display:flex; flex-direction:column;">
+      <!-- Toolbar & Actions -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <select id="reportCatFilter" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; border-radius:6px; border:1px solid #cbd5e1;" onchange="onReportFilterChange()">
+            <option value="">-- ทุกประเภทผลงาน (${totalWorks} เรื่อง) --</option>
+            ${catNames.map(c => `<option value="${esc(c)}" ${filter.cat === c ? 'selected' : ''}>${esc(c)} (${(groups[c]||[]).length} เรื่อง)</option>`).join('')}
+          </select>
+          <select id="reportStatusFilter" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; border-radius:6px; border:1px solid #cbd5e1;" onchange="onReportFilterChange()">
+            <option value="">-- ทุกผลการตัดสิน --</option>
+            <option value="PASS" ${filter.status === 'PASS' ? 'selected' : ''}>เฉพาะ: ผ่าน</option>
+            <option value="REVISION" ${filter.status === 'REVISION' ? 'selected' : ''}>เฉพาะ: แก้ไข</option>
+            <option value="REJECT" ${filter.status === 'REJECT' ? 'selected' : ''}>เฉพาะ: ไม่ผ่าน</option>
+            <option value="WAIT" ${filter.status === 'WAIT' ? 'selected' : ''}>เฉพาะ: รอผลประเมิน</option>
+          </select>
+          <input type="text" id="reportSearchQ" placeholder="ค้นหา รหัส / ชื่อเรื่อง / ผู้แต่ง" value="${esc(filter.q)}" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; width:180px; border-radius:6px; border:1px solid #cbd5e1;" oninput="onReportFilterChange()">
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm btn-primary" onclick="printAllWorksReport()" style="display:inline-flex; align-items:center; gap:6px; background:#006D70; color:#fff; font-weight:600; padding:7px 14px; border-radius:6px; box-shadow:0 2px 4px rgba(0,109,112,0.25);">
+            <i class="fa-solid fa-print"></i> พิมพ์ / บันทึก PDF (Print A4)
+          </button>
+          <button type="button" class="btn btn-sm btn-gold" onclick="exportAllWorksReportToExcel()" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; padding:7px 14px; border-radius:6px;">
+            <i class="fa-solid fa-file-excel"></i> ส่งออก Excel (.csv)
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Summary Stats -->
+      <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; font-size:0.82rem;">
+        <span style="background:#f1f5f9; padding:4px 10px; border-radius:6px; color:#334155;"><b>จำนวนผลงานทั้งหมด:</b> ${totalWorks} เรื่อง</span>
+        <span style="background:#dcfce7; padding:4px 10px; border-radius:6px; color:#166534;"><b>ผ่านเกณฑ์:</b> ${passedWorks} เรื่อง</span>
+        <span style="background:#e0f2fe; padding:4px 10px; border-radius:6px; color:#0369a1;"><b>อยู่ระหว่างประเมิน/รอสรุป:</b> ${waitingWorks} เรื่อง</span>
+        <span class="muted" style="margin-left:auto; align-self:center;">จัดกลุ่มตามประเภทผลงาน & เรียงตามรหัสผลงาน</span>
+      </div>
+
+      <!-- Report Preview Table -->
+      <div style="flex:1; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
+        ${filteredCatNames.length === 0 ? `
+          <div style="text-align:center; padding:40px; color:#94a3b8;">ไม่พบผลงานที่ตรงกับเงื่อนไขการค้นหา</div>
+        ` : filteredCatNames.map(cat => {
+          const list = filteredGroups[cat] || [];
+          return `
+            <div style="border-bottom:2px solid #006D70; margin-bottom:16px;">
+              <div style="background:#0C385B; color:#fff; padding:8px 12px; font-weight:700; font-size:0.92rem; display:flex; justify-content:space-between; align-items:center;">
+                <span>📂 ประเภทผลงาน: ${esc(cat)}</span>
+                <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff; font-size:0.78rem; padding:2px 8px;">${list.length} เรื่อง</span>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="table" style="font-size:0.82rem; margin:0; width:100%; border-collapse:collapse;">
+                  <thead style="background:#f8fafc; border-bottom:1px solid #cbd5e1;">
+                    <tr>
+                      <th style="width:40px; text-align:center;">ลำดับ</th>
+                      <th style="width:130px; text-align:left;">รหัสผลงาน</th>
+                      <th style="min-width:200px; text-align:left;">ชื่อผลงาน</th>
+                      <th style="width:150px; text-align:left;">ผู้แต่ง / ผู้นำเสนอ</th>
+                      <th style="width:80px; text-align:center;">กรรมการ 1</th>
+                      <th style="width:80px; text-align:center;">กรรมการ 2</th>
+                      <th style="width:80px; text-align:center;">กรรมการ 3</th>
+                      <th style="width:110px; text-align:center; background:#f0f9ff; color:#0369a1; font-weight:700;">คะแนนเฉลี่ย ± SD</th>
+                      <th style="width:90px; text-align:center;">ผลสรุป</th>
+                      <th style="width:130px; text-align:left;">หมายเหตุ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${list.map((w, idx) => {
+                      const sc1 = w.reviewer1 && w.reviewer1.TotalScore !== null ? Number(w.reviewer1.TotalScore) : '-';
+                      const sc2 = w.reviewer2 && w.reviewer2.TotalScore !== null ? Number(w.reviewer2.TotalScore) : '-';
+                      const sc3 = w.reviewer3 && w.reviewer3.TotalScore !== null ? Number(w.reviewer3.TotalScore) : '-';
+                      return `
+                        <tr style="border-bottom:1px solid #eef2f6;">
+                          <td style="text-align:center; color:#64748b;">${idx + 1}</td>
+                          <td style="font-weight:700; color:#0C385B;">${esc(w.workCode)}</td>
+                          <td>
+                            <div style="font-weight:600; color:#0f172a;">${esc(w.titleTH || w.titleEN)}</div>
+                            ${w.titleTH && w.titleEN ? `<div class="muted" style="font-size:0.75rem;">${esc(w.titleEN)}</div>` : ''}
+                          </td>
+                          <td>
+                            <div style="font-weight:600; color:#1e293b;">${esc(w.authors || w.presenter)}</div>
+                            ${w.institution ? `<div class="muted" style="font-size:0.74rem;">${esc(w.institution)}</div>` : ''}
+                          </td>
+                          <td style="text-align:center; font-weight:600; ${sc1 !== '-' ? 'color:#006D70;' : 'color:#94a3b8;'}">${sc1}</td>
+                          <td style="text-align:center; font-weight:600; ${sc2 !== '-' ? 'color:#006D70;' : 'color:#94a3b8;'}">${sc2}</td>
+                          <td style="text-align:center; font-weight:600; ${sc3 !== '-' ? 'color:#006D70;' : 'color:#94a3b8;'}">${sc3}</td>
+                          <td style="text-align:center; font-weight:700; background:#f0f9ff; color:#0369a1;">${esc(w.meanSdText)}</td>
+                          <td style="text-align:center;">
+                            <span class="badge" style="background:${w.resultBg}; color:${w.resultColor}; font-weight:700; font-size:0.78rem; padding:3px 8px; border-radius:999px;">
+                              ${esc(w.resultText)}
+                            </span>
+                          </td>
+                          <td style="font-size:0.76rem; color:#64748b; line-height:1.3;">${esc(w.remarks || '-')}</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  Swal.fire({
+    title: `<div style="display:flex; justify-content:space-between; align-items:center; width:100%; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+      <span style="font-size:1.18rem; color:#0C385B; font-weight:700;"><i class="fa-solid fa-file-invoice" style="color:#006D70;"></i> ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน</span>
+    </div>`,
+    html: html,
+    width: '95vw',
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: { popup: 'swal-report-popup' }
+  });
+}
+
+function onReportFilterChange() {
+  const cat = ($('#reportCatFilter') && $('#reportCatFilter').value) || '';
+  const status = ($('#reportStatusFilter') && $('#reportStatusFilter').value) || '';
+  const q = ($('#reportSearchQ') && $('#reportSearchQ').value) || '';
+  window._REPORT_ACTIVE_FILTER = { cat, status, q };
+  renderAllWorksReportModalView();
+}
+
+function printAllWorksReport() {
+  const data = window._CURRENT_REPORT_DATA;
+  if (!data) return;
+  const filter = window._REPORT_ACTIVE_FILTER;
+  const { enrichedWorks } = data;
+
+  const filteredList = enrichedWorks.filter(w => {
+    if (filter.cat && w.categoryName !== filter.cat) return false;
+    if (filter.status === 'PASS' && !w.resultText.includes('ผ่าน')) return false;
+    if (filter.status === 'REVISION' && !w.resultText.includes('แก้ไข')) return false;
+    if (filter.status === 'REJECT' && !w.resultText.includes('ไม่ผ่าน')) return false;
+    if (filter.status === 'WAIT' && !w.resultText.includes('รอ')) return false;
+    if (filter.q) {
+      const q = filter.q.toLowerCase();
+      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const { catNames, groups } = groupAndSortWorks(filteredList);
+
+  const totalWorks = filteredList.length;
+  const passedWorks = filteredList.filter(w => w.resultText.includes('ผ่าน')).length;
+
+  const win = window.open('', '_blank');
+  if (!win) return Swal.fire({ icon: 'warning', title: 'เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาตป็อปอัป' });
+
+  win.document.write(`<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4 landscape; margin: 8mm 10mm; }
+    body { font-family: 'Prompt', sans-serif; font-size: 10px; color: #111; margin: 0; padding: 10px; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .header-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    .header-logo { width: 75px; text-align: left; vertical-align: top; }
+    .header-logo img { max-height: 55px; max-width: 75px; object-fit: contain; }
+    .header-center { text-align: center; vertical-align: middle; }
+    .header-center h1 { font-size: 14.5px; font-weight: 700; margin: 0 0 2px 0; color: #0C385B; }
+    .header-center h2 { font-size: 11.5px; font-weight: 600; margin: 0 0 2px 0; color: #006D70; }
+    .header-center p { font-size: 9.5px; margin: 0; color: #475569; }
+    .header-right { width: 130px; text-align: right; vertical-align: top; font-size: 9px; color: #64748b; }
+    
+    .stats-bar { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 12px; margin-bottom: 12px; font-size: 10px; }
+    
+    table.report-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9.5px; page-break-inside: auto; }
+    table.report-table thead { display: table-header-group; }
+    table.report-table tr { page-break-inside: avoid; page-break-after: auto; }
+    table.report-table th, table.report-table td { border: 1px solid #475569; padding: 4px 6px; }
+    table.report-table th { background: #f1f5f9; font-weight: 700; text-align: center; color: #0f172a; }
+    
+    .category-row td { background: #0C385B !important; color: #fff !important; font-weight: 700; font-size: 10.5px; padding: 6px 8px; text-align: left; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+    
+    .sig-section { display: flex; justify-content: space-around; margin-top: 25px; page-break-inside: avoid; }
+    .sig-box { text-align: center; width: 220px; font-size: 10px; line-height: 1.6; }
+    
+    @media print {
+      button { display: none !important; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+    <button onclick="window.print()" style="padding:6px 18px; background:#006D70; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-family:inherit;">
+      🖨 พิมพ์เอกสาร (Print / Save PDF)
+    </button>
+  </div>
+
+  <table class="header-table">
+    <tr>
+      <td class="header-logo">
+        <img src="/images/hacc-logo.png" alt="Logo" onerror="this.src='/images/tuh-logo.png'">
+      </td>
+      <td class="header-center">
+        <h1>ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน</h1>
+        <h2>งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569</h2>
+        <p>วันที่ 18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 ณ อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</p>
+      </td>
+      <td class="header-right">
+        วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH')}<br>
+        เวลา: ${new Date().toLocaleTimeString('th-TH')}<br>
+        จำนวนทั้งหมด: ${totalWorks} เรื่อง
+      </td>
+    </tr>
+  </table>
+
+  <div class="stats-bar">
+    <span><b>สรุปภาพรวม:</b> ผลงานทั้งหมด ${totalWorks} เรื่อง | ผ่านเกณฑ์ ${passedWorks} เรื่อง</span>
+    <span><b>การจัดเรียง:</b> จัดกลุ่มตามประเภทผลงาน & เรียงตามเลขรหัสผลงาน</span>
+  </div>
+
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th style="width:30px;">ลำดับ</th>
+        <th style="width:115px;">รหัสผลงาน</th>
+        <th>ชื่อผลงาน (Title)</th>
+        <th style="width:140px;">ผู้แต่ง / ผู้นำเสนอ</th>
+        <th style="width:65px;">กรรมการ 1</th>
+        <th style="width:65px;">กรรมการ 2</th>
+        <th style="width:65px;">กรรมการ 3</th>
+        <th style="width:95px; background:#e0f2fe;">คะแนนเฉลี่ย ± SD</th>
+        <th style="width:75px;">ผลสรุป</th>
+        <th style="width:120px;">หมายเหตุ</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${catNames.map(cat => {
+        const list = groups[cat] || [];
+        const catRows = list.map((w, idx) => {
+          const sc1 = w.reviewer1 && w.reviewer1.TotalScore !== null ? Number(w.reviewer1.TotalScore) : '-';
+          const sc2 = w.reviewer2 && w.reviewer2.TotalScore !== null ? Number(w.reviewer2.TotalScore) : '-';
+          const sc3 = w.reviewer3 && w.reviewer3.TotalScore !== null ? Number(w.reviewer3.TotalScore) : '-';
+          return `
+            <tr>
+              <td style="text-align:center;">${idx + 1}</td>
+              <td style="font-weight:700; text-align:center;">${esc(w.workCode)}</td>
+              <td>
+                <div style="font-weight:600;">${esc(w.titleTH || w.titleEN)}</div>
+                ${w.titleTH && w.titleEN ? `<div style="font-size:8.5px; color:#475569;">${esc(w.titleEN)}</div>` : ''}
+              </td>
+              <td>
+                <div>${esc(w.authors || w.presenter)}</div>
+                ${w.institution ? `<div style="font-size:8.5px; color:#64748b;">${esc(w.institution)}</div>` : ''}
+              </td>
+              <td style="text-align:center; font-weight:600;">${sc1}</td>
+              <td style="text-align:center; font-weight:600;">${sc2}</td>
+              <td style="text-align:center; font-weight:600;">${sc3}</td>
+              <td style="text-align:center; font-weight:700; background:#f0f9ff;">${esc(w.meanSdText)}</td>
+              <td style="text-align:center; font-weight:700;">${esc(w.resultText)}</td>
+              <td style="font-size:8.5px; color:#475569;">${esc(w.remarks || '-')}</td>
+            </tr>
+          `;
+        }).join('');
+
+        return `
+          <tr class="category-row">
+            <td colspan="10">ประเภท: ${esc(cat)} (จำนวน ${list.length} เรื่อง)</td>
+          </tr>
+          ${catRows}
+        `;
+      }).join('')}
+    </tbody>
+  </table>
+
+  <div class="sig-section">
+    <div class="sig-box">
+      <div>ลงชื่อ.......................................................................</div>
+      <div>(.......................................................)</div>
+      <div>ประธานคณะกรรมการวิชาการ</div>
+    </div>
+    <div class="sig-box">
+      <div>ลงชื่อ.......................................................................</div>
+      <div>(.......................................................)</div>
+      <div>กรรมการและเลขานุการฝ่ายวิชาการ</div>
+    </div>
+  </div>
+</body>
+</html>`);
+
+  win.document.close();
+}
+
+function exportAllWorksReportToExcel() {
+  const data = window._CURRENT_REPORT_DATA;
+  if (!data) return;
+  const filter = window._REPORT_ACTIVE_FILTER;
+  const { enrichedWorks } = data;
+
+  const filteredList = enrichedWorks.filter(w => {
+    if (filter.cat && w.categoryName !== filter.cat) return false;
+    if (filter.status === 'PASS' && !w.resultText.includes('ผ่าน')) return false;
+    if (filter.status === 'REVISION' && !w.resultText.includes('แก้ไข')) return false;
+    if (filter.status === 'REJECT' && !w.resultText.includes('ไม่ผ่าน')) return false;
+    if (filter.status === 'WAIT' && !w.resultText.includes('รอ')) return false;
+    if (filter.q) {
+      const q = filter.q.toLowerCase();
+      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const { catNames, groups } = groupAndSortWorks(filteredList);
+
+  const cleanCsv = (v) => '"' + String(v ?? '').replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"';
+
+  const rows = [];
+  rows.push([cleanCsv('ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน')]);
+  rows.push([cleanCsv('งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569')]);
+  rows.push([cleanCsv('วันที่ 18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 ณ อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')]);
+  rows.push([]);
+
+  const headers = [
+    'ลำดับ',
+    'ประเภทผลงาน',
+    'รหัสผลงาน',
+    'ชื่อผลงาน (ภาษาไทย)',
+    'ชื่อผลงาน (ภาษาอังกฤษ)',
+    'ชื่อผู้แต่ง / ผู้นำเสนอ',
+    'หน่วยงาน / สังกัด',
+    'กรรมการคนที่ 1',
+    'คะแนนกรรมการคนที่ 1',
+    'กรรมการคนที่ 2',
+    'คะแนนกรรมการคนที่ 2',
+    'กรรมการคนที่ 3',
+    'คะแนนกรรมการคนที่ 3',
+    'คะแนนเฉลี่ย (Mean)',
+    'ส่วนเบี่ยงเบนมาตรฐาน (SD)',
+    'คะแนนเฉลี่ย ± SD',
+    'ผลสรุปการประเมิน',
+    'หมายเหตุ'
+  ];
+  rows.push(headers.map(cleanCsv));
+
+  let globalIdx = 1;
+  catNames.forEach(cat => {
+    const list = groups[cat] || [];
+    list.forEach(w => {
+      const rev1Name = (w.reviewer1 && w.reviewer1.ReviewerName) || '-';
+      const sc1 = w.reviewer1 && w.reviewer1.TotalScore !== null ? Number(w.reviewer1.TotalScore) : '-';
+      const rev2Name = (w.reviewer2 && w.reviewer2.ReviewerName) || '-';
+      const sc2 = w.reviewer2 && w.reviewer2.TotalScore !== null ? Number(w.reviewer2.TotalScore) : '-';
+      const rev3Name = (w.reviewer3 && w.reviewer3.ReviewerName) || '-';
+      const sc3 = w.reviewer3 && w.reviewer3.TotalScore !== null ? Number(w.reviewer3.TotalScore) : '-';
+
+      rows.push([
+        cleanCsv(globalIdx++),
+        cleanCsv(w.categoryName),
+        cleanCsv(w.workCode),
+        cleanCsv(w.titleTH),
+        cleanCsv(w.titleEN),
+        cleanCsv(w.authors || w.presenter),
+        cleanCsv(w.institution),
+        cleanCsv(rev1Name),
+        cleanCsv(sc1),
+        cleanCsv(rev2Name),
+        cleanCsv(sc2),
+        cleanCsv(rev3Name),
+        cleanCsv(sc3),
+        cleanCsv(w.mean > 0 ? w.mean.toFixed(2) : '-'),
+        cleanCsv(w.sd > 0 ? w.sd.toFixed(2) : '-'),
+        cleanCsv(w.meanSdText),
+        cleanCsv(w.resultText),
+        cleanCsv(w.remarks)
+      ]);
+    });
+  });
+
+  const csvContent = '\uFEFF' + rows.map(r => r.join(',')).join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  const dateStr = new Date().toISOString().slice(0, 10);
+  link.setAttribute('download', `ใบรายงานสรุปผลการประเมินผลงาน_TUH19_${dateStr}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  toast('ส่งออกไฟล์ Excel สำเร็จ');
+}
+
 </script>
 <footer style="text-align:center; padding: 20px; font-size: 0.85rem; color: #667a88; margin-top: 40px;">
   © 2026 สงวนลิขสิทธิ์ • แพลตฟอร์มนี้เป็นนวัตกรรมที่พัฒนาขึ้นเพื่อสนับสนุนงานวิชาการ<br>

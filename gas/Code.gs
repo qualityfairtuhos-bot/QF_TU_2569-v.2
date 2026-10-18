@@ -7155,7 +7155,10 @@ function adminListWorks(token, conferenceId, filters) {
         (authorsByWork[a.WorkID] || (authorsByWork[a.WorkID] = [])).push(a);
       });
       var assigns = findMany_('ReviewAssignments', { ConferenceID: cid });
+      var assignsByWork = {};
       var asc = assigns.reduce(function(acc, c) {
+        if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
+          (assignsByWork[c.WorkID] || (assignsByWork[c.WorkID] = [])).push(c);
         if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
           if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
           acc[c.WorkID].a++;
@@ -7340,7 +7343,20 @@ function adminListWorks(token, conferenceId, filters) {
           Institution: presenterOrg,
           ReviewerAssignedCount: ac.a,
           ReviewerCompletedCount: ac.c,
-          AverageScore: ac.c ? ac.t / ac.c : 0,
+          AverageScore: ac.c ? (ac.t / ac.c).toFixed(2) : '0',
+          reviewers: (assignsByWork[w.WorkID] || []).map(function(a){
+            var sc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
+            return {
+              AssignmentID: a.AssignmentID,
+              ReviewerID: a.ReviewerID,
+              ReviewerName: clean_(a.ReviewerName || a.ReviewerID || ''),
+              TotalScore: sc,
+              Status: clean_(a.Status || ''),
+              Decision: clean_(a.Decision || ''),
+              RecommendationToAuthor: clean_(a.RecommendationToAuthor || ''),
+              InternalComment: clean_(a.InternalComment || '')
+            };
+          }),
           authors: finalAuthors,
           files: filesByWork[w.WorkID] || []
         });
