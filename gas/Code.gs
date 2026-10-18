@@ -7159,7 +7159,6 @@ function adminListWorks(token, conferenceId, filters) {
       var asc = assigns.reduce(function(acc, c) {
         if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
           (assignsByWork[c.WorkID] || (assignsByWork[c.WorkID] = [])).push(c);
-        if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
           if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
           acc[c.WorkID].a++;
           var st2 = upper_(c.Status);

@@ -1,2 +1,5 @@
 import { PortalPage } from "@/components/portal-page";
-export default function ReviewerPage(){return <PortalPage portal="reviewer"/>}
+
+export default function Page() {
+  return <PortalPage portal="reviewer" />;
+}

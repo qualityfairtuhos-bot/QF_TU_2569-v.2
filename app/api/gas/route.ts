@@ -1,50 +1,32 @@
+import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
-import {randomUUID} from "node:crypto";
-import {NextRequest,NextResponse} from "next/server";
-import {ALLOWED_ACTIONS,READ_ACTIONS,SESSION_ACTIONS} from "@/lib/actions";
-import {clearSessionCookie,setSessionCookie} from "@/lib/auth";
-import {GAS_TIMEOUT_MS,MAX_REQUEST_BYTES,SESSION_COOKIE} from "@/lib/config";
-import type {ApiResponse,RpcRequest} from "@/lib/types";
+import crypto from "node:crypto";
+import { ALLOWED_ACTIONS, SESSION_ACTIONS, READ_ACTIONS } from "@/lib/actions";
+import { setSessionCookie, clearSessionCookie } from "@/lib/auth";
+import { GAS_TIMEOUT_MS, MAX_REQUEST_BYTES, SESSION_COOKIE } from "@/lib/config";
 
-export const runtime="nodejs";
-export const dynamic="force-dynamic";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const PERSISTED_FILE = path.join(process.cwd(), "persisted_settings.json");
+const SETTINGS_FILE = path.join(process.cwd(), "persisted_settings.json");
 
-function getPersistedSettings(): Record<string, string> {
+function getPersistedSettings(): Record<string, any> {
   try {
-    if (fs.existsSync(PERSISTED_FILE)) {
-      return JSON.parse(fs.readFileSync(PERSISTED_FILE, "utf-8"));
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
     }
-  } catch (e) {
-    console.error("Failed to read persisted_settings.json", e);
+  } catch (err) {
+    console.error("Failed to read persisted_settings.json", err);
   }
   return {};
 }
 
-function savePersistedSettings(settings: Record<string, string>) {
-  try {
-    const current = getPersistedSettings();
-    const updated = { ...current, ...settings };
-    fs.writeFileSync(PERSISTED_FILE, JSON.stringify(updated, null, 2), "utf-8");
-    const standaloneDir = path.join(process.cwd(), ".next", "standalone");
-    if (fs.existsSync(standaloneDir)) {
-      try {
-        fs.writeFileSync(path.join(standaloneDir, "persisted_settings.json"), JSON.stringify(updated, null, 2), "utf-8");
-      } catch {}
-    }
-  } catch (e) {
-    console.error("Failed to write persisted_settings.json", e);
-  }
-}
+const rateLimits = new Map<string, { count: number; reset: number }>();
+const memoryCache = new Map<string, { data: any; expiresAt: number }>();
+const staleCache = new Map<string, any>();
 
-const buckets=new Map<string,{count:number;reset:number}>();
-
-// Fast in-memory cache for read-heavy responses
-const memoryCache=new Map<string,{data:ApiResponse<unknown>;expiresAt:number}>();
-const lastKnownGood=new Map<string,ApiResponse<unknown>>();
-const CACHE_TTLS:Record<string,number>={
+const CACHE_TTLS: Record<string, number> = {
   getPublicBootstrap: 300_000,
   getPublicAnnouncement: 300_000,
   getPublicFinanceDocuments: 300_000,
@@ -65,12 +47,12 @@ const CACHE_TTLS:Record<string,number>={
   reviewerGetAssignment: 180_000,
   verifyWorkAccess: 120_000,
   getEventScannerBootstrap: 180_000,
-  listImportBatches: 300_000
+  listImportBatches: 300_000,
 };
 
-const inFlightRequests = new Map<string, Promise<ApiResponse<unknown>>>();
+const inFlight = new Map<string, Promise<any>>();
 
-const DEFAULT_CONFERENCE_BOOT = {
+const DEFAULT_BOOTSTRAP: any = {
   conference: {
     ConferenceID: "CONF-TUH-QF-2569",
     ConferenceNameTH: "งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569",
@@ -85,29 +67,36 @@ const DEFAULT_CONFERENCE_BOOT = {
     ResultAnnouncementAt: "2026-11-01T23:59:59",
     LogoUrl: "/images/tuh-logo.png",
     PrimaryColor: "#0C385B",
-    SecondaryColor: "#006D70"
+    SecondaryColor: "#006D70",
   },
   registrationTypes: [
     { TypeCode: "EXT_PROV_CTR_GEN", TypeNameTH: "สาธารณสุขจังหวัด / โรงพยาบาลศูนย์ / โรงพยาบาลทั่วไป", FeeAmount: 2500 },
     { TypeCode: "EXT_COMMUNITY", TypeNameTH: "โรงพยาบาลชุมชน / สาธารณสุขอำเภอ / รพ.สต.", FeeAmount: 1500 },
     { TypeCode: "EXT_GENERAL_ACAD_PRIV", TypeNameTH: "บุคคลภายนอกทั่วไป / สถาบันการศึกษา / เอกชน", FeeAmount: 2500 },
-    { TypeCode: "INTERNAL", TypeNameTH: "บุคลากรโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ", FeeAmount: 0 }
+    { TypeCode: "INTERNAL", TypeNameTH: "บุคลากรโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ", FeeAmount: 0 },
   ],
   workCategories: [
     { CategoryID: "CAT-1", CategoryCode: "RESEARCH", CategoryNameTH: "ผลงานวิจัยด้านคุณภาพและความปลอดภัย" },
     { CategoryID: "CAT-2", CategoryCode: "INNOVATION", CategoryNameTH: "ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย" },
     { CategoryID: "CAT-3", CategoryCode: "SERVICE", CategoryNameTH: "Service Excellence" },
     { CategoryID: "CAT-4", CategoryCode: "CQI", CategoryNameTH: "CQI/ Best Practice" },
-    { CategoryID: "CAT-5", CategoryCode: "PRIMARY_CARE", CategoryNameTH: "Primary Care & Community Network Development" }
+    { CategoryID: "CAT-5", CategoryCode: "PRIMARY_CARE", CategoryNameTH: "Primary Care & Community Network Development" },
   ],
   presentationTypes: [
     { PresentationTypeID: "PRES-ORAL", TypeCode: "ORAL", TypeNameTH: "แบบบรรยาย (Oral presentation)", PresentationMinutes: 10, QAMinutes: 2 },
-    { PresentationTypeID: "PRES-POSTER", TypeCode: "POSTER", TypeNameTH: "แบบโปสเตอร์ (e-poster)", PresentationMinutes: 4, QAMinutes: 1 }
+    { PresentationTypeID: "PRES-POSTER", TypeCode: "POSTER", TypeNameTH: "แบบโปสเตอร์ (e-poster)", PresentationMinutes: 4, QAMinutes: 1 },
   ],
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
-    BANNER_SLIDES_JSON: '[{\"id\":\"b_tuh_forum2569\",\"title\":\"งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569\",\"imageUrl\":\"https://lh3.googleusercontent.com/d/1K5ugV1wCA4NaKxB4SkQ5-viHTorL9aau\",\"fallbackImageUrl\":\"/images/bannerweb_TUH19-1920x600.jpg\",\"linkUrl\":\"\",\"active\":true}]'
+    BANNER_SLIDES_JSON: JSON.stringify([{
+      id: "b_tuh_forum2569",
+      title: "งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569",
+      imageUrl: "https://lh3.googleusercontent.com/d/1K5ugV1wCA4NaKxB4SkQ5-viHTorL9aau",
+      fallbackImageUrl: "/images/bannerweb_TUH19-1920x600.jpg",
+      linkUrl: "",
+      active: true,
+    }]),
   },
   organizationUnits: [
     { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
@@ -119,116 +108,103 @@ const DEFAULT_CONFERENCE_BOOT = {
     { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลผู้ป่วยใน" },
     { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลอุบัติเหตุและฉุกเฉิน" },
     { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลผู้ป่วยหนัก" },
-    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลห้องผ่าตัด" }
+    { UnitLevel: "UNIT", UnitNameTH: "งานการพยาบาลห้องผ่าตัด" },
   ],
   dailyQuota: {
     internal: { max: 400, day1: 0, day2: 0, day3: 0 },
-    external: { max: 200, day1: 0, day2: 0, day3: 0 }
-  }
+    external: { max: 200, day1: 0, day2: 0, day3: 0 },
+  },
 };
 
-const initPersisted = getPersistedSettings();
-if (Object.keys(initPersisted).length > 0) {
-  DEFAULT_CONFERENCE_BOOT.settings = { ...DEFAULT_CONFERENCE_BOOT.settings, ...initPersisted };
+const initialPersisted = getPersistedSettings();
+if (Object.keys(initialPersisted).length > 0) {
+  DEFAULT_BOOTSTRAP.settings = { ...DEFAULT_BOOTSTRAP.settings, ...initialPersisted };
 }
 
-const preseededBoot: ApiResponse<unknown> = {
-  success: true,
-  data: DEFAULT_CONFERENCE_BOOT
-};
-lastKnownGood.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', preseededBoot);
-lastKnownGood.set('getPublicBootstrap:[]', preseededBoot);
-lastKnownGood.set('getPublicBootstrap:[""]', preseededBoot);
-memoryCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
-memoryCache.set('getPublicBootstrap:[]', { data: preseededBoot, expiresAt: Date.now() + 300_000 });
+const DEFAULT_RESPONSE = { success: true, data: DEFAULT_BOOTSTRAP };
 
-function getCacheKey(action:string,args:unknown[]){
-  if(action.startsWith("reviewer") && args.length>0){
-    const tokenPart = typeof args[0] === "string" ? args[0].slice(0, 24) : "__REV__";
-    const userArgs = [tokenPart, ...args.slice(1)];
-    return `${action}:${JSON.stringify(userArgs)}`;
+function buildCacheKey(action: string, args: any[]): string {
+  if (action.startsWith("reviewer") && args.length > 0) {
+    const masked = [typeof args[0] === "string" ? args[0].slice(0, 24) : "__REV__", ...args.slice(1)];
+    return `${action}:${JSON.stringify(masked)}`;
   }
-  if(SESSION_ACTIONS.has(action)&&args.length>0){
-    const sessionlessArgs=["__SESSION__",...args.slice(1)];
-    return `${action}:${JSON.stringify(sessionlessArgs)}`;
+  if (SESSION_ACTIONS.has(action) && args.length > 0) {
+    const masked = ["__SESSION__", ...args.slice(1)];
+    return `${action}:${JSON.stringify(masked)}`;
   }
   return `${action}:${JSON.stringify(args)}`;
 }
 
-function getCachedResponse(action:string,args:unknown[]){
-  const ttl=CACHE_TTLS[action];
-  if(!ttl)return null;
-  const key=getCacheKey(action,args);
-  const item=memoryCache.get(key);
-  if(item&&item.expiresAt>Date.now()){
-    return item.data;
+function setCache(action: string, args: any[], result: any) {
+  const ttl = CACHE_TTLS[action];
+  if (!ttl || !result.success) return;
+  const key = buildCacheKey(action, args);
+  memoryCache.set(key, { data: result, expiresAt: Date.now() + ttl });
+  staleCache.set(key, result);
+}
+
+function getCached(action: string, args: any[]): any | null {
+  if (!CACHE_TTLS[action]) return null;
+  const key = buildCacheKey(action, args);
+  const entry = memoryCache.get(key);
+  if (entry && entry.expiresAt > Date.now()) {
+    return entry.data;
   }
-  if(item)memoryCache.delete(key);
+  if (entry) memoryCache.delete(key);
   return null;
 }
 
-function setCachedResponse(action:string,args:unknown[],data:ApiResponse<unknown>){
-  const ttl=CACHE_TTLS[action];
-  if(!ttl||!data.success)return;
-  const key=getCacheKey(action,args);
-  memoryCache.set(key,{data,expiresAt:Date.now()+ttl});
-  lastKnownGood.set(key,data);
-}
+function invalidateCache(action: string) {
+  if (READ_ACTIONS.has(action)) return;
 
-function invalidateServerCache(action:string){
-  // Do NOT invalidate cache on read actions!
-  if(READ_ACTIONS.has(action)) return;
-  // Targeted invalidation to protect unrelated cached data
-  if(/reviewerSaveReview|reviewer/i.test(action)){
-    for(const key of Array.from(memoryCache.keys())){
-      if(key.startsWith('reviewer') || key.startsWith('adminListWorks') || key.startsWith('adminDashboard')) {
+  if (/reviewerSaveReview|reviewer/i.test(action)) {
+    for (const key of Array.from(memoryCache.keys())) {
+      if (key.startsWith("reviewer") || key.startsWith("adminListWorks") || key.startsWith("adminDashboard")) {
         memoryCache.delete(key);
       }
     }
     return;
   }
-  if(/Registration|Participant/i.test(action)){
-    for(const key of Array.from(memoryCache.keys())){
-      if(key.startsWith('adminListRegistrations') || key.startsWith('adminDashboard') || key.startsWith('adminListMealPasses') || key.startsWith('lookupRegistration')) {
+  if (/Registration|Participant/i.test(action)) {
+    for (const key of Array.from(memoryCache.keys())) {
+      if (key.startsWith("adminListRegistrations") || key.startsWith("adminDashboard") || key.startsWith("adminListMealPasses") || key.startsWith("lookupRegistration")) {
         memoryCache.delete(key);
       }
     }
     return;
   }
-  if(/Payment|Receipt|Invoice/i.test(action)){
-    for(const key of Array.from(memoryCache.keys())){
-      if(key.startsWith('adminListPayments') || key.startsWith('adminDashboard') || key.startsWith('adminListFinanceDocuments')) {
+  if (/Payment|Receipt|Invoice/i.test(action)) {
+    for (const key of Array.from(memoryCache.keys())) {
+      if (key.startsWith("adminListPayments") || key.startsWith("adminDashboard") || key.startsWith("adminListFinanceDocuments")) {
         memoryCache.delete(key);
       }
     }
     return;
   }
-  if(/Work|File|Author|Criteria|Score/i.test(action)){
-    for(const key of Array.from(memoryCache.keys())){
-      if(key.startsWith('adminListWorks') || key.startsWith('adminDashboard') || key.startsWith('reviewer') || key.startsWith('verifyWorkAccess')) {
+  if (/Work|File|Author|Criteria|Score/i.test(action)) {
+    for (const key of Array.from(memoryCache.keys())) {
+      if (key.startsWith("adminListWorks") || key.startsWith("adminDashboard") || key.startsWith("reviewer") || key.startsWith("verifyWorkAccess")) {
         memoryCache.delete(key);
       }
     }
     return;
   }
-  // Generic write fallback
-  if(/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(action)){
+  if (/save|submit|update|verify|import|seed|init|add|revoke|delete|upload|replace|send|commit|toggle|reset|assign/i.test(action)) {
     memoryCache.clear();
   }
 }
 
-function rateLimited(request:NextRequest){
-  const key=request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()??"unknown",now=Date.now(),bucket=buckets.get(key);
-  if(!bucket||bucket.reset<now){buckets.set(key,{count:1,reset:now+60_000});return false}
-  bucket.count+=1;return bucket.count>180;
+function errorResponse(message: string, code: string, status = 400, reqId?: string) {
+  return NextResponse.json(
+    { success: false, message, errorCode: code, requestId: reqId },
+    { status }
+  );
 }
-function failure(message:string,errorCode:string,status:number,requestId:string){
-  return NextResponse.json<ApiResponse<never>>({success:false,message,errorCode,requestId},{status});
-}
-function getGasExecUrls(): string[] {
-  const custom = process.env.GAS_WEB_APP_URL || process.env.GAS_EXEC_URL;
-  if (custom && custom.trim().startsWith("http")) {
-    const trimmed = custom.trim();
+
+function getGasUrls(): string[] {
+  const url = process.env.GAS_WEB_APP_URL || process.env.GAS_EXEC_URL;
+  if (url && url.trim().startsWith("http")) {
+    const trimmed = url.trim();
     if (trimmed.includes("DEPLOYMENT_ID") || trimmed.includes("YOUR_") || trimmed.includes("REPLACE_ME")) {
       throw new Error("ยังไม่ได้ตั้งค่า GAS_WEB_APP_URL (พบค่าเริ่มต้น placeholder DEPLOYMENT_ID) กรุณาระบุ Web App URL ของ Google Apps Script ในการตั้งค่า (Settings > Environment Variables)");
     }
@@ -237,293 +213,377 @@ function getGasExecUrls(): string[] {
   throw new Error("ยังไม่ได้กำหนดค่า GAS_WEB_APP_URL กรุณาระบุ Web App URL ของ Google Apps Script ที่ Deploy แล้ว (ลงท้ายด้วย /exec) ในเมนู Settings");
 }
 
-function getGasSecret(): string {
-  return process.env.GAS_API_SECRET || process.env.GAS_WEBHOOK_TOKEN || process.env.BYPASS_SHARED_SECRET || "";
-}
-
-async function callGas(payload:RpcRequest&{secret:string},attempts:number){
+async function fetchGasWithRetry(payload: any, maxRetries: number) {
   let urls: string[];
   try {
-    urls = getGasExecUrls();
+    urls = getGasUrls();
   } catch (err) {
     throw err;
   }
-  let lastError: unknown = null;
 
+  let lastError: any = null;
   for (const url of urls) {
-    for(let attempt=0;attempt<attempts;attempt+=1){
-      if(attempt>0){
-        await new Promise((r)=>setTimeout(r,attempt*600));
+    for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 600));
       }
       const timeoutMs = Math.max(GAS_TIMEOUT_MS, 90_000);
-      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
-      try{
-        const currentPayload = attempt > 0 ? { ...payload, requestId: `${payload.requestId || randomUUID()}_r${attempt}` } : payload;
-        const response=await fetch(url,{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify(currentPayload),
-          redirect:"follow",
-          cache:"no-store",
-          keepalive:true,
-          signal:controller.signal
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const bodyPayload = attempt > 0 ? { ...payload, requestId: `${payload.requestId || crypto.randomUUID()}_r${attempt}` } : payload;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyPayload),
+          redirect: "follow",
+          cache: "no-store",
+          keepalive: true,
+          signal: controller.signal,
         });
-        if(response.status === 404){
+
+        if (res.status === 404) {
           throw new Error("ไม่พบ Google Apps Script Web App (HTTP 404) กรุณาตรวจสอบว่า URL ลงท้ายด้วย /exec และ Deploy แบบ Web App ถูกต้อง");
         }
-        if(!response.ok){
-          throw new Error(`การเชื่อมต่อไปยัง Google Apps Script ขัดข้อง (HTTP ${response.status})`);
+        if (!res.ok) {
+          throw new Error(`การเชื่อมต่อไปยัง Google Apps Script ขัดข้อง (HTTP ${res.status})`);
         }
-        const rawText=await response.text();
-        let result:ApiResponse<unknown>;
-        try{
-          result=JSON.parse(rawText) as ApiResponse<unknown>;
-        }catch{
-          if(rawText.includes("accounts.google.com")||rawText.includes("Authorization required")||rawText.includes("google.com/auth")){
+
+        const rawText = await res.text();
+        let parsed: any;
+        try {
+          parsed = JSON.parse(rawText);
+        } catch {
+          if (rawText.includes("accounts.google.com") || rawText.includes("Authorization required") || rawText.includes("google.com/auth")) {
             throw new Error("สิทธิ์การเข้าถึง Google Apps Script ไม่ถูกต้อง: กรุณา Deploy Web App โดยตั้ง 'Who has access' เป็น 'Anyone' และกดอนุมัติสิทธิ์ (Authorize)");
           }
-          if(rawText.includes("<!DOCTYPE")||rawText.includes("<html")){
+          if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
             throw new Error("Google Apps Script ส่งกลับเป็นหน้าเว็บ HTML (อาจเกิดจากสิทธิ์การใช้งานของ Script หรือ Web App URL ไม่ถูกต้อง)");
           }
           throw new Error(`คำตอบจากส่วนกลางไม่ถูกต้อง (${rawText.slice(0, 80)})`);
         }
-        if(typeof result.success!=="boolean")throw new Error("GAS_INVALID_RESPONSE");
-        return result;
-      }catch(error){
-        lastError = error;
-        if(attempt+1>=attempts && urls.indexOf(url) === urls.length - 1) throw error;
-      }finally{
-        clearTimeout(timeout);
+
+        if (typeof parsed.success !== "boolean") {
+          throw new Error("GAS_INVALID_RESPONSE");
+        }
+        return parsed;
+      } catch (err: any) {
+        lastError = err;
+        if (attempt + 1 >= maxRetries && urls.indexOf(url) === urls.length - 1) {
+          throw err;
+        }
+      } finally {
+        clearTimeout(timer);
       }
     }
   }
   throw lastError || new Error("ไม่สามารถเชื่อมต่อ Google Apps Script ได้ในขณะนี้");
 }
 
-export async function POST(request:NextRequest){
-  const requestId=randomUUID();
-  if(rateLimited(request))return failure("ส่งคำขอบ่อยเกินไป กรุณารอสักครู่","RATE_LIMITED",429,requestId);
-  const length=Number(request.headers.get("content-length")??"0");
-  if(length>MAX_REQUEST_BYTES)return failure("ข้อมูลหรือไฟล์มีขนาดใหญ่เกินกำหนด","PAYLOAD_TOO_LARGE",413,requestId);
-  let input:RpcRequest;
-  try{input=await request.json() as RpcRequest}catch{return failure("รูปแบบคำขอไม่ถูกต้อง","INVALID_JSON",400,requestId)}
-  const action=typeof input.action==="string"?input.action:"";
-  if(!ALLOWED_ACTIONS.has(action))return failure("ไม่อนุญาตให้เรียกคำสั่งนี้","ACTION_NOT_ALLOWED",403,requestId);
-  const args=Array.isArray(input.args)?[...input.args]:[];
-  if(args.length>20)return failure("จำนวนพารามิเตอร์ไม่ถูกต้อง","VALIDATION_ERROR",400,requestId);
+export async function POST(req: NextRequest) {
+  const reqId = crypto.randomUUID();
 
-  if(SESSION_ACTIONS.has(action)){
-    const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
-    const directToken = (typeof args[0] === "string" && args[0].trim() && args[0] !== "__COOKIE__") ? args[0].trim() : "";
-    const token = directToken || cookieToken;
-    if(!token) return failure("Session หมดอายุ กรุณาเข้าสู่ระบบใหม่","UNAUTHENTICATED",401,requestId);
-    if(args.length===0) args.push(token); else args[0]=token;
-  }
-
-  const bypassCache = Boolean((input as {bypassCache?: boolean}).bypassCache) || request.headers.get("x-bypass-cache") === "1";
-  const cacheKey=getCacheKey(action,args);
-
-  // Check in-memory cache for fast read actions unless explicitly bypassed
-  if(!bypassCache){
-    const cached=getCachedResponse(action,args);
-    if(cached){
-      return NextResponse.json(cached,{status:200,headers:{"X-Cache":"HIT"}});
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const now = Date.now();
+  const rl = rateLimits.get(ip);
+  if (rl && rl.reset >= now) {
+    rl.count += 1;
+    if (rl.count > 180) {
+      return errorResponse("ส่งคำขอบ่อยเกินไป กรุณารอสักครู่", "RATE_LIMITED", 429, reqId);
     }
   } else {
-    memoryCache.delete(cacheKey);
+    rateLimits.set(ip, { count: 1, reset: now + 60_000 });
   }
 
-  const secret=getGasSecret();
-  const outbound={action,args,requestId:typeof input.requestId==="string"?input.requestId:requestId,timestamp:Date.now(),secret};
-  const isRetryableAction = READ_ACTIONS.has(action) || action === "loginUser" || action === "requestPasswordReset" || action === "verifyWorkAccess" || action === "lookupRegistrationForEdit";
-  try{
-    let result: ApiResponse<unknown>;
-    if(READ_ACTIONS.has(action)){
-      if(inFlightRequests.has(cacheKey)){
-        result = await inFlightRequests.get(cacheKey)!;
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (contentLength > MAX_REQUEST_BYTES) {
+    return errorResponse("ข้อมูลหรือไฟล์มีขนาดใหญ่เกินกำหนด", "PAYLOAD_TOO_LARGE", 413, reqId);
+  }
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return errorResponse("รูปแบบคำขอไม่ถูกต้อง", "INVALID_JSON", 400, reqId);
+  }
+
+  const action = typeof body.action === "string" ? body.action : "";
+  if (!ALLOWED_ACTIONS.has(action)) {
+    return errorResponse("ไม่อนุญาตให้เรียกคำสั่งนี้", "ACTION_NOT_ALLOWED", 403, reqId);
+  }
+
+  const args: any[] = Array.isArray(body.args) ? [...body.args] : [];
+  if (args.length > 20) {
+    return errorResponse("จำนวนพารามิเตอร์ไม่ถูกต้อง", "VALIDATION_ERROR", 400, reqId);
+  }
+
+  if (SESSION_ACTIONS.has(action)) {
+    const cookieToken = req.cookies.get(SESSION_COOKIE)?.value;
+    const clientToken = (typeof args[0] === "string" && args[0].trim() && args[0] !== "__COOKIE__") ? args[0].trim() : "";
+    const sessionToken = clientToken || cookieToken;
+    if (!sessionToken) {
+      return errorResponse("Session หมดอายุ กรุณาเข้าสู่ระบบใหม่", "UNAUTHENTICATED", 401, reqId);
+    }
+    if (args.length === 0) {
+      args.push(sessionToken);
+    } else {
+      args[0] = sessionToken;
+    }
+  }
+
+  const bypassCache = !!body.bypassCache || req.headers.get("x-bypass-cache") === "1";
+  const cacheKey = buildCacheKey(action, args);
+
+  if (bypassCache) {
+    memoryCache.delete(cacheKey);
+  } else {
+    const cached = getCached(action, args);
+    if (cached) {
+      return NextResponse.json(cached, {
+        status: 200,
+        headers: { "X-Cache": "HIT" },
+      });
+    }
+  }
+
+  const secret = process.env.GAS_API_SECRET || process.env.GAS_WEBHOOK_TOKEN || process.env.BYPASS_SHARED_SECRET || "";
+  const payload = {
+    action,
+    args,
+    requestId: typeof body.requestId === "string" ? body.requestId : reqId,
+    timestamp: Date.now(),
+    secret,
+  };
+
+  const isRead = READ_ACTIONS.has(action) || action === "loginUser" || action === "requestPasswordReset" || action === "verifyWorkAccess" || action === "lookupRegistrationForEdit";
+
+  try {
+    let result: any;
+
+    if (READ_ACTIONS.has(action)) {
+      if (inFlight.has(cacheKey)) {
+        result = await inFlight.get(cacheKey)!;
       } else {
-        const promise = callGas(outbound, 2);
-        inFlightRequests.set(cacheKey, promise);
+        const promise = fetchGasWithRetry(payload, 2);
+        inFlight.set(cacheKey, promise);
         try {
           result = await promise;
         } finally {
-          inFlightRequests.delete(cacheKey);
+          inFlight.delete(cacheKey);
         }
       }
     } else {
-      if(action === "adminUploadBanner"){
-        const file = args[2] as { base64?: string; type?: string; fileName?: string; name?: string } | undefined;
-        if(!file || !file.base64){
-          return failure("ไม่พบข้อมูลไฟล์ภาพ", "INVALID_FILE", 400, requestId);
+      if (action === "adminUploadBanner") {
+        const fileObj = args[2];
+        if (!fileObj || !fileObj.base64) {
+          return errorResponse("ไม่พบข้อมูลไฟล์ภาพ", "INVALID_FILE", 400, reqId);
         }
-        const rawExt = (file.name || file.fileName || "").split(".").pop()?.toLowerCase();
-        const fileMime = file.type || (file as { mimeType?: string }).mimeType || "";
-        const ext = rawExt && /^(jpg|jpeg|png|webp|gif)$/.test(rawExt) ? rawExt : (fileMime.includes("png") ? "png" : "jpg");
-        const safeName = `banner_${Date.now()}.${ext}`;
+        const extMatch = (fileObj.name || fileObj.fileName || "").split(".").pop()?.toLowerCase();
+        const mime = fileObj.type || fileObj.mimeType || "";
+        const ext = extMatch && /^(jpg|jpeg|png|webp|gif)$/.test(extMatch) ? extMatch : (mime.includes("png") ? "png" : "jpg");
+        const fileName = `banner_${Date.now()}.${ext}`;
         const uploadsDir = path.join(process.cwd(), "public", "uploads");
-        if(!fs.existsSync(uploadsDir)){
+        if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
-        const filePath = path.join(uploadsDir, safeName);
-        const buffer = Buffer.from(file.base64, "base64");
-        fs.writeFileSync(filePath, buffer);
-        const localFileUrl = `/uploads/${safeName}`;
-
-        let upstreamFileUrl = localFileUrl;
+        const filePath = path.join(uploadsDir, fileName);
+        const buf = Buffer.from(fileObj.base64, "base64");
+        fs.writeFileSync(filePath, buf);
+        let fileUrl = `/uploads/${fileName}`;
         try {
-          const urls = getGasExecUrls();
-          if(urls.length > 0){
-            const upRes = await callGas(outbound, 1);
-            if(upRes.success && (upRes.data as { fileUrl?: string })?.fileUrl){
-              upstreamFileUrl = (upRes.data as { fileUrl: string }).fileUrl;
+          if (getGasUrls().length > 0) {
+            const upstream = await fetchGasWithRetry(payload, 1);
+            if (upstream.success && upstream.data?.fileUrl) {
+              fileUrl = upstream.data.fileUrl;
             }
           }
-        } catch {
-          // Keep localFileUrl
-        }
-
+        } catch {}
         return NextResponse.json({
           success: true,
           data: {
             fileId: `banner_${Date.now()}`,
-            fileUrl: upstreamFileUrl,
-            fileName: file.name || file.fileName || safeName
-          }
+            fileUrl,
+            fileName: fileObj.name || fileObj.fileName || fileName,
+          },
         });
       }
 
-      if(action === "saveAdminSettings"){
-        if(args.length >= 3 && args[2] && typeof args[2] === "object"){
-          const payload = args[2] as { settings?: Record<string, string>; conference?: Record<string, unknown> };
-          if(payload.settings && typeof payload.settings === "object"){
-            savePersistedSettings(payload.settings);
-            if(DEFAULT_CONFERENCE_BOOT.settings){
-              DEFAULT_CONFERENCE_BOOT.settings = { ...DEFAULT_CONFERENCE_BOOT.settings, ...payload.settings };
+      if (action === "saveAdminSettings") {
+        if (args.length >= 3 && args[2] && typeof args[2] === "object") {
+          const payloadSettings = args[2];
+          if (payloadSettings.settings && typeof payloadSettings.settings === "object") {
+            const newSettings = payloadSettings.settings;
+            try {
+              const current = { ...getPersistedSettings(), ...newSettings };
+              fs.writeFileSync(SETTINGS_FILE, JSON.stringify(current, null, 2), "utf-8");
+              const standaloneDir = path.join(process.cwd(), ".next", "standalone");
+              if (fs.existsSync(standaloneDir)) {
+                try {
+                  fs.writeFileSync(path.join(standaloneDir, "persisted_settings.json"), JSON.stringify(current, null, 2), "utf-8");
+                } catch {}
+              }
+            } catch (err) {
+              console.error("Failed to write persisted_settings.json", err);
+            }
+            if (DEFAULT_BOOTSTRAP.settings) {
+              DEFAULT_BOOTSTRAP.settings = { ...DEFAULT_BOOTSTRAP.settings, ...payloadSettings.settings };
             }
           }
         }
-        invalidateServerCache("saveAdminSettings");
+        invalidateCache("saveAdminSettings");
         memoryCache.clear();
-        lastKnownGood.clear();
-
+        staleCache.clear();
         try {
-          const urls = getGasExecUrls();
-          if(urls.length > 0){
-            const upRes = await callGas(outbound, 1);
-            if(upRes.success) return NextResponse.json(upRes);
+          if (getGasUrls().length > 0) {
+            const gasRes = await fetchGasWithRetry(payload, 1);
+            if (gasRes.success) return NextResponse.json(gasRes);
           }
-        } catch(e) {
+        } catch (e) {
           console.log("Upstream saveAdminSettings skipped or failed, saved locally:", e);
         }
-
         return NextResponse.json({
           success: true,
-          data: {
-            savedLocally: true,
-            message: "บันทึกการตั้งค่าเรียบร้อยแล้ว"
-          }
+          data: { savedLocally: true, message: "บันทึกการตั้งค่าเรียบร้อยแล้ว" },
         });
       }
 
-      result = await callGas(outbound, isRetryableAction ? 2 : 1);
+      result = await fetchGasWithRetry(payload, isRead ? 2 : 1);
     }
-    if(result.success){
-      if(action === "getPublicBootstrap" && result.data && typeof result.data === "object"){
-        const d = result.data as Record<string, unknown>;
+
+    if (result.success) {
+      if (action === "getPublicBootstrap" && result.data && typeof result.data === "object") {
         const persisted = getPersistedSettings();
-        if(d.settings && typeof d.settings === "object"){
-          d.settings = { ...(d.settings as Record<string, string>), ...persisted };
+        if (result.data.settings && typeof result.data.settings === "object") {
+          result.data.settings = { ...result.data.settings, ...persisted };
         }
       }
-      setCachedResponse(action,args,result);
-      invalidateServerCache(action);
+      setCache(action, args, result);
+      invalidateCache(action);
     }
-    if(action==="loginUser"&&result.success&&result.data&&typeof result.data==="object"){
-      const data={...(result.data as Record<string,unknown>)};
-      const token=typeof data.token==="string"?data.token:"";
-      if(!token)return failure("Backend ไม่ได้คืน Session ที่ถูกต้อง","INVALID_SESSION",502,requestId);
-      if(data.reviewerBoot && typeof data.reviewerBoot === "object"){
-        const cid = typeof data.conferenceId === "string" ? data.conferenceId : "CONF-TUH-QF-2569";
-        const revResponse: ApiResponse<unknown> = { success: true, data: data.reviewerBoot };
-        setCachedResponse("reviewerBootstrap", [token, cid], revResponse);
-        setCachedResponse("reviewerBootstrap", ["__COOKIE__", cid], revResponse);
-        setCachedResponse("reviewerBootstrap", [token], revResponse);
-        setCachedResponse("reviewerBootstrap", ["__COOKIE__"], revResponse);
+
+    if (action === "loginUser" && result.success && result.data && typeof result.data === "object") {
+      const data = { ...result.data };
+      const token = typeof data.token === "string" ? data.token : "";
+      if (!token) {
+        return errorResponse("Backend ไม่ได้คืน Session ที่ถูกต้อง", "INVALID_SESSION", 502, reqId);
       }
-      if(data.user && data.conference && data.settings){
-        const cid = typeof data.conferenceId === "string" ? data.conferenceId : "CONF-TUH-QF-2569";
+      if (data.reviewerBoot && typeof data.reviewerBoot === "object") {
+        const confId = typeof data.conferenceId === "string" ? data.conferenceId : "CONF-TUH-QF-2569";
+        const bootPayload = { success: true, data: data.reviewerBoot };
+        setCache("reviewerBootstrap", [token, confId], bootPayload);
+        setCache("reviewerBootstrap", ["__COOKIE__", confId], bootPayload);
+        setCache("reviewerBootstrap", [token], bootPayload);
+        setCache("reviewerBootstrap", ["__COOKIE__"], bootPayload);
+      }
+      if (data.user && data.conference && data.settings) {
+        const confId = typeof data.conferenceId === "string" ? data.conferenceId : "CONF-TUH-QF-2569";
         const adminBootData = {
           user: data.user,
           role: data.role,
           conference: data.conference,
           settings: data.settings,
-          workCategories: DEFAULT_CONFERENCE_BOOT.workCategories,
-          presentationTypes: DEFAULT_CONFERENCE_BOOT.presentationTypes,
-          optionConfig: data.optionConfig
+          workCategories: DEFAULT_BOOTSTRAP.workCategories,
+          presentationTypes: DEFAULT_BOOTSTRAP.presentationTypes,
+          optionConfig: data.optionConfig,
         };
-        const admResponse: ApiResponse<unknown> = { success: true, data: adminBootData };
-        setCachedResponse("adminBootstrap", [token, cid], admResponse);
-        setCachedResponse("adminBootstrap", ["__COOKIE__", cid], admResponse);
-        setCachedResponse("adminBootstrap", [token], admResponse);
-        setCachedResponse("adminBootstrap", ["__COOKIE__"], admResponse);
+        const bootPayload = { success: true, data: adminBootData };
+        setCache("adminBootstrap", [token, confId], bootPayload);
+        setCache("adminBootstrap", ["__COOKIE__", confId], bootPayload);
+        setCache("adminBootstrap", [token], bootPayload);
+        setCache("adminBootstrap", ["__COOKIE__"], bootPayload);
       }
-      const response=NextResponse.json({...result,data});
-      setSessionCookie(response,token);
+      const response = NextResponse.json({ ...result, data });
+      setSessionCookie(response, token);
       return response;
     }
+
     const headers: Record<string, string> = {};
-    if(result.success && READ_ACTIONS.has(action)){
+    if (result.success && READ_ACTIONS.has(action)) {
       headers["Cache-Control"] = "private, max-age=15, stale-while-revalidate=60";
     }
-    const response=NextResponse.json(result,{status:result.success?200:400,headers});
-    if(action==="logoutUser")clearSessionCookie(response);
+
+    const response = NextResponse.json(result, {
+      status: result.success ? 200 : 400,
+      headers,
+    });
+
+    if (action === "logoutUser") {
+      clearSessionCookie(response);
+    }
+
     return response;
-  }catch(err:unknown){
-    let errorMsg=err instanceof Error?err.message:String(err);
-    if(/aborted|AbortError|timeout|ECONNRESET/i.test(errorMsg)){
-      errorMsg="การเชื่อมต่อระบบส่วนกลางใช้เวลานานเกินกำหนด กรุณาลองใหม่อีกครั้ง";
+  } catch (err: any) {
+    let msg = err instanceof Error ? err.message : String(err);
+    if (/aborted|AbortError|timeout|ECONNRESET/i.test(msg)) {
+      msg = "การเชื่อมต่อระบบส่วนกลางใช้เวลานานเกินกำหนด กรุณาลองใหม่อีกครั้ง";
     }
-    // If upstream call fails, check if we have a last known good cached response for read actions
-    if(lastKnownGood.has(cacheKey)){
-      const fallback=lastKnownGood.get(cacheKey)!;
-      if(fallback.data && typeof fallback.data === "object"){
-        const d = fallback.data as Record<string, unknown>;
+
+    if (staleCache.has(cacheKey)) {
+      const fallback = staleCache.get(cacheKey);
+      if (fallback.data && typeof fallback.data === "object") {
         const persisted = getPersistedSettings();
-        if(d.settings && typeof d.settings === "object"){
-          d.settings = { ...(d.settings as Record<string, string>), ...persisted };
+        if (fallback.data.settings && typeof fallback.data.settings === "object") {
+          fallback.data.settings = { ...fallback.data.settings, ...persisted };
         }
       }
-      return NextResponse.json(fallback,{status:200,headers:{"X-Fallback":"true"}});
+      return NextResponse.json(fallback, {
+        status: 200,
+        headers: { "X-Fallback": "true" },
+      });
     }
-    if(action === "getPublicBootstrap"){
+
+    if (action === "getPublicBootstrap") {
       const persisted = getPersistedSettings();
-      const bootData = JSON.parse(JSON.stringify(DEFAULT_CONFERENCE_BOOT));
-      if(persisted && Object.keys(persisted).length > 0){
-        bootData.settings = { ...(bootData.settings || {}), ...persisted };
+      const fallback = JSON.parse(JSON.stringify(DEFAULT_BOOTSTRAP));
+      if (persisted && Object.keys(persisted).length > 0) {
+        fallback.settings = { ...(fallback.settings || {}), ...persisted };
       }
-      return NextResponse.json({ success: true, data: bootData }, { status: 200, headers: { "X-Fallback": "true" } });
+      return NextResponse.json(
+        { success: true, data: fallback },
+        { status: 200, headers: { "X-Fallback": "true" } }
+      );
     }
-    if(action === "getAdminSettings"){
+
+    if (action === "getAdminSettings") {
       const persisted = getPersistedSettings();
-      const settingsData = { ...(DEFAULT_CONFERENCE_BOOT.settings || {}), ...persisted };
-      const settingsList = Object.entries(settingsData).map(([SettingKey, SettingValue]) => ({ SettingKey, SettingValue }));
-      return NextResponse.json({
-        success: true,
-        data: {
-          conference: DEFAULT_CONFERENCE_BOOT.conference,
-          settings: settingsList,
-          settingsMap: settingsData,
-          optionConfig: {
-            prefixes: ["นาย","นาง","นางสาว","นพ.","พญ.","ทพ.","ทพญ.","ภก.","ภญ."],
-            positions: [],
-            professions: ["แพทย์","ทันตแพทย์","เภสัชกร","พยาบาล","นักวิชาการ"],
-            organizationGroups: [],
-            organizations: [],
-            foodTypes: ["ปกติ","อิสลาม","มังสวิรัติ","แพ้อาหาร"]
-          }
-        }
-      }, { status: 200, headers: { "X-Fallback": "true" } });
+      const settingsMap = { ...(DEFAULT_BOOTSTRAP.settings || {}), ...persisted };
+      const settingsList = Object.entries(settingsMap).map(([k, v]) => ({
+        SettingKey: k,
+        SettingValue: v,
+      }));
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            conference: DEFAULT_BOOTSTRAP.conference,
+            settings: settingsList,
+            settingsMap,
+            optionConfig: {
+              prefixes: ["นาย", "นาง", "นางสาว", "นพ.", "พญ.", "ทพ.", "ทพญ.", "ภก.", "ภญ."],
+              positions: [],
+              professions: ["แพทย์", "ทันตแพทย์", "เภสัชกร", "พยาบาล", "นักวิชาการ"],
+              organizationGroups: [],
+              organizations: [],
+              foodTypes: ["ปกติ", "อิสลาม", "มังสวิรัติ", "แพ้อาหาร"],
+            },
+          },
+        },
+        { status: 200, headers: { "X-Fallback": "true" } }
+      );
     }
-    return failure(`ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ (${errorMsg})`,"UPSTREAM_ERROR",502,requestId);
+
+    return errorResponse(
+      `ไม่สามารถเชื่อมต่อระบบส่วนกลางได้ (${msg})`,
+      "UPSTREAM_ERROR",
+      502,
+      reqId
+    );
   }
 }
+
+staleCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', DEFAULT_RESPONSE);
+staleCache.set("getPublicBootstrap:[]", DEFAULT_RESPONSE);
+staleCache.set('getPublicBootstrap:[""]', DEFAULT_RESPONSE);
+memoryCache.set('getPublicBootstrap:["CONF-TUH-QF-2569"]', { data: DEFAULT_RESPONSE, expiresAt: Date.now() + 300_000 });
+memoryCache.set("getPublicBootstrap:[]", { data: DEFAULT_RESPONSE, expiresAt: Date.now() + 300_000 });
