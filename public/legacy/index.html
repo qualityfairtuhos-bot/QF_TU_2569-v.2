@@ -638,7 +638,7 @@ function renderHeroBanners(){
       html += `
         <article class="hero-slide ${idx === 0 ? 'active' : ''}" data-hero-slide="${idx}" aria-hidden="${idx === 0 ? 'false' : 'true'}">
           <div class="banner-img-container" style="${cursorStyle}" ${clickAttr}>
-            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img">
+            <img src="${esc(normalizedUrl)}" alt="${esc(b.title || 'Conference Banner')}" class="banner-responsive-img" referrerpolicy="no-referrer" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.removeAttribute('data-fallback');}else{this.onerror=null;this.src='/images/bannerweb_TUH19-1920x600.jpg';}" data-fallback="${esc(b.fallbackImageUrl || '/images/bannerweb_TUH19-1920x600.jpg')}">
             ${showOverlay ? `
               <div class="custom-banner-overlay">
                 <div class="custom-banner-card">

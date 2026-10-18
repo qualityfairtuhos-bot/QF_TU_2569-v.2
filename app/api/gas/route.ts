@@ -107,7 +107,7 @@ const DEFAULT_CONFERENCE_BOOT = {
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
-    BANNER_SLIDES_JSON: '[{\"id\":\"b_tuh_var\",\"title\":\"มหกรรมคุณภาพ ครั้งที่ 19\",\"imageUrl\":\"/images/tuh-banner-var.jpg\",\"linkUrl\":\"\",\"active\":true}]'
+    BANNER_SLIDES_JSON: '[{\"id\":\"b_tuh_forum2569\",\"title\":\"งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569\",\"imageUrl\":\"https://lh3.googleusercontent.com/d/1K5ugV1wCA4NaKxB4SkQ5-viHTorL9aau\",\"fallbackImageUrl\":\"/images/bannerweb_TUH19-1920x600.jpg\",\"linkUrl\":\"\",\"active\":true}]'
   },
   organizationUnits: [
     { UnitLevel: "GROUP", UnitNameTH: "กลุ่มภารกิจด้านการพยาบาล" },
