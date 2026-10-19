@@ -4258,6 +4258,27 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
     return matchId || matchEmail;
   });
 
+  // Heal assignments with 0 TotalScore if ReviewScores has records
+  var allScoresForRev = getRecords_('ReviewScores') || [];
+  var revScoresMap = {};
+  allScoresForRev.forEach(function(s){
+    if (s.AssignmentID) {
+      revScoresMap[s.AssignmentID] = (revScoresMap[s.AssignmentID] || 0) + (Number(s.Score) || 0);
+    }
+  });
+  assignments.forEach(function(a){
+    if ((!a.TotalScore || Number(a.TotalScore) === 0) && revScoresMap[a.AssignmentID]) {
+      var calcScore = Math.round(revScoresMap[a.AssignmentID] * 100) / 100;
+      if (calcScore > 100) calcScore = Math.min(100, Math.round(calcScore / 2));
+      if (calcScore > 0) {
+        a.TotalScore = calcScore;
+        if (a.__row) {
+          try { updateRecord_('ReviewAssignments', a.__row, { TotalScore: calcScore, UpdatedAt: new Date() }); } catch(e){}
+        }
+      }
+    }
+  });
+
   // Targeted lookup: only fetch the specific works needed for these assignments
   const neededWorkIds = {};
   assignments.forEach(function(a) { if (a.WorkID) neededWorkIds[a.WorkID] = true; });
@@ -4834,18 +4855,22 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     const inserts = [];
     const savedScoresList = [];
     let total = 0;
-
     scores.forEach(function(s){
       if(s.Score === '' || s.Score === null || s.Score === undefined) return;
-      const c = criteriaMap[s.CriteriaID];
-      if(!c) return;
-      const score = num_(s.Score);
-      const max = num_(c.MaxScore, 100);
-      if(score < 0 || score > max) throw new Error('คะแนน ' + score + ' ในหัวข้อ "' + (c.CriteriaNameTH||c.CriteriaID) + '" เกินคะแนนเต็ม (' + max + ' คะแนน)');
-      
-      const weighted = score * (num_(c.WeightPercent, 100) / 100);
-      const comment = clean_(s.Comment);
-      const existing = existingMap[s.CriteriaID];
+      var c = criteriaMap[s.CriteriaID];
+      if(!c) {
+        c = allCriteria.find(function(ac){ return String(ac.CriteriaID).trim() === String(s.CriteriaID).trim(); });
+      }
+      if(!c) {
+        try { c = findOne_('ScoringCriteria', { CriteriaID: s.CriteriaID }); } catch(e){}
+      }
+      var score = num_(s.Score);
+      var max = c ? num_(c.MaxScore, 100) : 100;
+      if(max > 0 && score > max) score = max;
+      if(score < 0) score = 0;
+      var weighted = score * (c ? (num_(c.WeightPercent, 100) / 100) : 1);
+      var comment = clean_(s.Comment);
+      var existing = existingMap[s.CriteriaID];
       if(existing){
         updates.push({
           rowNumber: existing.__row,
@@ -4853,11 +4878,11 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
         });
         savedScoresList.push(Object.assign({}, existing, { Score: score, WeightedScore: weighted, Comment: comment }));
       } else {
-        const newScoreRecord = {
+        var newScoreRecord = {
           ScoreID: nextId_('SCORE'),
           ConferenceID: cid,
           AssignmentID: assignmentId,
-          ReviewRoundID: a.ReviewRoundID,
+          ReviewRoundID: a.ReviewRoundID || (c ? c.ReviewRoundID : ''),
           WorkID: a.WorkID,
           ReviewerID: rid || a.ReviewerID,
           CriteriaID: s.CriteriaID,
@@ -4872,14 +4897,20 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
       }
       total += score;
     });
-
     if (updates.length > 0) {
       batchUpdateRecords_('ReviewScores', updates);
     }
     if (inserts.length > 0) {
       appendRecords_('ReviewScores', inserts);
     }
-
+    if (total === 0) {
+      if (payload.TotalScore !== undefined && num_(payload.TotalScore) > 0) {
+        total = num_(payload.TotalScore);
+      } else if (scores.length > 0) {
+        var rawSum = scores.reduce(function(sum, x){ return sum + num_(x.Score); }, 0);
+        if (rawSum > 0) total = rawSum;
+      }
+    }
     total = Math.round(total * 100) / 100;
     if(total > 100) total = 100; // strictly capped at 100 points max
 
@@ -7669,7 +7700,17 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
         PresentationTypeName: w.PresentationTypeID === 'PRES-POSTER' ? 'โปสเตอร์ (Poster)' : 'บรรยาย (Oral)',
         PresenterName: presenterName,
         Status: a.Status,
-        TotalScore: Number(a.TotalScore) || 0,
+        TotalScore: (function(){
+          var calc = (myScores && myScores.length > 0) ? Math.round(myScores.reduce(function(sum, s){ return sum + (Number(s.Score) || 0); }, 0) * 100) / 100 : 0;
+          if (calc > 100) calc = Math.min(100, Math.round(calc / 2));
+          var asg = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : 0;
+          if (asg > 100) asg = Math.min(100, Math.round(asg / 2));
+          var fin = asg > 0 ? asg : calc;
+          if (fin > 0 && asg === 0 && a.__row) {
+            try { updateRecord_('ReviewAssignments', a.__row, { TotalScore: fin, UpdatedAt: new Date() }); } catch(e) {}
+          }
+          return fin;
+        })(),
         Decision: a.Decision || '',
         RecommendationToAuthor: a.RecommendationToAuthor || '',
         InternalComment: a.InternalComment || '',

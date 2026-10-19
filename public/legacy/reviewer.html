@@ -1082,6 +1082,7 @@ async function saveReview(submit) {
 
     const payload = {
       Scores: scores,
+      TotalScore: Math.round(totalEntered * 100) / 100,
       Decision: decisionEl ? decisionEl.value : '',
       RecommendationToAuthor: recEl ? recEl.value : '',
       InternalComment: internalEl ? internalEl.value : ''
