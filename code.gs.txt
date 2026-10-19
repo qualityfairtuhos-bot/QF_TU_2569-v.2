@@ -6337,11 +6337,15 @@ function exportWorksToExcel(token,conferenceId){
         if(!a[c.WorkID])a[c.WorkID]={a:0,c:0,t:0};
         a[c.WorkID].a++;
         var st1 = upper_(c.Status);
-        var hasValidScore1 = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore)) && Number(c.TotalScore) >= 0 && st1 !== 'ASSIGNED' && st1 !== 'OPENED');
-        var isCompleted1 = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st1) >= 0 || hasValidScore1 || (c.CompletedAt && st1 !== 'ASSIGNED' && st1 !== 'OPENED');
-        if(isCompleted1){
+        var isDraft1 = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st1) >= 0;
+        var isUnassigned1 = (st1 === 'ASSIGNED' || st1 === 'OPENED' || !st1);
+        var isConfirmedSubmitted1 = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st1) >= 0;
+        var rawSc1 = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore))) ? Number(c.TotalScore) : null;
+        var hasValidConfirmedScore1 = (rawSc1 !== null && rawSc1 > 0);
+        var isCompleted1 = !isDraft1 && !isUnassigned1 && (isConfirmedSubmitted1 || (hasValidConfirmedScore1 && !!c.CompletedAt));
+        if(isCompleted1 && hasValidConfirmedScore1){
           a[c.WorkID].c++;
-          var sc = num_(c.TotalScore);
+          var sc = rawSc1;
           if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
           a[c.WorkID].t += sc;
         }
@@ -7003,7 +7007,13 @@ function adminDashboard(token, conferenceId, forceRefresh, filters) {
     const assignments = findMany_('ReviewAssignments', { ConferenceID: cid }).filter(function(a) {
       return validWorkIds[a.WorkID];
     });
-    const completedReviews = assignments.filter(function(a) { return ['COMPLETE', 'LOCKED'].indexOf(upper_(a.Status)) >= 0; }).length;
+    const completedReviews = assignments.filter(function(a) { 
+      var st = upper_(a.Status);
+      var isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st) >= 0;
+      var isConfirmed = ['COMPLETE', 'LOCKED', 'SUBMITTED', 'DONE', 'EVALUATED', 'SCORED', 'PASS', 'REVISION', 'REJECT'].indexOf(st) >= 0;
+      var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
+      return !isDraft && isConfirmed && (rawSc !== null && rawSc > 0);
+    }).length;
 
     const mealRedeemedCount = findMany_('MealEntitlements', { ConferenceID: cid }).filter(function(e) { 
       return validRegIds[e.RegID] && upper_(e.Status) === 'REDEEMED'; 
@@ -7193,11 +7203,16 @@ function adminListWorks(token, conferenceId, filters) {
           if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
           acc[c.WorkID].a++;
           var st2 = upper_(c.Status);
-          var hasValidScore2 = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore)) && Number(c.TotalScore) >= 0 && st2 !== 'ASSIGNED' && st2 !== 'OPENED');
-          var isCompleted2 = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st2) >= 0 || hasValidScore2 || (c.CompletedAt && st2 !== 'ASSIGNED' && st2 !== 'OPENED');
-          if (isCompleted2) {
+          var isDraft2 = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st2) >= 0;
+          var isUnassigned2 = (st2 === 'ASSIGNED' || st2 === 'OPENED' || !st2);
+          var isConfirmedSubmitted2 = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st2) >= 0;
+          var rawSc2 = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore))) ? Number(c.TotalScore) : null;
+          // ถ้าเป็นแบบบันทึกร่าง หรือคะแนนเป็น 0 ให้ถือว่ายังไม่มีคะแนน การรายงานในตารางยังไม่นับ ให้นับเฉพาะที่กดยืนยันส่งผลแล้ว
+          var hasValidConfirmedScore2 = (rawSc2 !== null && rawSc2 > 0);
+          var isCompleted2 = !isDraft2 && !isUnassigned2 && (isConfirmedSubmitted2 || (hasValidConfirmedScore2 && !!c.CompletedAt));
+          if (isCompleted2 && hasValidConfirmedScore2) {
             acc[c.WorkID].c++;
-            var sc = num_(c.TotalScore);
+            var sc = rawSc2;
             if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
             acc[c.WorkID].t += sc;
           }
@@ -7375,14 +7390,19 @@ function adminListWorks(token, conferenceId, filters) {
           ReviewerCompletedCount: ac.c,
           AverageScore: ac.c ? (ac.t / ac.c).toFixed(2) : '0',
           reviewers: (assignsByWork[w.WorkID] || []).map(function(a){
-            var sc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
+            var stA = upper_(a.Status);
+            var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(stA) >= 0;
+            var isNotSubmitted = isDraftA || stA === 'ASSIGNED' || stA === 'OPENED' || !stA;
+            var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
+            // ถ้าเป็นแบบบันทึกร่าง หรือคะแนนเป็น 0 ให้ถือว่ายังไม่มีคะแนน (null)
+            var sc = (isNotSubmitted || rawSc === 0 || rawSc === null) ? null : rawSc;
             return {
               AssignmentID: a.AssignmentID,
               ReviewerID: a.ReviewerID,
               ReviewerName: clean_(a.ReviewerName || a.ReviewerID || ''),
               TotalScore: sc,
               Status: clean_(a.Status || ''),
-              Decision: clean_(a.Decision || ''),
+              Decision: isNotSubmitted ? '' : clean_(a.Decision || ''),
               RecommendationToAuthor: clean_(a.RecommendationToAuthor || ''),
               InternalComment: clean_(a.InternalComment || '')
             };
@@ -7574,7 +7594,8 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
           a.TotalScore = recalculatedTotal;
           patch.TotalScore = recalculatedTotal;
         }
-        if (['ASSIGNED', 'OPENED'].indexOf(upper_(a.Status)) >= 0) {
+        var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(upper_(a.Status)) >= 0;
+        if (!isDraftA && ['ASSIGNED', 'OPENED'].indexOf(upper_(a.Status)) >= 0 && recalculatedTotal > 0 && a.CompletedAt) {
           a.Status = 'COMPLETE';
           patch.Status = 'COMPLETE';
         }
@@ -7605,6 +7626,13 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
         a.ReviewerPosition = r.Position || '';
         a.ReviewerInstitution = r.Institution || '';
         a.ReviewerDepartment = r.Department || '';
+      }
+      var stA = upper_(a.Status);
+      var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(stA) >= 0;
+      var isNotSubmitted = isDraftA || stA === 'ASSIGNED' || stA === 'OPENED' || !stA;
+      var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
+      if (isNotSubmitted || rawSc === 0 || rawSc === null) {
+        a.TotalScore = null;
       }
     });
     

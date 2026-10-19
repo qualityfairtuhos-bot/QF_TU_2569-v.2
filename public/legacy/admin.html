@@ -3308,9 +3308,14 @@ async function openScoreSummary(wid){
     
     const isScored = (a) => {
       const st = String(a.Status || '').toUpperCase();
-      const hasScore = a.TotalScore !== null && a.TotalScore !== undefined && a.TotalScore !== '' && !isNaN(Number(a.TotalScore)) && Number(a.TotalScore) >= 0 && st !== 'ASSIGNED' && st !== 'OPENED';
-      const hasScoresInList = scores && scores.some(s => s.AssignmentID === a.AssignmentID && s.Score !== '' && s.Score !== null && s.Score !== undefined);
-      return ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st) || hasScore || hasScoresInList || (!!a.CompletedAt && st !== 'ASSIGNED' && st !== 'OPENED');
+      const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
+      if (isDraft) return false;
+      if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED'].includes(st) || !st) return false;
+      const isConfirmedSubmitted = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st);
+      const scoreVal = Number(a.TotalScore);
+      // ถ้าเป็นแบบบันทึกร่าง หรือคะแนนเป็น 0 ให้ถือว่ายังไม่มีคะแนน การรายงานในตารางยังไม่นับ
+      if (isNaN(scoreVal) || scoreVal <= 0) return false;
+      return isConfirmedSubmitted;
     };
     const completed = (assignments || []).filter(isScored);
     const totalAssigned = (assignments || []).length;
@@ -3323,6 +3328,8 @@ async function openScoreSummary(wid){
       if (completed.length > 0) {
         const totalSum = completed.reduce((sum, a) => sum + (Number(a.TotalScore) || 0), 0);
         rowItem.AverageScore = (totalSum / completed.length).toFixed(2);
+      } else {
+        rowItem.AverageScore = '0';
       }
       renderWorksTable();
     }
@@ -3386,17 +3393,26 @@ async function openScoreSummary(wid){
             ${a.InternalComment ? `<div style="margin-top:6px; padding:8px 12px; background:#fffbeb; border-radius:6px; border:1px solid #fef3c7; font-size:0.85rem; color:#92400e;"><b>ความเห็นภายใน:</b><br>${esc(a.InternalComment).replace(/\n/g, '<br>')}</div>` : ''}
           </div>`;
         } else {
-          // Unscored Reviewer Slot (แสดงช่องของ reviewer ที่ยังไม่ให้คะแนนไว้เลยจะได้ไม่งง)
+          // Unscored Reviewer Slot (แสดงช่องของ reviewer ที่ยังไม่ให้คะแนน หรือบันทึกร่างไว้)
+          const st = String(a.Status || '').toUpperCase();
+          const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
+          const badgeHtml = isDraft
+            ? `<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.8rem; padding:3px 10px; border-radius:999px;">💾 บันทึกร่างไว้ (ยังไม่ส่งผล)</span>`
+            : `<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.8rem; padding:3px 10px; border-radius:999px;">⏳ ยังไม่ให้คะแนน / รอการประเมิน</span>`;
+          const descHtml = isDraft
+            ? `กรรมการท่านนี้ได้ทำการ<b>บันทึกร่างการประเมิน</b>ไว้ แต่ยังไม่ได้กดยืนยันส่งผลการประเมิน ระบบจึงยังไม่นับผลคะแนนในตารางรายงาน`
+            : `กรรมการท่านนี้ได้รับการมอบหมายให้ประเมินผลงานแล้ว แต่ยังไม่ได้ส่งคะแนนประเมิน`;
+
           html += `<div style="margin-bottom:16px; border:1.5px dashed #cbd5e1; border-radius:10px; padding:14px; background:#f8fafc; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <div>
                 <b style="font-size:0.95rem; color:#334155;">กรรมการท่านที่ ${i+1}: ${esc(a.ReviewerName || a.ReviewerID || 'ผู้ประเมิน')}</b>
-                <span style="margin-left:8px;"><span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.8rem; padding:3px 10px; border-radius:999px;">⏳ ยังไม่ให้คะแนน / รอการประเมิน</span></span>
+                <span style="margin-left:8px;">${badgeHtml}</span>
               </div>
               <span style="background:#f1f5f9; color:#64748b; padding:3px 12px; border-radius:999px; font-weight:600; font-size:0.85rem;">ยังไม่มีคะแนน</span>
             </div>
             <div style="font-size:0.8rem; color:#64748b; margin-top:8px;">
-              กรรมการท่านนี้ได้รับการมอบหมายให้ประเมินผลงานแล้ว แต่ยังไม่ได้ส่งคะแนนประเมิน
+              ${descHtml}
             </div>
           </div>`;
         }
@@ -3477,9 +3493,14 @@ async function printCombinedWorkScoreSummary(wid) {
 
     const isScored = (a) => {
       const st = String(a.Status || '').toUpperCase();
-      const hasScore = a.TotalScore !== null && a.TotalScore !== undefined && a.TotalScore !== '' && !isNaN(Number(a.TotalScore)) && Number(a.TotalScore) >= 0 && st !== 'ASSIGNED' && st !== 'OPENED';
-      const hasScoresInList = scores && scores.some(s => s.AssignmentID === a.AssignmentID && s.Score !== '' && s.Score !== null && s.Score !== undefined);
-      return ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st) || hasScore || hasScoresInList || (!!a.CompletedAt && st !== 'ASSIGNED' && st !== 'OPENED');
+      const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
+      if (isDraft) return false;
+      if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED'].includes(st) || !st) return false;
+      const isConfirmedSubmitted = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st);
+      const scoreVal = Number(a.TotalScore);
+      // ถ้าเป็นแบบบันทึกร่าง หรือคะแนนเป็น 0 ให้ถือว่ายังไม่มีคะแนน การรายงานในตารางยังไม่นับ
+      if (isNaN(scoreVal) || scoreVal <= 0) return false;
+      return isConfirmedSubmitted;
     };
 
     const completed = (assignments || []).filter(isScored);

@@ -284,7 +284,7 @@ function prefetchAssignments(){
   });
 }
 function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); prefetchAssignments(); }
-function statusBadge(s){const c=s==='COMPLETE'?'ok':(s==='PASS'?'ok':'warn');return `<span class="badge ${c}">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
+function statusBadge(s){const st=String(s||'').toUpperCase();if(st==='COMPLETE'||st==='PASS')return `<span class="badge ok">${esc(s||'-')}</span>`;if(st==='DRAFT_SAVED'||st==='DRAFT'||st==='SAVED')return `<span class="badge warn" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">บันทึกร่าง</span>`;if(st==='ASSIGNED')return `<span class="badge" style="background:#f1f5f9; color:#475569;">รอดำเนินการ</span>`;return `<span class="badge warn">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
 let currentFilter = 'all';
 const ASSIGNMENT_CACHE = {};
 
