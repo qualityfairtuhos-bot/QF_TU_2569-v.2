@@ -192,6 +192,20 @@
         </div>
         <div class="kpis" id="assignments-kpis" style="margin-bottom:0"></div>
       </div>
+            <!-- Round Tabs Switcher -->
+      <div class="round-bar" style="margin-top:14px; margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <span style="font-weight:700; font-size:0.9rem; color:#0f172a;">รอบการประเมิน:</span>
+        <button type="button" class="btn btn-sm round-tab active" id="rtab-all" onclick="selectRoundTab('all')" style="font-size:0.84rem; padding:6px 14px; border-radius:10px; font-weight:600;">
+          📁 ทั้งหมด (<span id="count-rtab-all">0</span>)
+        </button>
+        <button type="button" class="btn btn-sm round-tab" id="rtab-round1" onclick="selectRoundTab('round1')" style="font-size:0.84rem; padding:6px 14px; border-radius:10px; font-weight:600; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd;">
+          📋 รอบประเมินผลงาน (<span id="count-rtab-r1">0</span>)
+        </button>
+        <button type="button" class="btn btn-sm round-tab" id="rtab-round2" onclick="selectRoundTab('round2')" style="font-size:0.84rem; padding:6px 14px; border-radius:10px; font-weight:600; background:#fffbeb; color:#92400e; border:1px solid #fde68a;">
+          🏆 รอบตัดสิน (<span id="count-rtab-r2">0</span>)
+        </button>
+      </div>
+
       <div class="filter-bar">
         <div class="filter-tabs" id="filterTabs">
           <button class="filter-tab active" data-filter="all">ทั้งหมด <span class="count-badge" id="count-all">0</span></button>
@@ -286,9 +300,84 @@ function prefetchAssignments(){
 function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); prefetchAssignments(); }
 function statusBadge(s){const st=String(s||'').toUpperCase();if(st==='COMPLETE'||st==='PASS')return `<span class="badge ok">${esc(s||'-')}</span>`;if(st==='DRAFT_SAVED'||st==='DRAFT'||st==='SAVED')return `<span class="badge warn" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">บันทึกร่าง</span>`;if(st==='ASSIGNED')return `<span class="badge" style="background:#f1f5f9; color:#475569;">รอดำเนินการ</span>`;return `<span class="badge warn">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
 let currentFilter = 'all';
+
+let currentRoundTab = 'all';
+
+function selectRoundTab(tab) {
+  currentRoundTab = tab;
+  ['all', 'round1', 'round2'].forEach(t => {
+    const el = document.getElementById('rtab-' + t);
+    if (el) {
+      if (t === tab) {
+        el.classList.add('active');
+        if (t === 'round2') {
+          el.style.background = '#b45309';
+          el.style.color = '#fff';
+          el.style.borderColor = '#92400e';
+        } else {
+          el.style.background = 'var(--teal)';
+          el.style.color = '#fff';
+        }
+      } else {
+        el.classList.remove('active');
+        if (t === 'round2') {
+          el.style.background = '#fffbeb';
+          el.style.color = '#92400e';
+          el.style.borderColor = '#fde68a';
+        } else if (t === 'round1') {
+          el.style.background = '#f0f9ff';
+          el.style.color = '#0369a1';
+          el.style.borderColor = '#bae6fd';
+        } else {
+          el.style.background = 'var(--soft)';
+          el.style.color = 'var(--ink)';
+        }
+      }
+    }
+  });
+  renderAssignments();
+}
+
 const ASSIGNMENT_CACHE = {};
 
-function renderAssignments(){const a=(BOOT&&BOOT.assignments)||[],complete=a.filter(x=>x.Status==='COMPLETE').length,pending=a.length-complete;const kh=[['ได้รับมอบหมาย',a.length],['ประเมินเสร็จ',complete],['รอดำเนินการ',pending],['ความคืบหน้า',a.length?Math.round(complete*100/a.length)+'%':'0%']].map(x=>`<div class="kpi"><span>${x[0]}</span><br><b>${x[1]}</b></div>`).join('');const dk=$('#kpis');if(dk)dk.innerHTML=kh;const ak=$('#assignments-kpis');if(ak)ak.innerHTML=kh;const elAll=$('#count-all');if(elAll)elAll.textContent=a.length;const elPen=$('#count-pending');if(elPen)elPen.textContent=pending;const elCom=$('#count-completed');if(elCom)elCom.textContent=complete;renderAssignmentsGrid();}
+function renderAssignments(){
+  const allAssignments = (BOOT && BOOT.assignments) || [];
+  
+  // Calculate counts across rounds
+  const r1List = allAssignments.filter(x => !(Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน')));
+  const r2List = allAssignments.filter(x => Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน'));
+  
+  const elRtabAll = document.getElementById('count-rtab-all');
+  if (elRtabAll) elRtabAll.textContent = allAssignments.length;
+  const elRtabR1 = document.getElementById('count-rtab-r1');
+  if (elRtabR1) elRtabR1.textContent = r1List.length;
+  const elRtabR2 = document.getElementById('count-rtab-r2');
+  if (elRtabR2) elRtabR2.textContent = r2List.length;
+
+  // Active round subset
+  let a = allAssignments;
+  if (currentRoundTab === 'round1') a = r1List;
+  else if (currentRoundTab === 'round2') a = r2List;
+
+  const complete = a.filter(x => x.Status === 'COMPLETE').length;
+  const pending = a.length - complete;
+  const roundLabel = currentRoundTab === 'round1' ? ' (รอบประเมินผลงาน)' : (currentRoundTab === 'round2' ? ' (รอบตัดสิน)' : '');
+  
+  const kh = [
+    ['ได้รับมอบหมาย' + roundLabel, a.length],
+    ['ประเมินเสร็จ', complete],
+    ['รอดำเนินการ', pending],
+    ['ความคืบหน้า', a.length ? Math.round(complete * 100 / a.length) + '%' : '0%']
+  ].map(x => `<div class="kpi"><span>${x[0]}</span><br><b>${x[1]}</b></div>`).join('');
+
+  const dk = $('#kpis'); if(dk) dk.innerHTML = kh;
+  const ak = $('#assignments-kpis'); if(ak) ak.innerHTML = kh;
+  const elAll = $('#count-all'); if(elAll) elAll.textContent = a.length;
+  const elPen = $('#count-pending'); if(elPen) elPen.textContent = pending;
+  const elCom = $('#count-completed'); if(elCom) elCom.textContent = complete;
+  
+  renderAssignmentsGrid();
+}
 function getAssignmentCategory(x) {
   if (!x) return 'ผลงานทั่วไป';
   const catName = String(x.CategoryName || x.CategoryNameTH || '').trim();
@@ -330,9 +419,12 @@ function renderAssignmentsGrid(){
     container.innerHTML = `<div class="kanban-empty"><span class="spin"></span> กำลังโหลดผลงานที่ได้รับมอบหมาย...</div>`;
     return;
   }
-  const a = BOOT.assignments || [];
+  const allAsns = BOOT.assignments || [];
   const search = ($('#searchAssignment').value || '').toLowerCase().trim();
-  const filtered = a.filter(x => {
+  const filtered = allAsns.filter(x => {
+    const isR2 = Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน');
+    if(currentRoundTab === 'round1' && isR2) return false;
+    if(currentRoundTab === 'round2' && !isR2) return false;
     if(currentFilter === 'pending' && x.Status === 'COMPLETE') return false;
     if(currentFilter === 'completed' && x.Status !== 'COMPLETE') return false;
     if(search){
@@ -396,6 +488,9 @@ function renderAssignmentsGrid(){
             ${x.PresenterName ? `<span>👤 ผู้นำเสนอ: ${esc(x.PresenterName)}</span>` : ''}
           </div>
           <div class="kanban-badges">
+            ${(Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน')) 
+              ? '<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700;">🏆 รอบตัดสิน</span>' 
+              : '<span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">📋 รอบประเมินผลงาน</span>'}
             ${statusBadge(x.Status)}
             ${x.Decision ? statusBadge(x.Decision) : ''}
             <span class="badge" style="background:#f1f5f9; color:#475569; font-weight:600;">${esc(cat)}</span>
@@ -663,6 +758,72 @@ function renderReview() {
   const d = CURRENT, w = d.work, a = d.assignment, scoreMap = {};
   (d.scores || []).forEach(x => scoreMap[x.CriteriaID] = x);
   
+  let prevRoundHtml = '';
+  if (d.previousRoundEvaluation && d.previousRoundEvaluation.hasPreviousReview) {
+    const revs = d.previousRoundEvaluation.reviews || [];
+    const revsListHtml = revs.map((pr, idx) => {
+      const decBadge = pr.decision ? `<span class="badge" style="background:#dcfce7; color:#166534; padding:2px 8px;">${esc(pr.decision)}</span>` : '';
+      const scRows = (pr.scores || []).map(s => `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px 8px; font-size:0.82rem;">ข้อ ${esc(s.itemNo)}. ${esc(s.criteriaName)}</td>
+          <td style="padding:6px 8px; text-align:center; font-weight:700; color:#0369a1; font-size:0.82rem;">${esc(s.score !== undefined && s.score !== null ? s.score : '-')} / ${esc(s.maxScore)}</td>
+          <td style="padding:6px 8px; font-size:0.8rem; color:#475569;">${esc(s.comment || '-')}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div style="background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:12px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+            <div>
+              <b style="color:#0f172a; font-size:0.92rem;">${esc(pr.reviewerLabel)}</b>
+              <span style="margin-left:8px;">${decBadge}</span>
+            </div>
+            <span style="background:#e0f2fe; color:#0369a1; padding:2px 10px; border-radius:999px; font-weight:700; font-size:0.9rem;">
+              คะแนนรอบแรก: ${Number(pr.totalScore) || 0} / 100
+            </span>
+          </div>
+          ${pr.recommendationToAuthor ? `<div style="font-size:0.85rem; color:#166534; background:#f0fdf4; padding:8px 10px; border-radius:6px; margin-bottom:8px;"><b>ข้อเสนอแนะถึงผู้ส่งผลงาน:</b> ${esc(pr.recommendationToAuthor)}</div>` : ''}
+          ${pr.internalComment ? `<div style="font-size:0.85rem; color:#92400e; background:#fffbeb; padding:8px 10px; border-radius:6px; margin-bottom:8px;"><b>ความเห็นภายใน:</b> ${esc(pr.internalComment)}</div>` : ''}
+          ${scRows ? `
+            <div style="margin-top:6px;">
+              <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+                <thead>
+                  <tr style="background:#f8fafc; color:#64748b; text-align:left; border-bottom:1px solid #e2e8f0;">
+                    <th style="padding:6px 8px;">เกณฑ์การประเมินรอบแรก</th>
+                    <th style="padding:6px 8px; text-align:center; width:90px;">คะแนน</th>
+                    <th style="padding:6px 8px;">ข้อเสนอแนะ</th>
+                  </tr>
+                </thead>
+                <tbody>${scRows}</tbody>
+              </table>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    prevRoundHtml = `
+      <div class="card" style="background:#f0f9ff; border:1.5px solid #7dd3fc; border-radius:14px; margin:16px 0; padding:16px; box-shadow:0 2px 8px rgba(3,105,161,0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <div style="font-weight:700; color:#0369a1; font-size:1.02rem; display:flex; align-items:center; gap:6px;">
+              <span>📊</span> ข้อมูลคะแนนและข้อเสนอแนะจากรอบประเมินผลงาน (รอบแรก)
+            </div>
+            <div style="font-size:0.84rem; color:#0284c7; margin-top:3px;">
+              มีผลการประเมินจากรอบแรก ${revs.length} ท่าน (ข้อมูลนี้แสดงเพื่อประกอบการพิจารณาตัดสิน โดยไม่มีการนำคะแนนไปรวมกับรอบตัดสิน)
+            </div>
+          </div>
+          <button type="button" class="btn soft" id="togglePrevReviewBtn" onclick="togglePrevReviewDetails()" style="font-size:0.82rem; padding:6px 14px; background:#fff; color:#0369a1; border:1px solid #7dd3fc; border-radius:8px; cursor:pointer; font-weight:600;">
+            👁️ ดูรายละเอียดคะแนนและคำแนะนำรอบแรก
+          </button>
+        </div>
+        <div id="prevReviewDetails" style="display:none; margin-top:14px; border-top:1px dashed #7dd3fc; padding-top:12px;">
+          ${revsListHtml}
+        </div>
+      </div>
+    `;
+  }
+  
   // Strictly resolve criteria to the single 100-point suite matching this work's category
   const criteriaList = resolveReviewerCriteria(d.criteria, w).slice().sort((x, y) => (Number(x.ItemNo || x.SortOrder) || 0) - (Number(y.ItemNo || y.SortOrder) || 0));
   d.criteria = criteriaList; // sync back to CURRENT.criteria
@@ -865,6 +1026,9 @@ function renderReview() {
           <div class="review-work-badge-row">
             <span class="work-code-pill">📌 รหัสผลงาน: ${esc(w.WorkCode || '-')}</span>
             <span class="work-category-pill">🏷️ ประเภท: <b>${workCategoryName}</b></span>
+            ${(Number(a.RoundNo) === 2 || String(a.ReviewRoundID).includes('2') || String(a.RoundNameTH).includes('ตัดสิน'))
+              ? '<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; padding:4px 8px; border-radius:999px;">🏆 รอบตัดสินผลงาน</span>'
+              : '<span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:600; padding:4px 8px; border-radius:999px;">📋 รอบประเมินผลงาน</span>'}
             <span class="work-rubric-pill">⚖️ เกณฑ์ประเมิน ${criteriaList.length} ข้อ (คะแนนเต็ม ${totalMax} คะแนน)</span>
           </div>
           <h1 class="review-work-title">
@@ -1202,3 +1366,18 @@ window.addEventListener('load',async()=>{
 </footer>
 </body>
 </html>
+
+
+function togglePrevReviewDetails() {
+  const el = document.getElementById('prevReviewDetails');
+  const btn = document.getElementById('togglePrevReviewBtn');
+  if (el) {
+    if (el.style.display === 'none' || !el.style.display) {
+      el.style.display = 'block';
+      if (btn) btn.innerHTML = '▲ ซ่อนรายละเอียดคะแนนรอบแรก';
+    } else {
+      el.style.display = 'none';
+      if (btn) btn.innerHTML = '👁️ ดูรายละเอียดคะแนนและคำแนะนำรอบแรก';
+    }
+  }
+}

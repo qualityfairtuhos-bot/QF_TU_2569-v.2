@@ -1,3 +1,184 @@
+
+function syncOfficialRound2Criteria_(cid) {
+  var rounds = findMany_('ReviewRounds', { ConferenceID: cid });
+  var round2 = rounds.find(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
+  var r2Id = round2 ? round2.ReviewRoundID : 'RR-2026-000002';
+  if (!round2) {
+    appendRecord_('ReviewRounds', {
+      ReviewRoundID: r2Id,
+      ConferenceID: cid,
+      RoundNo: 2,
+      RoundNameTH: 'รอบตัดสินผลงาน',
+      RoundNameEN: 'Final Decision Round',
+      MinReviewers: 2,
+      MaxReviewers: 3,
+      BlindReview: false,
+      AllowEditAfterSubmit: false,
+      AllowDecline: false,
+      CalculationMethod: 'AVERAGE',
+      PassingScore: 60,
+      Status: 'OPEN',
+      SortOrder: 2
+    });
+  }
+
+  // 1. Service Excellence / CQI / Primary Care (7 items, 100 points total)
+  var serviceCqiCriteria = [
+    {
+      ItemNo: 1,
+      NameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
+      NameEN: 'Situation Review and Problem Significance',
+      Desc: '- มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร (5 คะแนน)\n- มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร (5 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 2,
+      NameTH: 'มีเป้าหมายที่ชัดเจน',
+      NameEN: 'Clear Objectives and Goals',
+      Desc: '- มีการระบุเป้าหมายที่สอดคล้องกับปัญหา (5 คะแนน)\n- มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร (5 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 3,
+      NameTH: 'กิจกรรมการพัฒนา',
+      NameEN: 'Quality Improvement Activities',
+      Desc: '- มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง (10 คะแนน)\n- มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง (15 คะแนน)',
+      MaxScore: 25
+    },
+    {
+      ItemNo: 4,
+      NameTH: 'การประเมินผลการเปลี่ยนแปลง',
+      NameEN: 'Evaluation of Change and Results',
+      Desc: '- มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ (10 คะแนน)\n- มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด (10 คะแนน)',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 5,
+      NameTH: 'บทเรียนที่ได้รับ',
+      NameEN: 'Lessons Learned and Sustainability',
+      Desc: '- มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ (10 คะแนน)\n- มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น (10 คะแนน)',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 6,
+      NameTH: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
+      NameEN: 'Completeness and Alignment with Guidelines',
+      Desc: '- ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ (2.5 คะแนน)\n- การเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด (2.5 คะแนน)',
+      MaxScore: 5
+    },
+    {
+      ItemNo: 7,
+      NameTH: 'การนำเสนอผลงานและตอบข้อซักถาม',
+      NameEN: 'Presentation and Q&A',
+      Desc: 'การนำเสนอผลงานและการตอบข้อซักถามของคณะกรรมการ (10 คะแนน)',
+      MaxScore: 10
+    }
+  ];
+
+  // 2. Research & Innovation (8 items, 100 points total)
+  var researchInnovationCriteria = [
+    {
+      ItemNo: 1,
+      NameTH: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
+      NameEN: 'Title Relevance and Interest',
+      Desc: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ (5 คะแนน)',
+      MaxScore: 5
+    },
+    {
+      ItemNo: 2,
+      NameTH: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
+      NameEN: 'Comprehensive Abstract',
+      Desc: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ (15 คะแนน)',
+      MaxScore: 15
+    },
+    {
+      ItemNo: 3,
+      NameTH: 'บทนำ มีข้อมูลภูมิหลังที่ชัดเจน',
+      NameEN: 'Clear Background and Problem Statement',
+      Desc: '- ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุถึงวัตถุประสงค์ของการวิจัยที่ชัดเจน (10 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 4,
+      NameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
+      NameEN: 'Research Methodology / Innovation Development',
+      Desc: '- ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม (20 คะแนน)\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันโดยทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 5,
+      NameTH: 'ผลการวิจัย/ผลการศึกษาสอดคล้องกับวัตถุประสงค์',
+      NameEN: 'Results Aligned with Objectives',
+      Desc: '- นำเสนอผลการวิจัย/ ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้ (15 คะแนน)',
+      MaxScore: 15
+    },
+    {
+      ItemNo: 6,
+      NameTH: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
+      NameEN: 'Discussion and Recommendations',
+      Desc: '- มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัย (15 คะแนน)',
+      MaxScore: 15
+    },
+    {
+      ItemNo: 7,
+      NameTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
+      NameEN: 'Practical Utilization for Quality & Safety',
+      Desc: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย (10 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 8,
+      NameTH: 'การนำเสนอผลงานและตอบข้อซักถาม',
+      NameEN: 'Presentation and Q&A',
+      Desc: 'การนำเสนอผลงานและตอบข้อซักถาม (10 คะแนน)',
+      MaxScore: 10
+    }
+  ];
+
+  clearTableCache_('ScoringCriteria');
+  var allCrit = findMany_('ScoringCriteria', { ConferenceID: cid });
+
+  function syncGroupList(items, catGroupKey) {
+    items.forEach(function(it){
+      var existing = allCrit.find(function(c){
+        return String(c.ConferenceID) === String(cid) &&
+               String(c.ReviewRoundID) === String(r2Id) &&
+               String(c.CategoryID).toUpperCase() === catGroupKey.toUpperCase() &&
+               num_(c.ItemNo) === it.ItemNo;
+      });
+      var patch = {
+        ConferenceID: cid,
+        ReviewRoundID: r2Id,
+        CategoryID: catGroupKey,
+        PresentationTypeID: 'ALL',
+        ItemNo: it.ItemNo,
+        CriteriaNameTH: it.NameTH,
+        CriteriaNameEN: it.NameEN,
+        DescriptionTH: it.Desc,
+        MaxScore: it.MaxScore,
+        WeightPercent: 100,
+        RequiredComment: false,
+        Active: true,
+        SortOrder: it.ItemNo
+      };
+      if (existing) {
+        updateRecord_('ScoringCriteria', existing.__row, patch);
+      } else {
+        appendRecord_('ScoringCriteria', Object.assign({ CriteriaID: nextId_('CRIT') }, patch));
+      }
+    });
+  }
+
+  syncGroupList(serviceCqiCriteria, 'SERVICE_CQI_PRIMARY');
+  syncGroupList(serviceCqiCriteria, 'SERVICE');
+  syncGroupList(serviceCqiCriteria, 'CQI');
+  syncGroupList(serviceCqiCriteria, 'PRIMARY');
+  syncGroupList(researchInnovationCriteria, 'RESEARCH_INNOVATION');
+  syncGroupList(researchInnovationCriteria, 'RESEARCH');
+  syncGroupList(researchInnovationCriteria, 'INNOVATION');
+  clearTableCache_('ScoringCriteria');
+}
+
 /**
  * TUH Quality Fair Conference Management
  * Combined production Google Apps Script backend.
@@ -366,6 +547,8 @@ function seedReviewRounds_(cid){
 }
 
 function seedScoringCriteria_(cid){
+  try { syncOfficialRound2Criteria_(cid); } catch(e){}
+
   const round=findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1});
   const roundId = round ? round.ReviewRoundID : '';
   const rows=[
@@ -4320,7 +4503,15 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
     return s || 'ผลงานทั่วไป';
   }
 
+  const allRounds = getRecords_('ReviewRounds') || [];
+  const roundMap = {};
+  allRounds.forEach(function(r){ roundMap[r.ReviewRoundID] = r; });
   assignments.forEach(function(a){
+    const r = roundMap[a.ReviewRoundID];
+    const rNo = (r && r.RoundNo) ? Number(r.RoundNo) : (String(a.ReviewRoundID).includes('2') ? 2 : 1);
+    a.RoundNo = rNo;
+    a.RoundNameTH = (r && r.RoundNameTH) ? r.RoundNameTH : (rNo === 2 ? 'รอบตัดสินผลงาน' : 'รอบประเมินผลงาน');
+    a.RoundNameEN = (r && r.RoundNameEN) ? r.RoundNameEN : (rNo === 2 ? 'Final Round' : 'Preliminary Review');
     const w = workMap[a.WorkID];
     if (w) {
       a.TitleTH = a.TitleTH || w.TitleTH || w.TitleEN || w.ThaiTitle || w.EnglishTitle;
@@ -4785,7 +4976,53 @@ function reviewerGetAssignment(token,conferenceId,assignmentId){
       if(a.Status === 'ASSIGNED') a.Status = 'OPENED';
       try{updateRecord_('ReviewAssignments',a.__row,{OpenedAt:a.OpenedAt,Status:a.Status});}catch(e){}
     }
-    const result = {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores)};
+        // If Round 2 (รอบตัดสิน), fetch previous round (Round 1) evaluations for this work
+    let previousRoundEvaluation = null;
+    const isFinalRound = (round && Number(round.RoundNo) === 2) || (String(a.ReviewRoundID).includes('2'));
+    if (isFinalRound) {
+      const prevAssignments = findMany_('ReviewAssignments', { ConferenceID: cid, WorkID: a.WorkID })
+        .filter(function(pa){
+          return String(pa.AssignmentID) !== String(a.AssignmentID) &&
+                 String(pa.ReviewRoundID) !== String(a.ReviewRoundID) &&
+                 upper_(pa.Status) !== 'CANCELLED' && upper_(pa.Status) !== 'DECLINED';
+        });
+      
+      const allPrevScores = findMany_('ReviewScores', { ConferenceID: cid, WorkID: a.WorkID });
+      const allPrevCriteria = findMany_('ScoringCriteria', { ConferenceID: cid });
+      const critMap = {};
+      allPrevCriteria.forEach(function(c){ critMap[c.CriteriaID] = c; });
+
+      const prevReviews = prevAssignments.map(function(pa, idx){
+        const myScores = allPrevScores.filter(function(s){ return String(s.AssignmentID) === String(pa.AssignmentID); });
+        const subScores = myScores.map(function(s){
+          const cr = critMap[s.CriteriaID] || {};
+          return {
+            itemNo: cr.ItemNo || '',
+            criteriaName: cr.CriteriaNameTH || cr.CriteriaName || '',
+            score: s.Score,
+            maxScore: cr.MaxScore || '',
+            comment: clean_(s.Comment || '')
+          };
+        });
+        const isSameReviewer = String(pa.ReviewerID).trim() === String(a.ReviewerID).trim();
+        return {
+          reviewerName: pa.ReviewerName || ('กรรมการท่านที่ ' + (idx + 1)),
+          reviewerLabel: isSameReviewer ? ((pa.ReviewerName || 'ท่าน') + ' (ผลประเมินรอบแรกของท่าน)') : ('กรรมการท่านที่ ' + (idx + 1)),
+          isSelf: isSameReviewer,
+          totalScore: pa.TotalScore,
+          decision: pa.Decision || '',
+          recommendationToAuthor: pa.RecommendationToAuthor || '',
+          internalComment: pa.InternalComment || '',
+          scores: subScores
+        };
+      });
+
+      previousRoundEvaluation = {
+        hasPreviousReview: prevReviews.length > 0,
+        reviews: prevReviews
+      };
+    }
+    const result = {assignment:serialize_(a),work:serialize_(work),files:serialize_(files),criteria:serialize_(criteria),scores:serialize_(scores),previousRoundEvaluation:serialize_(previousRoundEvaluation)};
     try { cachePutLarge_(cacheKey, result, 180); } catch(e) {}
     return result;
   });
@@ -5281,6 +5518,7 @@ function adminGetReviewConfig(token,conferenceId){
       rounds = findMany_('ReviewRounds',{ConferenceID:cid});
     }
     var hasR2 = rounds.some(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
+    try { syncOfficialRound2Criteria_(cid); } catch(e){}
     if (!hasR2) {
       appendRecord_('ReviewRounds',{ReviewRoundID:'RR-2026-000002',ConferenceID:cid,RoundNo:2,RoundNameTH:'รอบตัดสินผลงาน',RoundNameEN:'Final Decision Round',MinReviewers:2,MaxReviewers:3,BlindReview:false,AllowEditAfterSubmit:false,AllowDecline:false,CalculationMethod:'AVERAGE',PassingScore:60,Status:'OPEN',SortOrder:2});
       rounds = findMany_('ReviewRounds',{ConferenceID:cid});
@@ -6018,13 +6256,22 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     if(!workIds||!workIds.length){
       workIds = findMany_('Works',{ConferenceID:conferenceId}).filter(w=>w.Status!=='REJECTED'&&w.Status!=='RECEIVED').map(w=>w.WorkID);
     }
-    if(!reviewerIds||!reviewerIds.length)throw new Error('No reviewers provided');
+    const isOriginal = (reviewerIds === '__ORIGINAL__' || (Array.isArray(reviewerIds) && reviewerIds.indexOf('__ORIGINAL__') >= 0));
+    if(!isOriginal && (!reviewerIds||!reviewerIds.length))throw new Error('No reviewers provided');
     let created=0,skipped=0;
     const revCountAdd = {};
     workIds.forEach(function(wid){
       const w = findOne_('Works',{ConferenceID:conferenceId,WorkID:wid});
+      let targetRids = reviewerIds;
+      if (isOriginal) {
+        // Find previous assignments for this work in other rounds (e.g. Round 1)
+        const prevAssignments = findMany_('ReviewAssignments',{ConferenceID:conferenceId,WorkID:wid}).filter(function(a){
+          return String(a.ReviewRoundID) !== String(roundId) && upper_(a.Status) !== 'CANCELLED' && upper_(a.Status) !== 'DECLINED';
+        });
+        targetRids = prevAssignments.map(function(a){ return a.ReviewerID; }).filter(Boolean);
+      }
       let assignedForThisWork = 0;
-      reviewerIds.forEach(function(rid){
+      (targetRids||[]).forEach(function(rid){
         const exist = findOne_('ReviewAssignments',{ConferenceID:conferenceId,WorkID:wid,ReviewerID:rid,ReviewRoundID:roundId});
         if(exist) { skipped++; return; }
         const rvw = findOne_('Reviewers',{ReviewerID:rid});
