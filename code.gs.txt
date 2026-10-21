@@ -4460,6 +4460,18 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
         }
       }
     }
+    var st = upper_(a.Status);
+    var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : 0;
+    var hasValidDecision = a.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(a.Decision)) >= 0;
+    if (rawSc > 0 && (a.CompletedAt || hasValidDecision)) {
+      if (['DRAFT_SAVED', 'DRAFT', 'SAVED', 'ASSIGNED', 'OPENED'].indexOf(st) >= 0 || !st) {
+        a.Status = 'COMPLETE';
+        if (!a.CompletedAt) a.CompletedAt = new Date();
+        if (a.__row) {
+          try { updateRecord_('ReviewAssignments', a.__row, { Status: 'COMPLETE', CompletedAt: a.CompletedAt, TotalScore: rawSc, UpdatedAt: new Date() }); } catch(e){}
+        }
+      }
+    }
   });
 
   // Targeted lookup: only fetch the specific works needed for these assignments
@@ -5151,13 +5163,16 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     total = Math.round(total * 100) / 100;
     if(total > 100) total = 100; // strictly capped at 100 points max
 
-    const status = submit ? 'COMPLETE' : 'DRAFT_SAVED';
+    var isSubmit = bool_(submit) || bool_(payload && payload.submit) || bool_(payload && payload.isSubmit);
+    if (!isSubmit && payload && payload.isDraft === false) isSubmit = true;
+    const status = isSubmit ? 'COMPLETE' : 'DRAFT_SAVED';
     // Reviewer submit never locks out reviewer themselves; only Admin accepts/locks!
     const isLocked = false;
+    const completedAt = isSubmit ? new Date() : (a.CompletedAt || '');
 
     updateRecord_('ReviewAssignments', a.__row, {
       Status: status,
-      CompletedAt: submit ? new Date() : (a.CompletedAt || ''),
+      CompletedAt: completedAt,
       TotalScore: total,
       Decision: clean_(payload.Decision),
       RecommendationToAuthor: clean_(payload.RecommendationToAuthor),
@@ -5193,17 +5208,28 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
       });
     }
 
+    const userEmail = normalizeEmail_(ctx.user.Email);
+    const revEmail = normalizeEmail_(a.ReviewerEmail || '');
     try { cacheRemoveLarge_('REV_ASG_' + assignmentId); } catch(e) {}
     try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
     try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + (rid||a.ReviewerID)); } catch(e) {}
+    try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + ctx.user.UserID); } catch(e) {}
+    try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + ctx.user.Email); } catch(e) {}
+    if (userEmail) { try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + userEmail); } catch(e) {} }
+    if (revEmail) { try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + revEmail); } catch(e) {} }
     if (work && work.RegID) {
       try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + work.RegID); } catch(e) {}
     }
+    clearTableCache_('ReviewAssignments');
+    clearTableCache_('ReviewScores');
+    clearTableCache_('ReviewSummary');
+    clearRequestCache_();
     return {
       status: status,
       totalScore: total,
       assignment: Object.assign({}, serialize_(a), {
         Status: status,
+        CompletedAt: completedAt,
         TotalScore: total,
         Decision: clean_(payload.Decision),
         RecommendationToAuthor: clean_(payload.RecommendationToAuthor),
@@ -7443,6 +7469,20 @@ function adminListWorks(token, conferenceId, filters) {
         (authorsByWork[a.WorkID] || (authorsByWork[a.WorkID] = [])).push(a);
       });
       var assigns = findMany_('ReviewAssignments', { ConferenceID: cid });
+      assigns.forEach(function(c) {
+        var rawSc = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore))) ? Number(c.TotalScore) : 0;
+        var hasValidDecision = c.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(c.Decision)) >= 0;
+        var st = upper_(c.Status);
+        if (rawSc > 0 && (c.CompletedAt || hasValidDecision)) {
+          if (['DRAFT_SAVED', 'DRAFT', 'SAVED', 'ASSIGNED', 'OPENED'].indexOf(st) >= 0 || !st) {
+            c.Status = 'COMPLETE';
+            if (!c.CompletedAt) c.CompletedAt = new Date();
+            if (c.__row) {
+              try { updateRecord_('ReviewAssignments', c.__row, { Status: 'COMPLETE', CompletedAt: c.CompletedAt, UpdatedAt: new Date() }, true); } catch(e) {}
+            }
+          }
+        }
+      });
       var assignsByWork = {};
       var asc = assigns.reduce(function(acc, c) {
         if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
@@ -7841,10 +7881,18 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
           a.TotalScore = recalculatedTotal;
           patch.TotalScore = recalculatedTotal;
         }
-        var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(upper_(a.Status)) >= 0;
-        if (!isDraftA && ['ASSIGNED', 'OPENED'].indexOf(upper_(a.Status)) >= 0 && recalculatedTotal > 0 && a.CompletedAt) {
-          a.Status = 'COMPLETE';
-          patch.Status = 'COMPLETE';
+        var st = upper_(a.Status);
+        var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st) >= 0;
+        var hasValidDecision = a.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(a.Decision)) >= 0;
+        if (recalculatedTotal > 0 && (a.CompletedAt || hasValidDecision)) {
+          if (isDraftA || ['ASSIGNED', 'OPENED'].indexOf(st) >= 0 || !st) {
+            a.Status = 'COMPLETE';
+            patch.Status = 'COMPLETE';
+            if (!a.CompletedAt) {
+              a.CompletedAt = new Date();
+              patch.CompletedAt = a.CompletedAt;
+            }
+          }
         }
         if (Object.keys(patch).length > 0) {
           patch.UpdatedAt = new Date();
@@ -8093,14 +8141,18 @@ function adminAcceptWorkScores(token, conferenceId, workId, lockReviewers) {
     var assignments = findMany_('ReviewAssignments', { ConferenceID: cid, WorkID: w.WorkID });
     var updates = [];
     assignments.forEach(function(a) {
+      var patch = {
+        ScoreAcceptedByAdmin: true,
+        AdminLocked: !!lockReviewers,
+        Locked: !!lockReviewers,
+        UpdatedAt: new Date()
+      };
+      if (num_(a.TotalScore) > 0) {
+        patch.Status = 'COMPLETE';
+      }
       updates.push({
         rowNumber: a.__row,
-        patch: {
-          ScoreAcceptedByAdmin: true,
-          AdminLocked: !!lockReviewers,
-          Locked: !!lockReviewers,
-          UpdatedAt: new Date()
-        }
+        patch: patch
       });
     });
     if (updates.length > 0) {

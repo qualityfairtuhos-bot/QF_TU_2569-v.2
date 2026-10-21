@@ -159,7 +159,13 @@ function invalidateCache(action: string) {
 
   if (/reviewerSaveReview|reviewer/i.test(action)) {
     for (const key of Array.from(memoryCache.keys())) {
-      if (key.startsWith("reviewer") || key.startsWith("adminListWorks") || key.startsWith("adminDashboard")) {
+      if (
+        key.startsWith("reviewer") ||
+        key.startsWith("adminListWorks") ||
+        key.startsWith("adminDashboard") ||
+        key.startsWith("adminGetWorkScoreSummary") ||
+        key.startsWith("adminGetReviewerEvaluationReport")
+      ) {
         memoryCache.delete(key);
       }
     }

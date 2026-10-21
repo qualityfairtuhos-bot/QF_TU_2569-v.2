@@ -1249,7 +1249,10 @@ async function saveReview(submit) {
       TotalScore: Math.round(totalEntered * 100) / 100,
       Decision: decisionEl ? decisionEl.value : '',
       RecommendationToAuthor: recEl ? recEl.value : '',
-      InternalComment: internalEl ? internalEl.value : ''
+      InternalComment: internalEl ? internalEl.value : '',
+      submit: !!submit,
+      isSubmit: !!submit,
+      isDraft: !submit
     };
     
     if (submit && !payload.Decision) {
@@ -1277,20 +1280,25 @@ async function saveReview(submit) {
     
     show(submit ? 'กำลังส่งผลประเมิน...' : 'กำลังบันทึกร่าง...');
     const aid = CURRENT.assignment.AssignmentID;
-    const r = await rpc('reviewerSaveReview', TOKEN, CID, aid, payload, submit);
+    const r = await rpc('reviewerSaveReview', TOKEN, CID, aid, payload, !!submit);
     
     // Immediately update local cache and state so UI updates in milliseconds
-    if (r && r.assignment) {
-      if (CURRENT && CURRENT.assignment) {
-        Object.assign(CURRENT.assignment, r.assignment);
-        if (r.scores) CURRENT.scores = r.scores;
-      }
-      ASSIGNMENT_CACHE[aid] = CURRENT;
-      if (BOOT && BOOT.assignments) {
-        const idx = BOOT.assignments.findIndex(x => x.AssignmentID === aid);
-        if (idx >= 0) {
-          BOOT.assignments[idx] = Object.assign({}, BOOT.assignments[idx], r.assignment);
-        }
+    const finalStatus = submit ? 'COMPLETE' : 'DRAFT_SAVED';
+    if (CURRENT && CURRENT.assignment) {
+      CURRENT.assignment.Status = finalStatus;
+      if (submit) CURRENT.assignment.CompletedAt = new Date().toISOString();
+      if (payload.Decision) CURRENT.assignment.Decision = payload.Decision;
+      if (payload.RecommendationToAuthor) CURRENT.assignment.RecommendationToAuthor = payload.RecommendationToAuthor;
+      if (payload.InternalComment) CURRENT.assignment.InternalComment = payload.InternalComment;
+      CURRENT.assignment.TotalScore = Math.round(totalEntered * 100) / 100;
+      if (r && r.assignment) Object.assign(CURRENT.assignment, r.assignment);
+      if (r && r.scores) CURRENT.scores = r.scores;
+    }
+    ASSIGNMENT_CACHE[aid] = CURRENT;
+    if (BOOT && BOOT.assignments) {
+      const idx = BOOT.assignments.findIndex(x => x.AssignmentID === aid);
+      if (idx >= 0) {
+        BOOT.assignments[idx] = Object.assign({}, BOOT.assignments[idx], CURRENT.assignment, { Status: finalStatus });
       }
     }
     
@@ -1317,6 +1325,14 @@ async function saveReview(submit) {
     // Background sync bootstrap silently without blocking the user
     rpc('reviewerBootstrap', TOKEN, CID).then(freshBoot => {
       if (freshBoot && freshBoot.assignments) {
+        const locallyComplete = new Set(
+          (BOOT.assignments || []).filter(x => x.Status === 'COMPLETE').map(x => x.AssignmentID)
+        );
+        freshBoot.assignments.forEach(x => {
+          if (locallyComplete.has(x.AssignmentID)) {
+            x.Status = 'COMPLETE';
+          }
+        });
         BOOT = freshBoot;
         renderAll();
       }

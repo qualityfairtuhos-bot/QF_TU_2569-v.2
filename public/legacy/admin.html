@@ -3461,14 +3461,16 @@ async function openScoreSummary(wid){
     
     const isScored = (a) => {
       const st = String(a.Status || '').toUpperCase();
+      const scoreVal = Number(a.TotalScore);
+      if (isNaN(scoreVal) || scoreVal <= 0) return false;
       const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
-      if (isDraft) return false;
       if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED'].includes(st) || !st) return false;
       const isConfirmedSubmitted = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st);
-      const scoreVal = Number(a.TotalScore);
-      // ถ้าเป็นแบบบันทึกร่าง หรือคะแนนเป็น 0 ให้ถือว่ายังไม่มีคะแนน การรายงานในตารางยังไม่นับ
-      if (isNaN(scoreVal) || scoreVal <= 0) return false;
-      return isConfirmedSubmitted;
+      if (isConfirmedSubmitted) return true;
+      if (isDraft && (a.CompletedAt || (a.Decision && ['PASS', 'REVISION', 'REJECT'].includes(String(a.Decision).toUpperCase())))) {
+        return true;
+      }
+      return false;
     };
     const completed = (assignments || []).filter(isScored);
     const totalAssigned = (assignments || []).length;
@@ -3549,7 +3551,12 @@ async function openScoreSummary(wid){
           // Unscored Reviewer Slot (แสดงช่องของ reviewer ที่ยังไม่ให้คะแนน หรือบันทึกร่างไว้)
           const st = String(a.Status || '').toUpperCase();
           const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
-          const badgeHtml = isDraft
+          const rawScore = Number(a.TotalScore) || 0;
+          const myScores = scores.filter(s => s.AssignmentID === a.AssignmentID);
+          const hasDraftScores = isDraft && (rawScore > 0 || myScores.length > 0 || a.RecommendationToAuthor);
+          const badgeHtml = hasDraftScores
+            ? `<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.8rem; padding:3px 10px; border-radius:999px;">💾 แบบร่าง (บันทึกคะแนน ${rawScore > 0 ? rawScore : "-"} คะแนน)</span>`
+            : isDraft
             ? `<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.8rem; padding:3px 10px; border-radius:999px;">💾 บันทึกร่างไว้ (ยังไม่ส่งผล)</span>`
             : `<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.8rem; padding:3px 10px; border-radius:999px;">⏳ ยังไม่ให้คะแนน / รอการประเมิน</span>`;
           const descHtml = isDraft
@@ -3562,7 +3569,7 @@ async function openScoreSummary(wid){
                 <b style="font-size:0.95rem; color:#334155;">กรรมการท่านที่ ${i+1}: ${esc(a.ReviewerName || a.ReviewerID || 'ผู้ประเมิน')}</b>
                 <span style="margin-left:8px;">${badgeHtml}</span>
               </div>
-              <span style="background:#f1f5f9; color:#64748b; padding:3px 12px; border-radius:999px; font-weight:600; font-size:0.85rem;">ยังไม่มีคะแนน</span>
+              <span style="background:#f1f5f9; color:#64748b; padding:3px 12px; border-radius:999px; font-weight:600; font-size:0.85rem;">${hasDraftScores && rawScore > 0 ? "คะแนนร่าง " + rawScore : "ยังไม่มีคะแนน"}</span>
             </div>
             <div style="font-size:0.8rem; color:#64748b; margin-top:8px;">
               ${descHtml}
