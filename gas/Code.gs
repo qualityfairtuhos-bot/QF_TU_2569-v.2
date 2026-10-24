@@ -135,6 +135,12 @@ function syncOfficialRound2Criteria_(cid) {
     }
   ];
 
+  // Remove redundant composite categories to avoid duplicate rows and confusion in ScoringCriteria
+  try {
+    deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'SERVICE_CQI_PRIMARY' });
+    deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'RESEARCH_INNOVATION' });
+  } catch(e) {}
+
   clearTableCache_('ScoringCriteria');
   var allCrit = findMany_('ScoringCriteria', { ConferenceID: cid });
 
@@ -169,11 +175,10 @@ function syncOfficialRound2Criteria_(cid) {
     });
   }
 
-  syncGroupList(serviceCqiCriteria, 'SERVICE_CQI_PRIMARY');
+  // Maintain ONLY individual distinct categories (no duplicate group rows in sheet)
   syncGroupList(serviceCqiCriteria, 'SERVICE');
   syncGroupList(serviceCqiCriteria, 'CQI');
   syncGroupList(serviceCqiCriteria, 'PRIMARY');
-  syncGroupList(researchInnovationCriteria, 'RESEARCH_INNOVATION');
   syncGroupList(researchInnovationCriteria, 'RESEARCH');
   syncGroupList(researchInnovationCriteria, 'INNOVATION');
   clearTableCache_('ScoringCriteria');
@@ -5521,8 +5526,12 @@ function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
       });
     }
 
-    syncGroupCriteria(researchCriteria, 'RESEARCH_INNOVATION', 'Research & Innovation');
-    syncGroupCriteria(serviceCriteria, 'SERVICE_CQI_PRIMARY', 'Service/CQI/Primary');
+    try {
+      deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'SERVICE_CQI_PRIMARY' });
+      deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'RESEARCH_INNOVATION' });
+    } catch(e) {}
+    syncGroupCriteria(researchCriteria, 'RESEARCH', 'Research');
+    syncGroupCriteria(researchCriteria, 'INNOVATION', 'Innovation');
     syncGroupCriteria(cqiCriteria, 'CQI', 'CQI/Best Practice');
     syncGroupCriteria(serviceCriteria, 'SERVICE', 'Service Excellence');
     syncGroupCriteria(primaryCriteria, 'PRIMARY', 'Primary Care');
@@ -6339,6 +6348,108 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e){}
 
     return {created:created,skipped:skipped};
+  });
+}
+function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, reviewerIds) {
+  return runSafely_('adminSyncWorkRoundReviewers', function() {
+    var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    var w = findOne_('Works', { ConferenceID: conferenceId, WorkID: workId });
+    if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
+    var round = findOne_('ReviewRounds', { ConferenceID: conferenceId, ReviewRoundID: roundId });
+    if (!round) throw new Error('ไม่พบรอบการประเมิน');
+
+    var currentAssignments = findMany_('ReviewAssignments', {
+      ConferenceID: conferenceId,
+      WorkID: workId,
+      ReviewRoundID: roundId
+    }).filter(function(a) { return upper_(a.Status) !== 'CANCELLED'; });
+
+    var currentRidMap = {};
+    currentAssignments.forEach(function(a) { currentRidMap[a.ReviewerID] = a; });
+
+    var targetRids = (reviewerIds || []).filter(Boolean);
+    var targetRidSet = {};
+    targetRids.forEach(function(rid) { targetRidSet[rid] = true; });
+
+    var added = 0;
+    var removed = 0;
+
+    // 1. Remove assignments that were unchecked
+    currentAssignments.forEach(function(a) {
+      if (!targetRidSet[a.ReviewerID]) {
+        updateRecord_('ReviewAssignments', a.__row, {
+          Status: 'CANCELLED',
+          UpdatedAt: new Date()
+        });
+        removed++;
+        var pool = findOne_('ReviewerPool', { ConferenceID: conferenceId, ReviewerID: a.ReviewerID });
+        if (pool && num_(pool.CurrentAssignedCount) > 0) {
+          try {
+            updateRecord_('ReviewerPool', pool.__row, {
+              CurrentAssignedCount: Math.max(0, num_(pool.CurrentAssignedCount) - 1),
+              UpdatedAt: new Date()
+            });
+          } catch(e) {}
+        }
+      }
+    });
+
+    // 2. Add assignments for newly checked reviewers
+    targetRids.forEach(function(rid) {
+      if (currentRidMap[rid]) {
+        var existing = currentRidMap[rid];
+        if (upper_(existing.Status) === 'CANCELLED') {
+          updateRecord_('ReviewAssignments', existing.__row, {
+            Status: 'ASSIGNED',
+            UpdatedAt: new Date()
+          });
+          added++;
+        }
+        return;
+      }
+      var rvw = findOne_('Reviewers', { ReviewerID: rid });
+      if (!rvw || String(rvw.Status).toUpperCase() === 'INACTIVE') return;
+      var pool = findOne_('ReviewerPool', { ConferenceID: conferenceId, ReviewerID: rid });
+      var aid = nextId_('ASN');
+      appendRecord_('ReviewAssignments', {
+        AssignmentID: aid,
+        ConferenceID: conferenceId,
+        ReviewRoundID: roundId,
+        WorkID: workId,
+        WorkCode: w.WorkCode || workId,
+        ReviewerID: rid,
+        ReviewerName: rvw.FullName || (rvw.FirstName + ' ' + rvw.LastName),
+        ReviewerEmail: rvw.Email,
+        AssignedAt: new Date(),
+        AssignedBy: ctx.user.Email,
+        Status: 'ASSIGNED',
+        CreatedAt: new Date(),
+        UpdatedAt: new Date()
+      });
+      added++;
+      if (pool) {
+        try {
+          updateRecord_('ReviewerPool', pool.__row, {
+            CurrentAssignedCount: num_(pool.CurrentAssignedCount, 0) + 1,
+            UpdatedAt: new Date()
+          });
+        } catch(e) {}
+      }
+      try { sendReviewAssignmentEmail_(conferenceId, w, rvw, aid); } catch(e) {}
+    });
+
+    if (added > 0 && ['WAITING_REVIEWER_ASSIGN','ACADEMIC_SCREENING','DRAFT','SUBMITTED'].indexOf(upper_(w.Status)) >= 0) {
+      try {
+        updateRecord_('Works', w.__row, { Status: 'UNDER_REVIEW', UpdatedAt: new Date() });
+      } catch(e) {}
+    }
+
+    clearTableCache_('ReviewAssignments');
+    clearTableCache_('Works');
+    clearTableCache_('ReviewerPool');
+    try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e) {}
+
+    return { success: true, added: added, removed: removed };
   });
 }
 function adminGetReviewer(token,conferenceId,reviewerId){
@@ -8474,6 +8585,7 @@ const API_ACTIONS = Object.freeze({
   adminAddReviewer: adminAddReviewer,
   adminAddUser: adminAddUser,
   adminAssignReviewersBulk: adminAssignReviewersBulk,
+  adminSyncWorkRoundReviewers: adminSyncWorkRoundReviewers,
   adminBootstrap: adminBootstrap,
   adminDashboard: adminDashboard,
   adminGetRegistration: adminGetRegistration,
@@ -8554,7 +8666,7 @@ const API_ACTIONS = Object.freeze({
 });
 
 const API_WRITE_ACTIONS = Object.freeze({
-  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1,
+  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminSyncWorkRoundReviewers:1,
   adminResendReviewerCreds:1, adminSaveRegistration:1, adminSendDirectEmail:1,
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,

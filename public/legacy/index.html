@@ -963,7 +963,7 @@ function renderAuthorWorks(works,reg,templates){
     const canOriginal=['DRAFT','SUBMITTED','ACADEMIC_SCREENING','RETURNED_FOR_EDIT'].includes(st);
     const canRevise=['REVISION_REQUIRED','REVISE_REQUIRED','REVISION_REQUESTED','REVISION_SUBMITTED'].includes(st);
     const isRevisionSubmitted = (st === 'REVISION_SUBMITTED');
-    const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED'].includes(st);
+    const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED','PUBLISHED'].includes(st) || st.includes('ACCEPT') || String(w.FinalDecision||'').toUpperCase() === 'ACCEPTED' || String(w.FinalDecision||'').toUpperCase() === 'PASS';
 
     // ตรวจสอบรูปแบบการนำเสนอว่าเป็น Oral หรือ Poster
     const presText = (String(w.PresentationTypeFinal||'') + ' ' + String(w.PresentationTypeName||'') + ' ' + String(w.PresentationTypeRequested||'') + ' ' + st).toUpperCase();
