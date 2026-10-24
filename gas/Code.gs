@@ -7930,7 +7930,7 @@ function adminGetRegistrationSignSheet(token, conferenceId, options) {
   });
 }
 
-function adminGetWorkScoreSummary(token, conferenceId, workId) {
+function adminGetWorkScoreSummary(token, conferenceId, workId, roundOption) {
   return runSafely_('adminGetWorkScoreSummary', function() {
     requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
     
@@ -7966,10 +7966,56 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
         }
       }
     }
-    var assignments = findMany_('ReviewAssignments', { ConferenceID: conferenceId, WorkID: workId });
+
+    var allRounds = findMany_('ReviewRounds', { ConferenceID: conferenceId }) || [];
+    var allAssignments = findMany_('ReviewAssignments', { ConferenceID: conferenceId, WorkID: workId });
     var allScores = findMany_('ReviewScores', { ConferenceID: conferenceId, WorkID: workId });
     var allCriteria = findMany_('ScoringCriteria', { ConferenceID: conferenceId }).filter(function(c){ return bool_(c.Active); });
-    var targetRoundId = (assignments[0] && assignments[0].ReviewRoundID) || (work && work.ReviewRoundID);
+
+    // Determine target round
+    var targetRound = null;
+    if (roundOption) {
+      var roStr = String(roundOption).trim();
+      targetRound = allRounds.find(function(r){
+        return String(r.ReviewRoundID).trim() === roStr || 
+               String(r.RoundNo).trim() === roStr ||
+               (roStr === '1' && (Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'))) ||
+               (roStr === '2' && (Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน')));
+      });
+    }
+
+    // Filter assignments by selected round, or prefer round that already has completed scores
+    var assignments = allAssignments;
+    if (targetRound) {
+      var rAssignments = allAssignments.filter(function(a){
+        return String(a.ReviewRoundID || '').trim() === String(targetRound.ReviewRoundID).trim();
+      });
+      if (rAssignments.length > 0) {
+        assignments = rAssignments;
+      }
+    } else {
+      // Auto-detect round: prefer round with completed scores, or Round 1
+      var scoredA = allAssignments.filter(function(a){ 
+        return num_(a.TotalScore) > 0 || ['COMPLETE','PASS','REVISION','REJECT','SUBMITTED','EVALUATED','SCORED'].indexOf(upper_(a.Status)) >= 0; 
+      });
+      if (scoredA.length > 0) {
+        var targetRid = scoredA[0].ReviewRoundID;
+        assignments = allAssignments.filter(function(a){ return String(a.ReviewRoundID || '').trim() === String(targetRid).trim(); });
+        targetRound = allRounds.find(function(r){ return String(r.ReviewRoundID).trim() === String(targetRid).trim(); });
+      } else if (allAssignments.length > 0) {
+        // Fallback to Round 1 assignments
+        var r1Round = allRounds.find(function(r){ return Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'); });
+        if (r1Round) {
+          var r1A = allAssignments.filter(function(a){ return String(a.ReviewRoundID || '').trim() === String(r1Round.ReviewRoundID).trim(); });
+          if (r1A.length > 0) {
+            assignments = r1A;
+            targetRound = r1Round;
+          }
+        }
+      }
+    }
+
+    var targetRoundId = targetRound ? targetRound.ReviewRoundID : ((assignments[0] && assignments[0].ReviewRoundID) || (work && work.ReviewRoundID));
     if (targetRoundId) {
       var roundSpecific = allCriteria.filter(function(c){
         var rId = String(c.ReviewRoundID||"").trim();
@@ -7978,15 +8024,36 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
       if (roundSpecific.length > 0) allCriteria = roundSpecific;
     }
     var criteria = filterCriteriaForWork_(allCriteria, work);
-    var validCritMap = {};
-    criteria.forEach(function(c){ validCritMap[c.CriteriaID] = true; });
-    var scores = allScores.filter(function(s){ return !!validCritMap[s.CriteriaID]; });
 
-    // Self-heal assignments to match reviewer's actual evaluation (NEVER force flat 100)
+    // Map criteria for reliable score lookup
+    var critMapById = {};
+    var critMapByItemNo = {};
+    criteria.forEach(function(c){ 
+      critMapById[String(c.CriteriaID).trim()] = c;
+      if (c.ItemNo !== undefined && c.ItemNo !== null && c.ItemNo !== '') {
+        critMapByItemNo[String(c.ItemNo).trim()] = c;
+      }
+    });
+
+    // Match each score row to criteria; never drop scores!
+    var scores = allScores.map(function(s){
+      var sc = Object.assign({}, s);
+      var matchedCrit = critMapById[String(sc.CriteriaID).trim()];
+      if (!matchedCrit && sc.ItemNo && critMapByItemNo[String(sc.ItemNo).trim()]) {
+        matchedCrit = critMapByItemNo[String(sc.ItemNo).trim()];
+        sc.CriteriaID = matchedCrit.CriteriaID;
+      }
+      return sc;
+    });
+
+    // Self-heal assignments to match reviewer's actual evaluation
     assignments.forEach(function(a) {
-      var myScores = scores.filter(function(s){ return s.AssignmentID === a.AssignmentID; });
-      if (myScores.length > 0) {
-        var recalculatedTotal = Math.round(myScores.reduce(function(sum, s){ return sum + num_(s.Score); }, 0) * 100) / 100;
+      var myScores = scores.filter(function(s){ return String(s.AssignmentID) === String(a.AssignmentID); });
+      var recalculatedTotal = myScores.length > 0 
+        ? Math.round(myScores.reduce(function(sum, s){ return sum + num_(s.Score); }, 0) * 100) / 100
+        : (num_(a.TotalScore) > 0 ? num_(a.TotalScore) : 0);
+
+      if (recalculatedTotal > 0) {
         var patch = {};
         if (num_(a.TotalScore) !== recalculatedTotal) {
           a.TotalScore = recalculatedTotal;
@@ -7995,8 +8062,8 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
         var st = upper_(a.Status);
         var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st) >= 0;
         var hasValidDecision = a.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(a.Decision)) >= 0;
-        if (recalculatedTotal > 0 && (a.CompletedAt || hasValidDecision)) {
-          if (isDraftA || ['ASSIGNED', 'OPENED'].indexOf(st) >= 0 || !st) {
+        if (!isDraftA || a.CompletedAt || hasValidDecision) {
+          if (st !== 'COMPLETE' && ['PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st) < 0) {
             a.Status = 'COMPLETE';
             patch.Status = 'COMPLETE';
             if (!a.CompletedAt) {
@@ -8035,19 +8102,26 @@ function adminGetWorkScoreSummary(token, conferenceId, workId) {
       }
       var stA = upper_(a.Status);
       var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(stA) >= 0;
-      var isNotSubmitted = isDraftA || stA === 'ASSIGNED' || stA === 'OPENED' || !stA;
-      var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
-      if (isNotSubmitted || rawSc === 0 || rawSc === null) {
+      var hasScore = num_(a.TotalScore) > 0;
+      // Do NOT nullify TotalScore if it already has a positive score or completed status!
+      if (isDraftA && !hasScore) {
         a.TotalScore = null;
       }
     });
+
+    var roundName = targetRound 
+      ? (targetRound.RoundNameTH || targetRound.RoundNameEN) 
+      : ((assignments[0] && assignments[0].RoundNameTH) || (work.ReviewRoundName || 'รอบประเมินผลงาน'));
     
     return {
       work: serialize_(work),
       authors: serialize_(authors),
       assignments: serialize_(assignments),
       scores: serialize_(scores),
-      criteria: serialize_(criteria)
+      criteria: serialize_(criteria),
+      round: targetRound ? serialize_(targetRound) : null,
+      roundName: roundName,
+      allRounds: serialize_(allRounds)
     };
   });
 }
