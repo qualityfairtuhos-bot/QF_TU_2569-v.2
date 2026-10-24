@@ -1,6 +1,30 @@
 
-function syncOfficialRound2Criteria_(cid) {
+function syncOfficialCriteria_(cid) {
   var rounds = findMany_('ReviewRounds', { ConferenceID: cid });
+  
+  // Ensure Round 1 exists
+  var round1 = rounds.find(function(r){ return Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'); });
+  var r1Id = round1 ? round1.ReviewRoundID : 'RR-2026-000001';
+  if (!round1) {
+    appendRecord_('ReviewRounds', {
+      ReviewRoundID: r1Id,
+      ConferenceID: cid,
+      RoundNo: 1,
+      RoundNameTH: 'รอบประเมินผลงาน',
+      RoundNameEN: 'Main Review',
+      MinReviewers: 2,
+      MaxReviewers: 3,
+      BlindReview: true,
+      AllowEditAfterSubmit: false,
+      AllowDecline: true,
+      CalculationMethod: 'AVERAGE',
+      PassingScore: 60,
+      Status: 'OPEN',
+      SortOrder: 1
+    });
+  }
+
+  // Ensure Round 2 exists
   var round2 = rounds.find(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
   var r2Id = round2 ? round2.ReviewRoundID : 'RR-2026-000002';
   if (!round2) {
@@ -22,8 +46,113 @@ function syncOfficialRound2Criteria_(cid) {
     });
   }
 
+  // ==========================================
+  // ROUND 1 OFFICIAL CRITERIA (รอบประเมินผลงาน / คัดกรอง)
+  // ==========================================
+  // 1. Service Excellence / CQI / Primary Care (6 items, 100 points total)
+  var serviceCqiCriteriaR1 = [
+    {
+      ItemNo: 1,
+      NameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
+      NameEN: 'Situation Review and Problem Significance',
+      Desc: '- มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร (5 คะแนน)\n- มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร (5 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 2,
+      NameTH: 'มีเป้าหมายที่ชัดเจน',
+      NameEN: 'Clear Objectives and Goals',
+      Desc: '- มีการระบุเป้าหมายที่สอดคล้องกับปัญหา (5 คะแนน)\n- มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร (5 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 3,
+      NameTH: 'กิจกรรมการพัฒนา',
+      NameEN: 'Quality Improvement Activities',
+      Desc: '- มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง (10 คะแนน)\n- มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง (20 คะแนน)',
+      MaxScore: 30
+    },
+    {
+      ItemNo: 4,
+      NameTH: 'การประเมินผลการเปลี่ยนแปลง',
+      NameEN: 'Evaluation of Change and Results',
+      Desc: '- มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ (10 คะแนน)\n- มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด (15 คะแนน)',
+      MaxScore: 25
+    },
+    {
+      ItemNo: 5,
+      NameTH: 'บทเรียนที่ได้รับ',
+      NameEN: 'Lessons Learned and Sustainability',
+      Desc: '- มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ (10 คะแนน)\n- มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น (10 คะแนน)',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 6,
+      NameTH: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
+      NameEN: 'Completeness and Alignment with Guidelines',
+      Desc: '- ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ (2.5 คะแนน)\n- การเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด (2.5 คะแนน)',
+      MaxScore: 5
+    }
+  ];
+
+  // 2. Research & Innovation (7 items, 100 points total)
+  var researchInnovationCriteriaR1 = [
+    {
+      ItemNo: 1,
+      NameTH: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
+      NameEN: 'Title Relevance and Interest',
+      Desc: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ (5 คะแนน)',
+      MaxScore: 5
+    },
+    {
+      ItemNo: 2,
+      NameTH: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
+      NameEN: 'Comprehensive Abstract',
+      Desc: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ (15 คะแนน)',
+      MaxScore: 15
+    },
+    {
+      ItemNo: 3,
+      NameTH: 'บทนำ มีข้อมูลภูมิหลังที่ชัดเจน',
+      NameEN: 'Clear Background and Problem Statement',
+      Desc: '- ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุถึงวัตถุประสงค์ของการวิจัยที่ชัดเจน (10 คะแนน)',
+      MaxScore: 10
+    },
+    {
+      ItemNo: 4,
+      NameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
+      NameEN: 'Research Methodology / Innovation Development',
+      Desc: '- ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันโดยทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 5,
+      NameTH: 'ผลการวิจัย/ผลการศึกษาสอดคล้องกับวัตถุประสงค์',
+      NameEN: 'Results Aligned with Objectives',
+      Desc: '- นำเสนอผลการวิจัย/ ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้ (20 คะแนน)',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 6,
+      NameTH: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
+      NameEN: 'Discussion and Recommendations',
+      Desc: '- มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัย (20 คะแนน)',
+      MaxScore: 20
+    },
+    {
+      ItemNo: 7,
+      NameTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
+      NameEN: 'Practical Utilization for Quality & Safety',
+      Desc: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย (10 คะแนน)',
+      MaxScore: 10
+    }
+  ];
+
+  // ==========================================
+  // ROUND 2 OFFICIAL CRITERIA (รอบตัดสินผลงาน / การนำเสนอและตอบข้อซักถาม)
+  // ==========================================
   // 1. Service Excellence / CQI / Primary Care (7 items, 100 points total)
-  var serviceCqiCriteria = [
+  var serviceCqiCriteriaR2 = [
     {
       ItemNo: 1,
       NameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
@@ -76,7 +205,7 @@ function syncOfficialRound2Criteria_(cid) {
   ];
 
   // 2. Research & Innovation (8 items, 100 points total)
-  var researchInnovationCriteria = [
+  var researchInnovationCriteriaR2 = [
     {
       ItemNo: 1,
       NameTH: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
@@ -102,7 +231,7 @@ function syncOfficialRound2Criteria_(cid) {
       ItemNo: 4,
       NameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
       NameEN: 'Research Methodology / Innovation Development',
-      Desc: '- ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม (20 คะแนน)\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันโดยทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
+      Desc: '- ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันโดยทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
       MaxScore: 20
     },
     {
@@ -135,7 +264,7 @@ function syncOfficialRound2Criteria_(cid) {
     }
   ];
 
-  // Remove redundant composite categories to avoid duplicate rows and confusion in ScoringCriteria
+  // Remove redundant composite categories to avoid confusion
   try {
     deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'SERVICE_CQI_PRIMARY' });
     deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'RESEARCH_INNOVATION' });
@@ -144,17 +273,17 @@ function syncOfficialRound2Criteria_(cid) {
   clearTableCache_('ScoringCriteria');
   var allCrit = findMany_('ScoringCriteria', { ConferenceID: cid });
 
-  function syncGroupList(items, catGroupKey) {
+  function syncCriteriaList(items, catGroupKey, roundId) {
     items.forEach(function(it){
       var existing = allCrit.find(function(c){
         return String(c.ConferenceID) === String(cid) &&
-               String(c.ReviewRoundID) === String(r2Id) &&
+               String(c.ReviewRoundID) === String(roundId) &&
                String(c.CategoryID).toUpperCase() === catGroupKey.toUpperCase() &&
                num_(c.ItemNo) === it.ItemNo;
       });
       var patch = {
         ConferenceID: cid,
-        ReviewRoundID: r2Id,
+        ReviewRoundID: roundId,
         CategoryID: catGroupKey,
         PresentationTypeID: 'ALL',
         ItemNo: it.ItemNo,
@@ -175,13 +304,25 @@ function syncOfficialRound2Criteria_(cid) {
     });
   }
 
-  // Maintain ONLY individual distinct categories (no duplicate group rows in sheet)
-  syncGroupList(serviceCqiCriteria, 'SERVICE');
-  syncGroupList(serviceCqiCriteria, 'CQI');
-  syncGroupList(serviceCqiCriteria, 'PRIMARY');
-  syncGroupList(researchInnovationCriteria, 'RESEARCH');
-  syncGroupList(researchInnovationCriteria, 'INNOVATION');
+  // Sync Round 1 criteria (6 items for Service/CQI/Primary, 7 items for Research/Innovation)
+  syncCriteriaList(serviceCqiCriteriaR1, 'SERVICE', r1Id);
+  syncCriteriaList(serviceCqiCriteriaR1, 'CQI', r1Id);
+  syncCriteriaList(serviceCqiCriteriaR1, 'PRIMARY', r1Id);
+  syncCriteriaList(researchInnovationCriteriaR1, 'RESEARCH', r1Id);
+  syncCriteriaList(researchInnovationCriteriaR1, 'INNOVATION', r1Id);
+
+  // Sync Round 2 criteria (7 items for Service/CQI/Primary, 8 items for Research/Innovation)
+  syncCriteriaList(serviceCqiCriteriaR2, 'SERVICE', r2Id);
+  syncCriteriaList(serviceCqiCriteriaR2, 'CQI', r2Id);
+  syncCriteriaList(serviceCqiCriteriaR2, 'PRIMARY', r2Id);
+  syncCriteriaList(researchInnovationCriteriaR2, 'RESEARCH', r2Id);
+  syncCriteriaList(researchInnovationCriteriaR2, 'INNOVATION', r2Id);
+
   clearTableCache_('ScoringCriteria');
+}
+
+function syncOfficialRound2Criteria_(cid) {
+  return syncOfficialCriteria_(cid);
 }
 
 /**
@@ -552,50 +693,7 @@ function seedReviewRounds_(cid){
 }
 
 function seedScoringCriteria_(cid){
-  try { syncOfficialRound2Criteria_(cid); } catch(e){}
-
-  const round=findOne_('ReviewRounds',{ConferenceID:cid,RoundNo:1});
-  const roundId = round ? round.ReviewRoundID : '';
-  const rows=[
-    [1, 'กำหนดที่มาและความสำคัญของปัญหาชัดเจน', 'Clear background and problem significance', 'บทนำ/วัตถุประสงค์', 5, 100],
-    [2, 'ระบุวัตถุประสงค์อย่างชัดเจน', 'Clear statement of objectives', 'บทนำ/วัตถุประสงค์', 5, 100],
-    [3, 'ระบุขั้นตอนการดำเนินงานที่ชัดเจน', 'Clear operational procedures and workflow', 'วิธีดำเนินการ', 15, 100],
-    [4, 'รูปแบบการดำเนินงานสอดคล้องกับวัตถุประสงค์', 'Methodology aligned with objectives', 'วิธีดำเนินการ', 15, 100],
-    [5, 'การนำเสนอผลการศึกษาครบถ้วนชัดเจนและตรงตามวัตถุประสงค์', 'Comprehensive and clear study results aligned with objectives', 'ผลการศึกษา/ผลลัพธ์', 30, 100],
-    [6, 'การอภิปรายผล/บทเรียนที่ได้จากการวิเคราะห์ข้อมูลสมเหตุสมผลและน่าเชื่อถือ', 'Reasonable and credible discussion and lessons learned', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
-    [7, 'การสรุปผลสอดคล้องกับผลการศึกษา', 'Conclusions consistent with study findings', 'การอภิปรายผล/บทเรียนและข้อเสนอแนะ', 10, 100],
-    [8, 'การนำไปใช้แก้ปัญหา พัฒนาวิธีการ เทคนิค หรือเครื่องมือใหม่ ๆ ที่เป็นประโยชน์', 'Practical utilization for problem-solving or method development', 'การใช้ประโยชน์', 10, 100]
-  ];
-  rows.forEach(function(r){
-    const existing = findOne_('ScoringCriteria', { ConferenceID: cid, ItemNo: r[0] });
-    if (!existing) {
-      appendRecord_('ScoringCriteria', {
-        CriteriaID: nextId_('CRIT'),
-        ConferenceID: cid,
-        ReviewRoundID: roundId,
-        ItemNo: r[0],
-        CriteriaNameTH: r[1],
-        CriteriaNameEN: r[2],
-        DescriptionTH: r[3],
-        MaxScore: r[4],
-        WeightPercent: r[5],
-        RequiredComment: false,
-        Active: true,
-        SortOrder: r[0]
-      });
-    } else {
-      updateRecord_('ScoringCriteria', existing.__row, {
-        ReviewRoundID: roundId || existing.ReviewRoundID,
-        CriteriaNameTH: r[1],
-        CriteriaNameEN: r[2],
-        DescriptionTH: r[3],
-        MaxScore: r[4],
-        WeightPercent: r[5],
-        Active: true,
-        SortOrder: r[0]
-      });
-    }
-  });
+  syncOfficialCriteria_(cid);
 }
 
 function seedEmailTemplates_(cid){
@@ -5379,165 +5477,16 @@ function adminSaveReviewRound(token,conferenceId,p){return runSafely_('adminSave
 function adminDeleteScoringCriterion(token,conferenceId,criteriaId){return runSafely_('adminDeleteScoringCriterion',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);var cid=conferenceId||APP.DEFAULT_CONFERENCE_ID;var r=findOne_('ScoringCriteria',{ConferenceID:cid,CriteriaID:criteriaId});if(!r)throw new Error('ไม่พบเกณฑ์คะแนนที่ต้องการลบ');updateRecord_('ScoringCriteria',r.__row,{Active:false,UpdatedAt:new Date()});clearTableCache_('ScoringCriteria');invalidateCache_(cid);return {success:true};});}
 function adminSaveScoringCriterion(token,conferenceId,p){return runSafely_('adminSaveScoringCriterion',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);p=p||{};let r=p.CriteriaID?findOne_('ScoringCriteria',{ConferenceID:conferenceId,CriteriaID:p.CriteriaID}):null;const patch={ReviewRoundID:clean_(p.ReviewRoundID),CategoryID:clean_(p.CategoryID),PresentationTypeID:clean_(p.PresentationTypeID),ItemNo:num_(p.ItemNo),CriteriaNameTH:clean_(p.CriteriaNameTH),CriteriaNameEN:clean_(p.CriteriaNameEN),DescriptionTH:clean_(p.DescriptionTH),MaxScore:num_(p.MaxScore),WeightPercent:num_(p.WeightPercent,100),RequiredComment:bool_(p.RequiredComment),Active:bool_(p.Active),SortOrder:num_(p.SortOrder,99)};if(r)updateRecord_('ScoringCriteria',r.__row,patch);else appendRecord_('ScoringCriteria',Object.assign({CriteriaID:nextId_('CRIT'),ConferenceID:conferenceId},patch));invalidateCache_(conferenceId);return true;});}
 function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
-  return runSafely_('adminSetupCategoryScoringCriteria',function(){
-    requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
+  return runSafely_("adminSetupCategoryScoringCriteria",function(){
+    requireSession_(token,["SUPERADMIN","CONFERENCE_ADMIN","ACADEMIC_STAFF"],conferenceId);
     var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
-    var rounds = findMany_('ReviewRounds',{ConferenceID:cid});
-    
-    var round2 = rounds.find(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
-    if (!round2) {
-      var r2Id = 'RR-2026-000002';
-      appendRecord_('ReviewRounds', {
-        ReviewRoundID: r2Id,
-        ConferenceID: cid,
-        RoundNo: 2,
-        RoundNameTH: 'รอบตัดสินผลงาน',
-        RoundNameEN: 'Final Decision Round',
-        MinReviewers: 2,
-        MaxReviewers: 3,
-        BlindReview: false,
-        AllowEditAfterSubmit: false,
-        AllowDecline: false,
-        CalculationMethod: 'AVERAGE',
-        PassingScore: 60,
-        Status: 'OPEN',
-        SortOrder: 2
-      });
-      rounds = findMany_('ReviewRounds',{ConferenceID:cid});
-      round2 = rounds.find(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
-    }
-    
-    var round1 = rounds.find(function(r){ return Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'); }) || rounds[0];
-    var round1Id = round1 ? round1.ReviewRoundID : 'RR-2026-000001';
-    var round2Id = round2 ? round2.ReviewRoundID : 'RR-2026-000002';
-
-    var isFinal = (roundId === round2Id) || (round2 && roundId === round2.ReviewRoundID) || String(roundId).includes('2') || String(roundId).includes('FINAL');
-    var targetRoundId = isFinal ? round2Id : (roundId || round1Id);
-
-    var existingCrit = findMany_('ScoringCriteria',{ConferenceID:cid});
-    var seenKeys = {};
-    existingCrit.forEach(function(c){
-      var cRound = String(c.ReviewRoundID || '').trim();
-      if (cRound === targetRoundId || (!cRound && !isFinal)) {
-        var cat = String(c.CategoryID || '').trim().toUpperCase();
-        var itemNo = num_(c.ItemNo);
-        var key = cat + '_' + itemNo;
-        if (!cat || cat === 'ALL' || seenKeys[key]) {
-          updateRecord_('ScoringCriteria', c.__row, { Active: false, UpdatedAt: new Date() });
-        } else {
-          seenKeys[key] = true;
-        }
-      }
-    });
-
-    var cqiCriteria, serviceCriteria, primaryCriteria, researchCriteria;
-    var suiteTitle = '';
-
-    if (isFinal) {
-      suiteTitle = 'รอบตัดสินผลงาน (รวมการนำเสนอและตอบข้อซักถาม รวม 100 คะแนน)';
-      var finalPresentationCriteria = [
-        { ItemNo: 1, NameTH: 'ความสำคัญของปัญหา ผลกระทบ และเป้าหมายการพัฒนางาน', MaxScore: 15, Desc: 'ระบุปัญหา ผลกระทบ ข้อมูลเชิงประจักษ์ และเป้าหมายชัดเจน' },
-        { ItemNo: 2, NameTH: 'กระบวนการพัฒนาคุณภาพ (PDCA) นวัตกรรมบริการ และการมีส่วนร่วม', MaxScore: 20, Desc: 'ขั้นตอนการออกแบบกระบวนการใหม่ การมีส่วนร่วมของสหสาขาวิชาชีพ และการนำไปใช้จริง' },
-        { ItemNo: 3, NameTH: 'ผลลัพธ์การพัฒนา ประสิทธิผล คุณภาพบริการ ความปลอดภัย และความคุ้มค่า', MaxScore: 20, Desc: 'ผลลัพธ์เชิงประจักษ์ มีการเปรียบเทียบก่อน-หลัง ประสิทธิผล และความปลอดภัย' },
-        { ItemNo: 4, NameTH: 'บทเรียนที่ได้รับ ความยั่งยืน และโอกาสการต่อยอดขยายผล', MaxScore: 15, Desc: 'ปัจจัยความสำเร็จ ปัญหาอุปสรรค แนวทางธำรงรักษาความต่อเนื่อง และการขยายผล' },
-        { ItemNo: 5, NameTH: 'ทักษะการนำเสนอ ลำดับขั้นตอน สื่อการนำเสนอ และการรักษาเวลา', MaxScore: 15, Desc: 'ความชัดเจนในการสื่อสาร บุคลิกภาพ ความน่าสนใจของสื่อ และการควบคุมเวลาตามกำหนด' },
-        { ItemNo: 6, NameTH: 'การตอบข้อซักถามและความชัดเจนในการตอบของผู้นำเสนอ', MaxScore: 15, Desc: 'ความรอบรู้ในงานพัฒนา ตอบตรงประเด็น และให้ข้อมูลเชิงลึกแก่คณะกรรมการ' }
-      ];
-      cqiCriteria = finalPresentationCriteria;
-      serviceCriteria = finalPresentationCriteria;
-      primaryCriteria = finalPresentationCriteria;
-
-      researchCriteria = [
-        { ItemNo: 1, NameTH: 'ความสำคัญและความเป็นมาของปัญหาการวิจัย / นวัตกรรม', MaxScore: 10, Desc: 'ความสำคัญ ปัญหา และช่องว่างทางวิชาการหรือนวัตกรรมชัดเจน' },
-        { ItemNo: 2, NameTH: 'ระเบียบวิธีวิจัย / การออกแบบสิ่งประดิษฐ์และนวัตกรรม', MaxScore: 15, Desc: 'แบบแผนการวิจัย หรือการออกแบบสิ่งประดิษฐ์ถูกต้องตามหลักวิชาการ' },
-        { ItemNo: 3, NameTH: 'การวิเคราะห์ข้อมูล ผลการวิจัย และประสิทธิผล', MaxScore: 20, Desc: 'สถิติหรือวิธีการวิเคราะห์เหมาะสม ผลการวิจัยตอบโจทย์และมีความน่าเชื่อถือ' },
-        { ItemNo: 4, NameTH: 'การอภิปรายผล คุณค่าทางวิชาการ และการนำไปใช้ประโยชน์จริง', MaxScore: 15, Desc: 'อภิปรายสอดคล้องกับผลวิจัยและทฤษฎี ข้อเสนอแนะนำไปปฏิบัติได้จริง' },
-        { ItemNo: 5, NameTH: 'ความคิดริเริ่มสร้างสรรค์ และความแปลกใหม่ของผลงาน', MaxScore: 10, Desc: 'ความแปลกใหม่ มีเอกลักษณ์ และเป็นประโยชน์ต่อระบบสุขภาพ' },
-        { ItemNo: 6, NameTH: 'ทักษะการนำเสนอ การสื่อสาร บุคลิกภาพ และการรักษาเวลา', MaxScore: 15, Desc: 'การเรียบเรียงเนื้อหา ความชัดเจน ความน่าสนใจของสื่อ และการตรงต่อเวลา' },
-        { ItemNo: 7, NameTH: 'การตอบข้อซักถามและความรอบรู้ทางวิชาการ', MaxScore: 15, Desc: 'ตอบคำถามตรงประเด็น แสดงความรอบรู้ในระเบียบวิธีวิจัยและผลการศึกษา' }
-      ];
-    } else {
-      suiteTitle = 'รอบประเมินผลงาน (คัดกรองเนื้อหา รวม 100 คะแนน)';
-      cqiCriteria = [
-        { ItemNo: 1, NameTH: 'การทบทวนสถานการณ์ / ปัญหา / จุดเริ่มต้นของกิจกรรม', MaxScore: 10, Desc: 'ระบุปัญหา ผลกระทบ ข้อมูลเชิงประจักษ์ และความจำเป็นชัดเจน' },
-        { ItemNo: 2, NameTH: 'เป้าหมายและตัวชี้วัดที่ชัดเจนและวัดผลได้', MaxScore: 10, Desc: 'สอดคล้องกับปัญหา วัดผลลัพธ์เป็นรูปธรรม' },
-        { ItemNo: 3, NameTH: 'กิจกรรมและกระบวนการพัฒนาคุณภาพ (PDCA)', MaxScore: 30, Desc: 'ขั้นตอนการวิเคราะห์สาเหตุ การออกแบบกระบวนการใหม่ และการนำไปปฏิบัติจริง' },
-        { ItemNo: 4, NameTH: 'ผลการพัฒนาและการบรรลุเป้าหมาย', MaxScore: 25, Desc: 'การเปรียบเทียบผลลัพธ์ก่อน-หลัง ประสิทธิผล และความปลอดภัย' },
-        { ItemNo: 5, NameTH: 'บทเรียนที่ได้รับและการปรับปรุงต่อเนื่อง', MaxScore: 15, Desc: 'ปัจจัยความสำเร็จ ปัญหาอุปสรรค และแนวทางแก้ไข' },
-        { ItemNo: 6, NameTH: 'การขยายผลและโอกาสพัฒนาต่อเนื่อง', MaxScore: 10, Desc: 'การต่อยอด ถ่ายทอดความรู้ หรือการเป็นแนวปฏิบัติที่ดี (Best Practice)' }
-      ];
-      serviceCriteria = [
-        { ItemNo: 1, NameTH: 'ความสำคัญของปัญหา / เหตุผลและความจำเป็น', MaxScore: 15, Desc: 'ระบุปัญหา ผลกระทบ หรือความจำเป็นในการพัฒนางานชัดเจน' },
-        { ItemNo: 2, NameTH: 'วัตถุประสงค์และเป้าหมายที่วัดผลได้', MaxScore: 10, Desc: 'สอดคล้องกับปัญหา วัดผลสำเร็จได้เป็นรูปธรรม' },
-        { ItemNo: 3, NameTH: 'กระบวนการพัฒนาและการนำไปใช้จริง', MaxScore: 25, Desc: 'ขั้นตอนการออกแบบ การมีส่วนร่วม การนำกระบวนการหรือนวัตกรรมบริการไปปฏิบัติ' },
-        { ItemNo: 4, NameTH: 'ผลลัพธ์การพัฒนาและความคุ้มค่า', MaxScore: 25, Desc: 'ผลลัพธ์เชิงคุณภาพ/เชิงปริมาณ ประสิทธิภาพ คุณภาพบริการ หรือความปลอดภัย' },
-        { ItemNo: 5, NameTH: 'บทเรียนที่ได้รับและความยั่งยืน', MaxScore: 15, Desc: 'ปัจจัยความสำเร็จ ปัญหาอุปสรรค และแนวทางธำรงรักษาความต่อเนื่อง' },
-        { ItemNo: 6, NameTH: 'การขยายผลและโอกาสพัฒนาต่อเนื่อง', MaxScore: 10, Desc: 'การต่อยอด ถ่ายทอดความรู้ หรือการเป็นต้นแบบการปฏิบัติงาน' }
-      ];
-      primaryCriteria = [
-        { ItemNo: 1, NameTH: 'การวิเคราะห์ปัญหาและบริบทสุขภาพชุมชน', MaxScore: 15, Desc: 'ความเข้าใจปัญหาบริบทพื้นที่ ความต้องการของประชาชน/ชุมชน' },
-        { ItemNo: 2, NameTH: 'เป้าหมายและการมีส่วนร่วมของเครือข่าย', MaxScore: 15, Desc: 'ความร่วมมือของสหสาขาวิชาชีพ ชุมชน ท้องถิ่น และเครือข่ายสุขภาพ' },
-        { ItemNo: 3, NameTH: 'กระบวนการพัฒนาระบบบริการปฐมภูมิ', MaxScore: 25, Desc: 'การบูรณาการบริการ การสร้างเสริมสุขภาพ ป้องกันโรค และการดูแลต่อเนื่อง' },
-        { ItemNo: 4, NameTH: 'ผลลัพธ์ด้านสุขภาพและการเปลี่ยนแปลงเชิงบวก', MaxScore: 20, Desc: 'การเข้าถึงบริการ พฤติกรรมสุขภาพ หรือคุณภาพชีวิตของกลุ่มเป้าหมาย' },
-        { ItemNo: 5, NameTH: 'บทเรียนการทำงานและการสร้างพลังชุมชน', MaxScore: 15, Desc: 'การเรียนรู้ร่วมกัน การพึ่งตนเอง และความเข้มแข็งของชุมชน' },
-        { ItemNo: 6, NameTH: 'ความยั่งยืนและการพัฒนาต่อเนื่องในระบบปฐมภูมิ', MaxScore: 10, Desc: 'กลไกความต่อเนื่องและการขยายผลสู่พื้นที่อื่น' }
-      ];
-      researchCriteria = [
-        { ItemNo: 1, NameTH: 'ความสำคัญและความเป็นมาของปัญหาการวิจัย / นวัตกรรม', MaxScore: 15, Desc: 'ความสำคัญ ปัญหา และช่องว่างทางวิชาการหรือนวัตกรรม' },
-        { ItemNo: 2, NameTH: 'คำถามวิจัย / วัตถุประสงค์ / สมมติฐาน', MaxScore: 10, Desc: 'มีความชัดเจน สอดคล้องกับปัญหาและกรอบแนวคิด' },
-        { ItemNo: 3, NameTH: 'ระเบียบวิธีวิจัย / การออกแบบสิ่งประดิษฐ์และนวัตกรรม', MaxScore: 20, Desc: 'แบบแผนการวิจัย หรือการออกแบบสิ่งประดิษฐ์ถูกต้องตามหลักวิชาการ' },
-        { ItemNo: 4, NameTH: 'คุณภาพเครื่องมือและการเก็บรวบรวมข้อมูล / จริยธรรมการวิจัย', MaxScore: 15, Desc: 'ความเที่ยงตรง ความน่าเชื่อถือ และการพิทักษ์สิทธิ์กลุ่มตัวอย่าง' },
-        { ItemNo: 5, NameTH: 'การวิเคราะห์ข้อมูลและผลการวิจัย / ประสิทธิผล', MaxScore: 20, Desc: 'สถิติหรือวิธีการวิเคราะห์เหมาะสม ผลการวิจัยตอบโจทย์' },
-        { ItemNo: 6, NameTH: 'การอภิปรายผล / ข้อเสนอแนะและการนำไปใช้ประโยชน์', MaxScore: 10, Desc: 'อภิปรายสอดคล้องกับผลวิจัยและทฤษฎี ข้อเสนอแนะนำไปใช้ได้จริง' },
-        { ItemNo: 7, NameTH: 'ความคิดริเริ่มสร้างสรรค์ / คุณค่าต่องานสุขภาพ', MaxScore: 10, Desc: 'ความแปลกใหม่ ประโยชน์ต่อการพัฒนาสุขภาพและระบบบริการ' }
-      ];
-    }
-
-    clearTableCache_('ScoringCriteria');
-    var currentCrit = findMany_('ScoringCriteria',{ConferenceID:cid});
-    function syncGroupCriteria(items, catId, groupName) {
-      items.forEach(function(it){
-        var found = currentCrit.find(function(c){
-          return String(c.ConferenceID) === String(cid) &&
-                 String(c.ReviewRoundID) === String(targetRoundId) &&
-                 String(c.CategoryID).toUpperCase() === catId.toUpperCase() &&
-                 num_(c.ItemNo) === it.ItemNo;
-        });
-        var patch = {
-          ConferenceID: cid,
-          ReviewRoundID: targetRoundId,
-          CategoryID: catId,
-          PresentationTypeID: 'ALL',
-          ItemNo: it.ItemNo,
-          CriteriaNameTH: it.NameTH,
-          CriteriaNameEN: groupName + ' Criterion ' + it.ItemNo,
-          DescriptionTH: it.Desc,
-          MaxScore: it.MaxScore,
-          WeightPercent: 100,
-          RequiredComment: false,
-          Active: true,
-          SortOrder: it.ItemNo
-        };
-        if (found) {
-          updateRecord_('ScoringCriteria', found.__row, patch);
-        } else {
-          appendRecord_('ScoringCriteria', Object.assign({ CriteriaID: nextId_('CRIT') }, patch));
-        }
-      });
-    }
-
-    try {
-      deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'SERVICE_CQI_PRIMARY' });
-      deleteRowsWhere_('ScoringCriteria', { ConferenceID: cid, CategoryID: 'RESEARCH_INNOVATION' });
-    } catch(e) {}
-    syncGroupCriteria(researchCriteria, 'RESEARCH', 'Research');
-    syncGroupCriteria(researchCriteria, 'INNOVATION', 'Innovation');
-    syncGroupCriteria(cqiCriteria, 'CQI', 'CQI/Best Practice');
-    syncGroupCriteria(serviceCriteria, 'SERVICE', 'Service Excellence');
-    syncGroupCriteria(primaryCriteria, 'PRIMARY', 'Primary Care');
-    clearTableCache_('ScoringCriteria');
+    syncOfficialCriteria_(cid);
     invalidateCache_(cid);
-    return { success: true, message: 'ตั้งค่าเกณฑ์คะแนน' + suiteTitle + ' เรียบร้อย (แต่ละประเภทคะแนนเต็ม 100 คะแนน)' };
+    return {
+      success: true,
+      message: "ตั้งค่าเกณฑ์คะแนนรอบประเมินผลงาน (6-7 ข้อ) และรอบตัดสิน (7-8 ข้อ) แยกตามหมวดหมู่เรียบร้อยแล้ว (รอบละ 100 คะแนน)",
+      criteria: serialize_(findMany_("ScoringCriteria",{ConferenceID:cid}))
+    };
   });
 }
 
@@ -8044,6 +7993,20 @@ function adminGetWorkScoreSummary(token, conferenceId, workId, roundOption) {
         sc.CriteriaID = matchedCrit.CriteriaID;
       }
       return sc;
+    });
+
+    // Positional fallback per assignment if criteria IDs rotated
+    assignments.forEach(function(a) {
+      var aScores = scores.filter(function(s){ return String(s.AssignmentID) === String(a.AssignmentID); });
+      var unmatched = aScores.filter(function(s){ return !critMapById[String(s.CriteriaID).trim()]; });
+      if (unmatched.length > 0 && aScores.length === criteria.length) {
+        aScores.forEach(function(s, idx){
+          if (criteria[idx]) {
+            s.CriteriaID = criteria[idx].CriteriaID;
+            s.ItemNo = criteria[idx].ItemNo;
+          }
+        });
+      }
     });
 
     // Self-heal assignments to match reviewer's actual evaluation

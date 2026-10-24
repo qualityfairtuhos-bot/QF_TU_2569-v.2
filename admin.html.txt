@@ -27,8 +27,8 @@
     .sidebar.collapsed{transform:translateX(-100%)}
     .hamburger{display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid #DCE5EA;border-radius:8px;font-size:1.15rem;cursor:pointer;color:var(--ink);width:36px;height:36px;padding:0;margin-right:12px;transition:background 0.15s ease,color 0.15s ease}
     .hamburger:hover{background:#F4F7F8;color:var(--teal)}
-    .btn-sidebar-collapse{position:absolute;top:14px;right:12px;background:rgba(255,255,255,.12);border:0;color:#C7D2DC;border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;transition:background .2s,color .2s}
-    .btn-sidebar-collapse:hover{background:rgba(255,255,255,.28);color:#fff}
+    .btn-sidebar-collapse{position:absolute;top:12px;right:10px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.9rem;transition:background .2s,color .2s;z-index:10}
+    .btn-sidebar-collapse:hover{background:rgba(0,109,112,.8);color:#fff}
     .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:80;opacity:0;transition:opacity 0.25s ease}.overlay.show{display:block;opacity:1}
     .brand{position:relative;padding:14px 12px;border-bottom:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:108px;background:linear-gradient(135deg,rgba(0,109,112,.38),rgba(12,56,91,.1))}
     .brand-logos{display:flex;align-items:center;justify-content:center;gap:9px}.brand img{width:92px;height:52px;object-fit:contain;filter:drop-shadow(0 5px 10px rgba(0,0,0,.25))}.brand img:last-child{width:58px}.brand-label{font-size:.78rem;font-weight:600;color:#fff;text-align:center;white-space:nowrap}.user{padding:16px;border-bottom:1px solid rgba(255,255,255,.12)}.menu{padding:10px}.menu button{width:100%;text-align:left;border:0;background:transparent;color:#C7D2DC;padding:12px;border-radius:10px;margin:2px 0}.menu button.active,.menu button:hover{background:#0D6670;color:#fff}
@@ -3977,13 +3977,14 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
           sc = aInfo.byCritId[String(c.CriteriaID).trim()];
         } else if (c.ItemNo && aInfo.byItemNo[String(c.ItemNo).trim()] !== undefined) {
           sc = aInfo.byItemNo[String(c.ItemNo).trim()];
-        } else if (aInfo.myScores.length === criteriaList.length && aInfo.myScores[critIdx]) {
+        } else if (aInfo.myScores[critIdx] && aInfo.myScores[critIdx].Score !== undefined && aInfo.myScores[critIdx].Score !== null && aInfo.myScores[critIdx].Score !== '') {
           sc = Number(aInfo.myScores[critIdx].Score);
         }
         
         const val = (sc !== undefined && !isNaN(sc)) ? sc : (aInfo.myScores.length === 0 && Number(a.TotalScore) > 0 ? Math.round(Number(c.MaxScore) * (Number(a.TotalScore) / totalMax) * 10) / 10 : 0);
         validCompletedScores.push(val);
-        return `<td style="text-align:center; padding:6px 8px; font-weight:600;">${(sc !== undefined && !isNaN(sc)) ? sc : (val > 0 ? val : '-')}</td>`;
+        const cellText = (sc !== undefined && !isNaN(sc)) ? sc : (val > 0 ? val : '-');
+        return `<td style="text-align:center; padding:6px 8px; font-weight:600;">${cellText}</td>`;
       }).join('') : `<td colspan="3" style="text-align:center; color:#94a3b8;">ยังไม่มีคะแนน</td>`;
 
       const sum = validCompletedScores.reduce((acc, v) => acc + v, 0);
@@ -4075,6 +4076,10 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
     const win = window.open('', '_blank');
     if (!win) return Swal.fire({ icon: 'warning', title: 'เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาตป็อปอัป' });
 
+    const mainReportTitle = roundText.includes('ตัดสิน') 
+      ? 'ใบสรุปผลการให้คะแนนการนำเสนอผลงานวิชาการ (รอบตัดสิน)' 
+      : 'ใบสรุปผลการให้คะแนนผลงานวิชาการ (รอบประเมินผลงาน)';
+
     win.document.write(`<!doctype html><html lang="th"><head>
   <meta charset="utf-8">
   <title>${esc(docTitle)}</title>
@@ -4123,7 +4128,7 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
         <img src="/images/hacc-logo.png" alt="Logo" onerror="this.src='/images/tuh-logo.png'">
       </td>
       <td class="header-center">
-        <h1>ใบสรุปผลการให้คะแนนการนำเสนอผลงานวิชาการ (${esc(roundText)})</h1>
+        <h1>${esc(mainReportTitle)}</h1>
         <h2>งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569</h2>
         <p>วันที่ 18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 ณ อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</p>
       </td>
