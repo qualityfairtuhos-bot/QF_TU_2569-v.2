@@ -4712,15 +4712,17 @@ async function printReviewerIndividualReport(reviewerId) {
     const dateStr = new Date().toLocaleString('th-TH');
 
     const rows = assignments.map(x => {
-      const isDone = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED'].includes(String(x.Status).toUpperCase()) || (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '');
+      const scNum = Number(x.TotalScore);
+      let scVal = (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '' && !isNaN(scNum)) ? scNum : null;
+      if ((scVal === null || scVal === 0) && x.scores && x.scores.length > 0) {
+        const scFromScores = Math.round(x.scores.reduce((sum, s) => sum + (Number(s.Score) || 0), 0) * 100) / 100;
+        if (scFromScores > 0) scVal = scFromScores;
+      }
+      const hasScore = (scVal !== null && scVal > 0);
+      const isDone = hasScore || ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED'].includes(String(x.Status).toUpperCase());
       const st = isDone ? 'COMPLETE' : (x.Status || 'PENDING');
       const dec = x.Decision ? ` / ${esc(x.Decision)}` : '';
-      const scNum = Number(x.TotalScore);
-      let sc = (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '') ? esc(x.TotalScore) : '-';
-      if ((scNum === 0 || sc === '0' || sc === '-') && x.scores && x.scores.length > 0) {
-        const scFromScores = Math.round(x.scores.reduce((sum, s) => sum + (Number(s.Score) || 0), 0) * 100) / 100;
-        if (scFromScores > 0) sc = esc(scFromScores);
-      }
+      const sc = hasScore ? esc(scVal) : (isDone ? '0' : '-');
       const comment = esc(x.RecommendationToAuthor || x.InternalComment || '-');
 
       return `

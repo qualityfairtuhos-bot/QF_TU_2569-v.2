@@ -8115,12 +8115,29 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
     }
     
     var revEmail = normalizeEmail_(rev.Email || '');
+    var revIds = {};
+    if (reviewerId) revIds[String(reviewerId).trim().toLowerCase()] = true;
+    if (rev.ReviewerID) revIds[String(rev.ReviewerID).trim().toLowerCase()] = true;
+    if (rev.UserID) revIds[String(rev.UserID).trim().toLowerCase()] = true;
+
+    var revEmails = {};
+    if (revEmail) revEmails[revEmail] = true;
+    if (rev.Email) revEmails[normalizeEmail_(rev.Email)] = true;
+
     var allAssignments = findMany_('ReviewAssignments', { ConferenceID: cid });
     var assignments = allAssignments.filter(function(a) {
       if (upper_(a.Status) === 'CANCELLED') return false;
-      var matchId = String(a.ReviewerID || '').trim() === String(reviewerId || '').trim();
-      var matchEmail = revEmail && a.ReviewerEmail && normalizeEmail_(a.ReviewerEmail) === revEmail;
+      var aRid = String(a.ReviewerID || '').trim().toLowerCase();
+      var aEmail = normalizeEmail_(a.ReviewerEmail || '');
+      var matchId = aRid && revIds[aRid];
+      var matchEmail = aEmail && revEmails[aEmail];
       return matchId || matchEmail;
+    });
+
+    // Populate all reviewer aliases from assignments
+    assignments.forEach(function(a) {
+      if (a.ReviewerID) revIds[String(a.ReviewerID).trim().toLowerCase()] = true;
+      if (a.ReviewerEmail) revEmails[normalizeEmail_(a.ReviewerEmail)] = true;
     });
 
     var neededWorkIds = {};
@@ -8137,11 +8154,29 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
       authorMap[auth.WorkID].push(auth);
     });
 
-    var allScores = getRecords_('ReviewScores') || [];
+    var allScores = findMany_('ReviewScores', { ConferenceID: cid });
+    if (!allScores || allScores.length === 0) {
+      allScores = getRecords_('ReviewScores') || [];
+    }
+
+    var allSummaries = findMany_('ReviewSummary', { ConferenceID: cid });
+    if (!allSummaries || allSummaries.length === 0) {
+      allSummaries = getRecords_('ReviewSummary') || [];
+    }
+
     var asgnIds = {};
-    assignments.forEach(function(a){ asgnIds[a.AssignmentID] = true; });
+    assignments.forEach(function(a){
+      if (a.AssignmentID) asgnIds[String(a.AssignmentID).trim().toLowerCase()] = true;
+    });
+
     var relevantScores = allScores.filter(function(s){
-      return (s.AssignmentID && asgnIds[s.AssignmentID]) || (String(s.ReviewerID || '').trim() === String(reviewerId || '').trim());
+      var sAid = String(s.AssignmentID || '').trim().toLowerCase();
+      if (sAid && asgnIds[sAid]) return true;
+      var sRid = String(s.ReviewerID || '').trim().toLowerCase();
+      if (sRid && revIds[sRid]) return true;
+      var sEmail = normalizeEmail_(s.ReviewerEmail || s.ReviewerID || '');
+      if (sEmail && revEmails[sEmail]) return true;
+      return false;
     });
 
     var allCriteria = findMany_('ScoringCriteria', { ConferenceID: cid }).filter(function(c){ return bool_(c.Active); });
@@ -8155,9 +8190,74 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
         var reg = findOne_('Registrations', { ConferenceID: cid, RegID: w.RegID });
         if (reg) presenterName = clean_(reg.FullName) || [reg.Prefix, reg.FirstName, reg.LastName].filter(Boolean).map(clean_).join(' ');
       }
+
+      var aIdClean = String(a.AssignmentID || '').trim().toLowerCase();
+      var aWorkClean = String(a.WorkID || '').trim().toLowerCase();
+      var aRoundClean = String(a.ReviewRoundID || '').trim().toLowerCase();
+
       var myScores = relevantScores.filter(function(s){
-        return s.AssignmentID === a.AssignmentID || (s.WorkID === a.WorkID && String(s.ReviewerID || '').trim() === String(reviewerId || '').trim());
+        var sAid = String(s.AssignmentID || '').trim().toLowerCase();
+        if (aIdClean && sAid && sAid === aIdClean) return true;
+        var sWid = String(s.WorkID || '').trim().toLowerCase();
+        if (aWorkClean && sWid && sWid === aWorkClean) {
+          var sRid = String(s.ReviewerID || '').trim().toLowerCase();
+          var sEmail = normalizeEmail_(s.ReviewerEmail || s.ReviewerID || '');
+          var isMyRev = (sRid && revIds[sRid]) || (sEmail && revEmails[sEmail]);
+          if (isMyRev) {
+            if (aRoundClean && s.ReviewRoundID) {
+              return String(s.ReviewRoundID).trim().toLowerCase() === aRoundClean;
+            }
+            return true;
+          }
+        }
+        return false;
       });
+
+      var mySummary = allSummaries.find(function(sm){
+        var smAid = String(sm.AssignmentID || '').trim().toLowerCase();
+        if (aIdClean && smAid && smAid === aIdClean) return true;
+        var smWid = String(sm.WorkID || '').trim().toLowerCase();
+        if (aWorkClean && smWid && smWid === aWorkClean) {
+          var smRid = String(sm.ReviewerID || '').trim().toLowerCase();
+          var smEmail = normalizeEmail_(sm.ReviewerEmail || sm.ReviewerID || '');
+          return (smRid && revIds[smRid]) || (smEmail && revEmails[smEmail]);
+        }
+        return false;
+      });
+
+      var calc = (myScores && myScores.length > 0) ? Math.round(myScores.reduce(function(sum, s){ return sum + (Number(s.Score) || 0); }, 0) * 100) / 100 : 0;
+      if (calc > 100) calc = Math.min(100, Math.round(calc / 2));
+
+      var asg = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : 0;
+      if (asg > 100) asg = Math.min(100, Math.round(asg / 2));
+
+      var smScore = (mySummary && mySummary.TotalScore !== '' && mySummary.TotalScore !== null && mySummary.TotalScore !== undefined && !isNaN(Number(mySummary.TotalScore))) ? Number(mySummary.TotalScore) : 0;
+      if (smScore > 100) smScore = Math.min(100, Math.round(smScore / 2));
+
+      var fin = asg > 0 ? asg : (calc > 0 ? calc : (smScore > 0 ? smScore : 0));
+
+      var dec = a.Decision || (mySummary ? mySummary.Decision : '') || '';
+      var rec = a.RecommendationToAuthor || (mySummary ? mySummary.RecommendationToAuthor : '') || '';
+      var com = a.InternalComment || (mySummary ? mySummary.InternalComment : '') || '';
+
+      var curStatus = a.Status;
+      if (fin > 0 && (!curStatus || ['ASSIGNED', 'OPENED', 'DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(upper_(curStatus)) >= 0)) {
+        curStatus = 'COMPLETE';
+      }
+
+      if (a.__row && (asg === 0 && fin > 0 || (!a.Decision && dec) || (!a.RecommendationToAuthor && rec))) {
+        try {
+          var patch = { UpdatedAt: new Date() };
+          if (asg === 0 && fin > 0) patch.TotalScore = fin;
+          if (!a.Decision && dec) patch.Decision = dec;
+          if (!a.RecommendationToAuthor && rec) patch.RecommendationToAuthor = rec;
+          if (curStatus === 'COMPLETE' && a.Status !== 'COMPLETE') {
+            patch.Status = 'COMPLETE';
+            if (!a.CompletedAt) patch.CompletedAt = new Date();
+          }
+          updateRecord_('ReviewAssignments', a.__row, patch);
+        } catch(e) {}
+      }
 
       return {
         AssignmentID: a.AssignmentID,
@@ -8170,21 +8270,11 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
         PresentationTypeID: w.PresentationTypeID || '',
         PresentationTypeName: w.PresentationTypeID === 'PRES-POSTER' ? 'โปสเตอร์ (Poster)' : 'บรรยาย (Oral)',
         PresenterName: presenterName,
-        Status: a.Status,
-        TotalScore: (function(){
-          var calc = (myScores && myScores.length > 0) ? Math.round(myScores.reduce(function(sum, s){ return sum + (Number(s.Score) || 0); }, 0) * 100) / 100 : 0;
-          if (calc > 100) calc = Math.min(100, Math.round(calc / 2));
-          var asg = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : 0;
-          if (asg > 100) asg = Math.min(100, Math.round(asg / 2));
-          var fin = asg > 0 ? asg : calc;
-          if (fin > 0 && asg === 0 && a.__row) {
-            try { updateRecord_('ReviewAssignments', a.__row, { TotalScore: fin, UpdatedAt: new Date() }); } catch(e) {}
-          }
-          return fin;
-        })(),
-        Decision: a.Decision || '',
-        RecommendationToAuthor: a.RecommendationToAuthor || '',
-        InternalComment: a.InternalComment || '',
+        Status: curStatus,
+        TotalScore: fin,
+        Decision: dec,
+        RecommendationToAuthor: rec,
+        InternalComment: com,
         CompletedAt: a.CompletedAt || a.UpdatedAt || '',
         scores: serialize_(myScores)
       };
