@@ -7607,8 +7607,14 @@ function adminListWorks(token, conferenceId, filters) {
       var asc = assigns.reduce(function(acc, c) {
         if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
           (assignsByWork[c.WorkID] || (assignsByWork[c.WorkID] = [])).push(c);
-          if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0 };
-          acc[c.WorkID].a++;
+          if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0, r1A: 0, r1C: 0, r1T: 0, r2A: 0, r2C: 0, r2T: 0 };
+          var isR2 = isRound2_(c);
+          if (isR2) {
+            acc[c.WorkID].r2A++;
+          } else {
+            acc[c.WorkID].r1A++;
+            acc[c.WorkID].a++;
+          }
           var st2 = upper_(c.Status);
           var isDraft2 = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st2) >= 0;
           var isUnassigned2 = (st2 === 'ASSIGNED' || st2 === 'OPENED' || !st2);
@@ -7618,10 +7624,17 @@ function adminListWorks(token, conferenceId, filters) {
           var hasValidConfirmedScore2 = (rawSc2 !== null && rawSc2 > 0);
           var isCompleted2 = !isDraft2 && !isUnassigned2 && (isConfirmedSubmitted2 || (hasValidConfirmedScore2 && !!c.CompletedAt));
           if (isCompleted2 && hasValidConfirmedScore2) {
-            acc[c.WorkID].c++;
             var sc = rawSc2;
             if (sc > 100) sc = Math.min(100, Math.round(sc / 2));
-            acc[c.WorkID].t += sc;
+            if (isR2) {
+              acc[c.WorkID].r2C++;
+              acc[c.WorkID].r2T += sc;
+            } else {
+              acc[c.WorkID].r1C++;
+              acc[c.WorkID].r1T += sc;
+              acc[c.WorkID].c++;
+              acc[c.WorkID].t += sc;
+            }
           }
         }
         return acc;
@@ -7793,9 +7806,15 @@ function adminListWorks(token, conferenceId, filters) {
           PresenterEmail: presenterEmail,
           PresenterPhone: presenterPhone,
           Institution: presenterOrg,
-          ReviewerAssignedCount: ac.a,
-          ReviewerCompletedCount: ac.c,
-          AverageScore: ac.c ? (ac.t / ac.c).toFixed(2) : '0',
+          ReviewerAssignedCount: ac.r1A,
+          ReviewerCompletedCount: ac.r1C,
+          AverageScore: ac.r1C ? (ac.r1T / ac.r1C).toFixed(2) : '0',
+          ReviewerAssignedCountR1: ac.r1A,
+          ReviewerCompletedCountR1: ac.r1C,
+          AverageScoreR1: ac.r1C ? (ac.r1T / ac.r1C).toFixed(2) : '0',
+          ReviewerAssignedCountR2: ac.r2A,
+          ReviewerCompletedCountR2: ac.r2C,
+          AverageScoreR2: ac.r2C ? (ac.r2T / ac.r2C).toFixed(2) : '0',
           reviewers: (assignsByWork[w.WorkID] || []).map(function(a){
             var stA = upper_(a.Status);
             var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(stA) >= 0;
@@ -7805,6 +7824,8 @@ function adminListWorks(token, conferenceId, filters) {
             var sc = (isNotSubmitted || rawSc === 0 || rawSc === null) ? null : rawSc;
             return {
               AssignmentID: a.AssignmentID,
+              ReviewRoundID: a.ReviewRoundID,
+              isRound2: isRound2_(a),
               ReviewerID: a.ReviewerID,
               ReviewerName: clean_(a.ReviewerName || a.ReviewerID || ''),
               TotalScore: sc,
