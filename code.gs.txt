@@ -1,30 +1,13 @@
 
-function syncOfficialCriteria_(cid) {
+// NOTE: Round 1 criteria (CRIT-2026-000006 through CRIT-2026-000018) are completely managed
+// by the conference administrator directly in the Google Sheet with preserved CriteriaIDs.
+// NO automated function will ever create, seed, modify, or delete Round 1 criteria.
+
+function syncOfficialRound2Criteria_(cid) {
+  cid = cid || APP.DEFAULT_CONFERENCE_ID;
   var rounds = findMany_('ReviewRounds', { ConferenceID: cid });
   
-  // Ensure Round 1 exists
-  var round1 = rounds.find(function(r){ return Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'); });
-  var r1Id = round1 ? round1.ReviewRoundID : 'RR-2026-000001';
-  if (!round1) {
-    appendRecord_('ReviewRounds', {
-      ReviewRoundID: r1Id,
-      ConferenceID: cid,
-      RoundNo: 1,
-      RoundNameTH: 'รอบประเมินผลงาน',
-      RoundNameEN: 'Main Review',
-      MinReviewers: 2,
-      MaxReviewers: 3,
-      BlindReview: true,
-      AllowEditAfterSubmit: false,
-      AllowDecline: true,
-      CalculationMethod: 'AVERAGE',
-      PassingScore: 60,
-      Status: 'OPEN',
-      SortOrder: 1
-    });
-  }
-
-  // Ensure Round 2 exists
+  // Ensure Round 2 exists in ReviewRounds
   var round2 = rounds.find(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
   var r2Id = round2 ? round2.ReviewRoundID : 'RR-2026-000002';
   if (!round2) {
@@ -46,110 +29,16 @@ function syncOfficialCriteria_(cid) {
     });
   }
 
-  // ==========================================
-  // ROUND 1 OFFICIAL CRITERIA (รอบประเมินผลงาน / คัดกรอง)
-  // ==========================================
-  // 1. Service Excellence / CQI / Primary Care (6 items, 100 points total)
-  var serviceCqiCriteriaR1 = [
-    {
-      ItemNo: 1,
-      NameTH: 'มีการทบทวนสถานการณ์/ปัญหา/จุดเริ่มต้นของกิจกรรมการพัฒนาคุณภาพ',
-      NameEN: 'Situation Review and Problem Significance',
-      Desc: '- มีการระบุว่าปัญหาที่ต้องการแก้ไขคืออะไร เกิดขึ้นที่ไหน เกี่ยวข้องกับใคร (5 คะแนน)\n- มีการระบุปัญหาว่ามีสาเหตุสำคัญจากอะไร มีผลกระทบต่องานหรือการดูแลผู้ป่วยอย่างไร (5 คะแนน)',
-      MaxScore: 10
-    },
-    {
-      ItemNo: 2,
-      NameTH: 'มีเป้าหมายที่ชัดเจน',
-      NameEN: 'Clear Objectives and Goals',
-      Desc: '- มีการระบุเป้าหมายที่สอดคล้องกับปัญหา (5 คะแนน)\n- มีการระบุจุดเน้นของผลงานว่าได้ปรับปรุงอะไรและเกิดผลลัพธ์อะไร (5 คะแนน)',
-      MaxScore: 10
-    },
-    {
-      ItemNo: 3,
-      NameTH: 'กิจกรรมการพัฒนา',
-      NameEN: 'Quality Improvement Activities',
-      Desc: '- มีการระบุแนวคิด/องค์ความรู้ที่นำมาใช้ในการออกแบบกิจกรรมการพัฒนาหรือการเปลี่ยนแปลง (10 คะแนน)\n- มีการระบุประเด็นการพัฒนาที่เน้นวิธีการสำคัญเพียงพอเพื่อให้ผู้อ่านเข้าใจว่าทีมได้ทำอะไรบ้าง (20 คะแนน)',
-      MaxScore: 30
-    },
-    {
-      ItemNo: 4,
-      NameTH: 'การประเมินผลการเปลี่ยนแปลง',
-      NameEN: 'Evaluation of Change and Results',
-      Desc: '- มีการประเมินเชิงปริมาณ หรือ เชิงคุณภาพ (10 คะแนน)\n- มีการวิเคราะห์ว่าการเปลี่ยนแปลงนี้สามารถแก้ปัญหาที่เป็นจุดเริ่มต้นได้ประสบผลสำเร็จเพียงใด (15 คะแนน)',
-      MaxScore: 25
-    },
-    {
-      ItemNo: 5,
-      NameTH: 'บทเรียนที่ได้รับ',
-      NameEN: 'Lessons Learned and Sustainability',
-      Desc: '- มีการระบุข้อมูลที่ได้รับจากการพัฒนาและการนำผลงานไปใช้ ข้อสรุปที่เป็นหลักการสอดคล้องกับผลงานที่นำเสนอ (10 คะแนน)\n- มีการแสดงข้อสังเกต/ข้อเสนอแนะ ข้อควรระวังในการนำผลงานไปประยุกต์ใช้ รวมทั้งแนวทางการพัฒนาเพิ่มเติมให้มีผลลัพธ์ที่ดีขึ้น ประสบความสำเร็จมากยิ่งขึ้น (10 คะแนน)',
-      MaxScore: 20
-    },
-    {
-      ItemNo: 6,
-      NameTH: 'ความครบถ้วนตามแนวทางผลงานการพัฒนาคุณภาพ',
-      NameEN: 'Completeness and Alignment with Guidelines',
-      Desc: '- ข้อกำหนดในการจัดทำผลงานการพัฒนาคุณภาพ (2.5 คะแนน)\n- การเรียงลำดับเนื้อหา ตามหัวข้อที่กำหนด (2.5 คะแนน)',
-      MaxScore: 5
-    }
-  ];
-
-  // 2. Research & Innovation (7 items, 100 points total)
-  var researchInnovationCriteriaR1 = [
-    {
-      ItemNo: 1,
-      NameTH: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ',
-      NameEN: 'Title Relevance and Interest',
-      Desc: 'ชื่อเรื่อง ตรงประเด็น ตรงกับแนวคิดหลักการประชุมและน่าสนใจ (5 คะแนน)',
-      MaxScore: 5
-    },
-    {
-      ItemNo: 2,
-      NameTH: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ',
-      NameEN: 'Comprehensive Abstract',
-      Desc: 'บทคัดย่อครอบคลุม ข้อมูลภูมิหลังวัตถุประสงค์ วิธีการ ผลการวิจัย และข้อเสนอแนะ (15 คะแนน)',
-      MaxScore: 15
-    },
-    {
-      ItemNo: 3,
-      NameTH: 'บทนำ มีข้อมูลภูมิหลังที่ชัดเจน',
-      NameEN: 'Clear Background and Problem Statement',
-      Desc: '- ระบุประเด็นปัญหาของงานวิจัยและเหตุผลในการทำวิจัยและระบุถึงวัตถุประสงค์ของการวิจัยที่ชัดเจน (10 คะแนน)',
-      MaxScore: 10
-    },
-    {
-      ItemNo: 4,
-      NameTH: 'ระเบียบวิธีวิจัย/วิธีการพัฒนานวัตกรรม',
-      NameEN: 'Research Methodology / Innovation Development',
-      Desc: '- ระบุรูปแบบงานวิจัย ประชากรที่ศึกษา ขนาดตัวอย่าง และวิธีสุ่มตัวอย่าง ตลอดวิธีการเก็บรวบรวมข้อมูล วิธีการวิเคราะห์ และสถิติที่ใช้มีความเหมาะสม\nกรณีเป็นผลงานสิ่งประดิษฐ์นวัตกรรม : มีความสมเหตุสมผล และสอดรับกับองค์ความรู้ที่เป็นที่ยอมรับกันโดยทั่วไป แสดงความคิดริเริ่ม หรือต่อยอดองค์ความรู้เดิมได้อย่างน่าสนใจ มีการปฏิบัติจริงหรือประดิษฐ์จริงแล้ว และมีรายงานผลการปฏิบัติ/ผลการใช้งานเบื้องต้น',
-      MaxScore: 20
-    },
-    {
-      ItemNo: 5,
-      NameTH: 'ผลการวิจัย/ผลการศึกษาสอดคล้องกับวัตถุประสงค์',
-      NameEN: 'Results Aligned with Objectives',
-      Desc: '- นำเสนอผลการวิจัย/ ผลการศึกษาได้สอดคล้องกับการตอบตามวัตถุประสงค์ที่ตั้งไว้ (20 คะแนน)',
-      MaxScore: 20
-    },
-    {
-      ItemNo: 6,
-      NameTH: 'การอภิปรายผล และข้อเสนอแนะจากผลการวิจัย',
-      NameEN: 'Discussion and Recommendations',
-      Desc: '- มีการอภิปรายผลมุ่งสู่ประเด็นสำคัญของผลการวิจัย (20 คะแนน)',
-      MaxScore: 20
-    },
-    {
-      ItemNo: 7,
-      NameTH: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย',
-      NameEN: 'Practical Utilization for Quality & Safety',
-      Desc: 'การใช้ประโยชน์จากการวิจัยเพื่อการพัฒนาคุณภาพ และความปลอดภัย (10 คะแนน)',
-      MaxScore: 10
-    }
-  ];
+  // Check if Round 2 criteria already exist in ScoringCriteria to prevent any duplication or overwriting
+  clearTableCache_('ScoringCriteria');
+  var allCrit = findMany_('ScoringCriteria', { ConferenceID: cid });
+  var r2CritCount = allCrit.filter(function(c){ return String(c.ReviewRoundID) === String(r2Id); }).length;
+  if (r2CritCount >= 37) {
+    return { success: true, message: 'เกณฑ์รอบตัดสินมีอยู่แล้วในระบบ (' + r2CritCount + ' รายการ)' };
+  }
 
   // ==========================================
-  // ROUND 2 OFFICIAL CRITERIA (รอบตัดสินผลงาน / การนำเสนอและตอบข้อซักถาม)
+  // ROUND 2 OFFICIAL CRITERIA ONLY (รอบตัดสินผลงาน / การนำเสนอและตอบข้อซักถาม)
   // ==========================================
   // 1. Service Excellence / CQI / Primary Care (7 items, 100 points total)
   var serviceCqiCriteriaR2 = [
@@ -264,11 +153,6 @@ function syncOfficialCriteria_(cid) {
     }
   ];
 
-  // NOTE: User has restored Round 1 criteria in ScoringCriteria sheet with original CriteriaIDs.
-  // NEVER delete or recreate Round 1 criteria (SERVICE_CQI_PRIMARY and RESEARCH_INNOVATION).
-  clearTableCache_('ScoringCriteria');
-  var allCrit = findMany_('ScoringCriteria', { ConferenceID: cid });
-
   function syncCriteriaList(items, catGroupKey, roundId) {
     items.forEach(function(it){
       var existing = allCrit.find(function(c){
@@ -300,8 +184,6 @@ function syncOfficialCriteria_(cid) {
     });
   }
 
-  // NOTE: Round 1 criteria auto-creation is completely removed as requested by user.
-  // Sync Round 2 criteria ONLY (7 items for Service/CQI/Primary, 8 items for Research/Innovation)
   syncCriteriaList(serviceCqiCriteriaR2, 'SERVICE', r2Id);
   syncCriteriaList(serviceCqiCriteriaR2, 'CQI', r2Id);
   syncCriteriaList(serviceCqiCriteriaR2, 'PRIMARY', r2Id);
@@ -309,11 +191,14 @@ function syncOfficialCriteria_(cid) {
   syncCriteriaList(researchInnovationCriteriaR2, 'INNOVATION', r2Id);
 
   clearTableCache_('ScoringCriteria');
+  return { success: true };
 }
 
-function syncOfficialRound2Criteria_(cid) {
-  return syncOfficialCriteria_(cid);
+function syncOfficialCriteria_(cid) {
+  // Alias pointing only to Round 2 sync; Round 1 is never modified or created.
+  return syncOfficialRound2Criteria_(cid);
 }
+
 
 /**
  * TUH Quality Fair Conference Management
@@ -5540,11 +5425,11 @@ function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
   return runSafely_("adminSetupCategoryScoringCriteria",function(){
     requireSession_(token,["SUPERADMIN","CONFERENCE_ADMIN","ACADEMIC_STAFF"],conferenceId);
     var cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
-    syncOfficialCriteria_(cid);
+    syncOfficialRound2Criteria_(cid);
     invalidateCache_(cid);
     return {
       success: true,
-      message: "ตั้งค่าเกณฑ์คะแนนรอบประเมินผลงาน (6-7 ข้อ) และรอบตัดสิน (7-8 ข้อ) แยกตามหมวดหมู่เรียบร้อยแล้ว (รอบละ 100 คะแนน)",
+      message: "ตั้งค่าเกณฑ์คะแนนรอบตัดสิน (7-8 ข้อ) เรียบร้อยแล้ว (เกณฑ์รอบ 1 ยังคงเดิมตามที่กำหนดไว้ใน Google Sheet)",
       criteria: serialize_(findMany_("ScoringCriteria",{ConferenceID:cid}))
     };
   });
@@ -5562,7 +5447,6 @@ function adminGetReviewConfig(token,conferenceId){
       rounds = findMany_('ReviewRounds',{ConferenceID:cid});
     }
     var hasR2 = rounds.some(function(r){ return Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'); });
-    try { syncOfficialRound2Criteria_(cid); } catch(e){}
     if (!hasR2) {
       appendRecord_('ReviewRounds',{ReviewRoundID:'RR-2026-000002',ConferenceID:cid,RoundNo:2,RoundNameTH:'รอบตัดสินผลงาน',RoundNameEN:'Final Decision Round',MinReviewers:2,MaxReviewers:3,BlindReview:false,AllowEditAfterSubmit:false,AllowDecline:false,CalculationMethod:'AVERAGE',PassingScore:60,Status:'OPEN',SortOrder:2});
       rounds = findMany_('ReviewRounds',{ConferenceID:cid});

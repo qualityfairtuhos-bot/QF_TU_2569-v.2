@@ -24,6 +24,15 @@
     .btn-sq.btn-primary,.btn-primary.btn-sq{background:var(--teal)!important;color:#fff!important;border-color:var(--teal)!important}
     .btn-sq.btn-blue,.btn-blue.btn-sq{background:var(--blue)!important;color:#fff!important;border-color:var(--blue)!important}
     .btn-sq.btn-gold,.btn-gold.btn-sq{background:var(--gold)!important;color:#172B3A!important}
+    .btn-action-teal{background:#006D70!important;color:#ffffff!important;border:1px solid #005a5d!important}
+    .btn-action-teal:hover{background:#005a5d!important;color:#ffffff!important}
+    .btn-action-teal i{color:#ffffff!important}
+    .btn-action-brown{background:#b45309!important;color:#ffffff!important;border:1px solid #92400e!important}
+    .btn-action-brown:hover{background:#92400e!important;color:#ffffff!important}
+    .btn-action-brown i{color:#ffffff!important}
+    .btn-action-blue{background:#0C385B!important;color:#ffffff!important;border:1px solid #082842!important}
+    .btn-action-blue:hover{background:#082842!important;color:#ffffff!important}
+    .btn-action-blue i{color:#ffffff!important}
     .app{display:none}
     .sidebar{position:fixed;inset:0 auto 0 0;width:250px;background:linear-gradient(180deg,#071A2D,#0B2941 62%,#073942);color:#fff;overflow:auto;border-right:1px solid rgba(255,255,255,.08);transition:transform 0.25s ease, margin-left 0.25s ease;z-index:90}
     .sidebar.open{transform:translateX(0)!important}
@@ -2933,10 +2942,10 @@ function renderWorksTable(){
     <td class="actions-col" style="min-width:180px; width:180px; padding:6px 8px;">
       <!-- แถวที่ 1: กรรมการ, สรุปคะแนน และพิมพ์รายงานคะแนน -->
       <div style="display:flex; gap:4px; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
-        <button class="btn btn-sm btn-sq" style="background:#006D70; color:#fff; border-color:#005a5d;" title="จ่ายงานรอบประเมินผลงาน (รอบที่ 1)" onclick="openAssignReviewerModal('${esc(w.WorkID)}', 1)"><i class="fa-solid fa-user-plus"></i></button>
-        <button class="btn btn-sm btn-sq" style="background:#b45309; color:#fff; border-color:#92400e;" title="จ่ายงานกรรมการรอบตัดสิน (รอบที่ 2)" onclick="openAssignReviewerModal('${esc(w.WorkID)}', 2)"><i class="fa-solid fa-award"></i></button>
-        <button class="btn btn-sm btn-sq" style="background:#0C385B; color:#fff; border-color:#082842;" title="ดูคะแนนและตัดสินผลงาน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple"></i></button>
-        <button class="btn btn-sm btn-sq" style="background:#006D70; color:#fff; border-color:#005a5d;" title="พิมพ์ใบสรุปรายงานคะแนนผลงาน (เลือกรอบประเมิน หรือรอบตัดสิน)" onclick="openPrintWorkScoreSelector('${esc(w.WorkID)}')"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="btn btn-sm btn-sq btn-action-teal" style="background:#006D70 !important; color:#ffffff !important; border:1px solid #005a5d !important;" title="จ่ายงานรอบประเมินผลงาน (รอบที่ 1)" onclick="openAssignReviewerModal('${esc(w.WorkID)}', 1)"><i class="fa-solid fa-user-plus" style="color:#ffffff !important; font-size:14px;"></i></button>
+        <button type="button" class="btn btn-sm btn-sq btn-action-brown" style="background:#b45309 !important; color:#ffffff !important; border:1px solid #92400e !important;" title="จ่ายงานกรรมการรอบตัดสิน (รอบที่ 2)" onclick="openAssignReviewerModal('${esc(w.WorkID)}', 2)"><i class="fa-solid fa-award" style="color:#ffffff !important; font-size:14px;"></i></button>
+        <button type="button" class="btn btn-sm btn-sq btn-action-blue" style="background:#0C385B !important; color:#ffffff !important; border:1px solid #082842 !important;" title="ดูคะแนนและตัดสินผลงาน" onclick="openScoreSummary('${esc(w.WorkID)}')"><i class="fa-solid fa-chart-simple" style="color:#ffffff !important; font-size:14px;"></i></button>
+        <button type="button" class="btn btn-sm btn-sq btn-action-teal" style="background:#006D70 !important; color:#ffffff !important; border:1px solid #005a5d !important;" title="พิมพ์ใบสรุปรายงานคะแนนผลงาน (เลือกรอบประเมิน หรือรอบตัดสิน)" onclick="openPrintWorkScoreSelector('${esc(w.WorkID)}')"><i class="fa-solid fa-print" style="color:#ffffff !important; font-size:14px;"></i></button>
       </div>
       <!-- แถวที่ 2: ปรับสถานะ, ส่งอีเมล, จัดการไฟล์, และลบผลงาน -->
       <div style="display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
