@@ -3441,7 +3441,7 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
 
     const rounds = d.rounds || [];
     let initialRoundId = (rounds[0] && rounds[0].ReviewRoundID) || '';
-    if (targetRoundNoOrId === 2 || String(targetRoundNoOrId).includes('2')) {
+    if (targetRoundNoOrId === 2 || String(targetRoundNoOrId) === '2' || /(?:^|[-_])2$|[-_]0*2$/i.test(String(targetRoundNoOrId).trim())) {
       const r2 = rounds.find(r => Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'));
       if (r2) initialRoundId = r2.ReviewRoundID;
       else if (rounds[1]) initialRoundId = rounds[1].ReviewRoundID;

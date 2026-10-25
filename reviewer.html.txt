@@ -340,12 +340,32 @@ function selectRoundTab(tab) {
 
 const ASSIGNMENT_CACHE = {};
 
+function isRound2_(x) {
+  if (!x) return false;
+  if (x === 2 || x === '2') return true;
+  if (x === 1 || x === '1') return false;
+  if (typeof x === 'object') {
+    if (x.RoundNo !== undefined && x.RoundNo !== null && x.RoundNo !== '') {
+      return Number(x.RoundNo) === 2;
+    }
+    const name = String(x.RoundNameTH || x.RoundName || '').trim();
+    if (name.includes('ตัดสิน') || String(x.RoundNameEN || '').toLowerCase().includes('final')) return true;
+    const rid = String(x.ReviewRoundID || '').trim();
+    if (/(?:^|[-_])2$|[-_]0*2$/i.test(rid)) return true;
+    return false;
+  }
+  const s = String(x).trim();
+  if (s.includes('ตัดสิน') || s.toLowerCase().includes('final')) return true;
+  if (/(?:^|[-_])2$|[-_]0*2$/i.test(s)) return true;
+  return false;
+}
+
 function renderAssignments(){
   const allAssignments = (BOOT && BOOT.assignments) || [];
   
-  // Calculate counts across rounds
-  const r1List = allAssignments.filter(x => !(Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน')));
-  const r2List = allAssignments.filter(x => Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน'));
+  // Calculate counts across rounds accurately
+  const r1List = allAssignments.filter(x => !isRound2_(x));
+  const r2List = allAssignments.filter(x => isRound2_(x));
   
   const elRtabAll = document.getElementById('count-rtab-all');
   if (elRtabAll) elRtabAll.textContent = allAssignments.length;
@@ -422,7 +442,7 @@ function renderAssignmentsGrid(){
   const allAsns = BOOT.assignments || [];
   const search = ($('#searchAssignment').value || '').toLowerCase().trim();
   const filtered = allAsns.filter(x => {
-    const isR2 = Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน');
+    const isR2 = isRound2_(x);
     if(currentRoundTab === 'round1' && isR2) return false;
     if(currentRoundTab === 'round2' && !isR2) return false;
     if(currentFilter === 'pending' && x.Status === 'COMPLETE') return false;
@@ -488,7 +508,7 @@ function renderAssignmentsGrid(){
             ${x.PresenterName ? `<span>👤 ผู้นำเสนอ: ${esc(x.PresenterName)}</span>` : ''}
           </div>
           <div class="kanban-badges">
-            ${(Number(x.RoundNo) === 2 || String(x.ReviewRoundID).includes('2') || String(x.RoundNameTH).includes('ตัดสิน')) 
+            ${isRound2_(x) 
               ? '<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700;">🏆 รอบตัดสิน</span>' 
               : '<span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">📋 รอบประเมินผลงาน</span>'}
             ${statusBadge(x.Status)}
@@ -639,8 +659,8 @@ function resolveReviewerCriteria(rawCriteria, work) {
         if (/สิ่งประดิษฐ์|นวัตกรรม|INNOVAT/i.test(text)) sScore += 60;
         if (critCat === 'INNOVATION' || critCat === 'CAT-2') sScore += 50;
       }
-      if (!isResearch && !isInnovation && critCat === 'SERVICE_CQI_PRIMARY') sScore += 20;
-      if ((isResearch || isInnovation) && critCat === 'RESEARCH_INNOVATION') sScore += 20;
+      if (!isResearch && !isInnovation && (critCat === 'SERVICE_CQI_PRIMARY' || critCat.includes('SERVICE_CQI_PRIMARY'))) sScore += 150;
+      if ((isResearch || isInnovation) && (critCat === 'RESEARCH_INNOVATION' || critCat.includes('RESEARCH_INNOVATION'))) sScore += 150;
     });
 
     if (sScore > bestScore) {
@@ -1026,7 +1046,7 @@ function renderReview() {
           <div class="review-work-badge-row">
             <span class="work-code-pill">📌 รหัสผลงาน: ${esc(w.WorkCode || '-')}</span>
             <span class="work-category-pill">🏷️ ประเภท: <b>${workCategoryName}</b></span>
-            ${(Number(a.RoundNo) === 2 || String(a.ReviewRoundID).includes('2') || String(a.RoundNameTH).includes('ตัดสิน'))
+            ${isRound2_(a)
               ? '<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; padding:4px 8px; border-radius:999px;">🏆 รอบตัดสินผลงาน</span>'
               : '<span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:600; padding:4px 8px; border-radius:999px;">📋 รอบประเมินผลงาน</span>'}
             <span class="work-rubric-pill">⚖️ เกณฑ์ประเมิน ${criteriaList.length} ข้อ (คะแนนเต็ม ${totalMax} คะแนน)</span>
