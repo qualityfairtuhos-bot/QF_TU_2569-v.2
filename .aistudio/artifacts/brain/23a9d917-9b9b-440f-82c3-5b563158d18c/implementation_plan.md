@@ -121,3 +121,20 @@ This feature enhances the TUH Quality Fair conference management system by intro
    - In Round 2 evaluation view, render historical evaluation card with original scores and feedback.
 5. **Build & Verify**:
    - Run `node tools/prepare-legacy.mjs`, linting, tests, and compilation checks.
+
+---
+
+## 5. Tax ID & Payment Confirmation Workflow Hardening (Completed)
+
+1. **Tax ID Leading Zero Preservation**:
+   - Google Sheets text formatting (`@`) enforced for all columns in `PLAIN_TEXT_FIELDS` (`CID`, `Phone`, `ReceiptTaxID`, `ReceiptPostalCode`, `ReceiptPhone`, etc.) on both `appendRecord_`, `appendRecords_`, and `updateRecord_`.
+   - String normalization `normalizeTaxId_` / `normalizeTaxId` ensures 13-digit Tax IDs with leading zeroes (such as `0994000260164`) are never coerced into numeric types or stripped of `0`.
+2. **Receipt Requirement (`ReceiptRequirement`) Synchronization**:
+   - Stored and mapped in `submitRegistration`, `saveRegistrationEdit`, `adminSaveRegistration`, and `adminUpdateReceiptInfo`.
+   - Inferred automatically as `'NEED_RECEIPT'` if the applicant enters a `ReceiptName` or `ReceiptTaxID`, preventing false `'NO_RECEIPT'` status.
+3. **Official Payment Confirmation Receipt (ใบยืนยันการรับเงินค่าลงทะเบียน)**:
+   - Added printable A4 document template with official TUH & HACC conference header, 13-digit Tax ID formatting, payment itemization, and clear disclaimers that the official government tax invoice is issued by the TUH Finance & Procurement division.
+   - Added direct "ใบยืนยันรับเงิน" action button in Admin Finance (`#payRows`).
+4. **RPC & Reviewer Permission Hardening**:
+   - Verified `adminAcceptWorkScores` and `adminUnlockWorkScores` in `API_ACTIONS` and `API_WRITE_ACTIONS` for role-authorized administrative actions.
+   - Legacy bundle refreshed via `tools/prepare-legacy.mjs` and verified with `compile_applet` and `lint_applet`.

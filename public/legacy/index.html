@@ -456,7 +456,13 @@ function load(t){$('#loadingText').textContent=t||'กำลังประม�
 function done(){$('#loading').classList.remove('show')}
 function alertErr(e){done();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('#page-'+p).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));scrollTo({top:0,behavior:'smooth'})}
-function formObj(f){const o={};new FormData(f).forEach((v,k)=>o[k]=v);f.querySelectorAll('input[type=checkbox]').forEach(x=>o[x.name]=x.checked);if(o.ReceiptTaxID&&!o.ReceiptTaxId)o.ReceiptTaxId=o.ReceiptTaxID;if(o.ReceiptTaxId&&!o.ReceiptTaxID)o.ReceiptTaxID=o.ReceiptTaxId;return o}
+function normalizeTaxId(v){
+  if(v===undefined||v===null)return '';
+  let s=String(v).trim().replace(/[^\d]/g,'');
+  if(s.length===12)s='0'+s;
+  return s;
+}
+function formObj(f){const o={};new FormData(f).forEach((v,k)=>o[k]=v);f.querySelectorAll('input[type=checkbox]').forEach(x=>o[x.name]=x.checked);if(o.ReceiptTaxID)o.ReceiptTaxID=normalizeTaxId(o.ReceiptTaxID);if(o.ReceiptTaxId)o.ReceiptTaxId=normalizeTaxId(o.ReceiptTaxId);if(o.ReceiptTaxID&&!o.ReceiptTaxId)o.ReceiptTaxId=o.ReceiptTaxID;if(o.ReceiptTaxId&&!o.ReceiptTaxID)o.ReceiptTaxID=o.ReceiptTaxId;return o}
 function fileObj(el){return new Promise((res,rej)=>{const f=el.files[0];if(!f)return res(null);const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 
@@ -799,6 +805,9 @@ function renderStatus(r,docs){
     return `<label class="attendance-option"><input type="checkbox" name="AttendanceDay${dayNum}" ${checked ? 'checked' : ''}><span><b>วันที่ ${dayNum}: ${esc(formatThaiDate(d))}</b><span class="en">Day ${dayNum}: ${esc(formatEnglishDate(d))}</span></span></label>`;
   }).join('') : '<div class="notice">ผู้ดูแลระบบยังไม่ได้กำหนดวันจัดงาน กรุณาติดต่อเจ้าหน้าที่</div>';
 
+  const hasRc = (r.ReceiptRequirement==='NEED_RECEIPT')||(!r.ReceiptRequirement&&(r.ReceiptName||r.ReceiptTaxID||r.ReceiptTaxId));
+  const taxId = normalizeTaxId(r.ReceiptTaxID||r.ReceiptTaxId||'');
+
   $('#statusResult').innerHTML=`<div class="card">
     <div class="notice ${r.DataCompletenessStatus==='COMPLETE'?'success':''}" style="margin-bottom:14px">
       สถานะข้อมูล: <b>${esc(r.DataCompletenessStatus)}</b> | สถานะลงทะเบียน: <b>${esc(r.RegistrationStatus)}</b> | การเงิน: <b>${esc(r.PaymentStatus)}</b>
@@ -837,12 +846,15 @@ function renderStatus(r,docs){
         <div class="form-section">
           <div class="form-section-header"><span class="sec-badge">3</span><span>ข้อมูลสำหรับออกใบเสร็จรับเงิน & ใบแจ้งหนี้</span><span class="en" style="margin-left:auto;font-size:0.85rem;color:#718797">Receipt & Tax Invoice</span></div>
           <div class="grid">
-            <div class="field"><label>ความประสงค์ออกใบเสร็จ<span class="en">Receipt requirement</span></label><select name="ReceiptRequirement"><option value="NO_RECEIPT" ${r.ReceiptRequirement==='NO_RECEIPT'?'selected':''}>ไม่ออกใบเสร็จ / No receipt</option><option value="NEED_RECEIPT" ${r.ReceiptRequirement==='NEED_RECEIPT'?'selected':''}>ต้องการออกใบเสร็จรับเงิน / Request receipt</option></select></div>
+            <div class="field"><label>ความประสงค์ออกใบเสร็จ<span class="en">Receipt requirement</span></label><select name="ReceiptRequirement"><option value="NO_RECEIPT" ${!hasRc?'selected':''}>ไม่ออกใบเสร็จ / No receipt</option><option value="NEED_RECEIPT" ${hasRc?'selected':''}>ต้องการออกใบเสร็จรับเงิน / Request receipt</option></select></div>
             <div class="field"><label>ชื่อบุคคล/หน่วยงานสำหรับออกใบเสร็จ<span class="en">Receipt name / Entity name</span></label>${input('ReceiptName',r.ReceiptName||'')}</div>
-            <div class="field"><label>เลขประจำตัวผู้เสียภาษี / เลขบัตรประชาชน<span class="en">Tax ID / Citizen ID</span></label>${input('ReceiptTaxID',r.ReceiptTaxID||r.ReceiptTaxId||'','','text','13')}</div>
+            <div class="field"><label>เลขประจำตัวผู้เสียภาษี / เลขบัตรประชาชน<span class="en">Tax ID / Citizen ID</span></label>${input('ReceiptTaxID',taxId,'','text','13')}</div>
             <div class="field"><label>เบอร์โทรศัพท์สำหรับใบเสร็จ<span class="en">Receipt contact phone</span></label>${input('ReceiptPhone',r.ReceiptPhone||'','','tel')}</div>
             <div class="field"><label>ที่อยู่สำหรับออกใบเสร็จ<span class="en">Receipt address</span></label><textarea name="ReceiptAddress" rows="2" placeholder="เลขที่ อาคาร ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด">${esc(r.ReceiptAddress||'')}</textarea></div>
             <div class="field"><label>รหัสไปรษณีย์สำหรับใบเสร็จ<span class="en">Receipt postal code</span></label>${input('ReceiptPostalCode',r.ReceiptPostalCode||'','','text','5')}</div>
+            <div class="field grid-full" style="font-size:0.83rem;color:#0f766e;background:#f0fdfa;padding:8px 12px;border-radius:6px;border:1px solid #ccfbf1;margin-top:2px;">
+              <i class="fa-solid fa-circle-info"></i> <b>การออกใบเสร็จรับเงิน:</b> ท่านสามารถขอรับใบยืนยันการรับเงินค่าลงทะเบียนจากระบบได้ และใบเสร็จรับเงินตัวจริงของทางราชการจะออกโดยระบบงานคลังและพัสดุของโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ
+            </div>
             <div class="field grid-full" style="margin-top:2px;">
               <label style="cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-weight:600;color:#073552;background:#f0fdf4;padding:10px 14px;border:1px solid #bbf7d0;border-radius:8px;">
                 <input type="checkbox" name="NeedInvoice" value="true" ${r.NeedInvoice ? 'checked' : ''} style="width:18px;height:18px;margin-top:2px;accent-color:#006D70;cursor:pointer;">

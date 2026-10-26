@@ -1125,8 +1125,15 @@ function num_(v,d){ const n=Number(v); return isFinite(n)?n:(d||0); }
 function jsonParse_(v,d){ try{return v?JSON.parse(v):d;}catch(e){return d;} }
 function safeJson_(v){ try{return JSON.stringify(v);}catch(e){return '{}';} }
 function pad2_(n){ return (n<10?'0':'')+n; }
-function uuid_(){ return Utilities.getUuid(); }
 function normalizeCid_(v){ return clean_(v).replace(/[^\d]/g, ''); }
+function normalizeTaxId_(v){
+  if (v === undefined || v === null) return '';
+  var s = clean_(v).replace(/[^\d]/g, '');
+  if (s.length === 12) {
+    s = '0' + s;
+  }
+  return s;
+}
 function normalizePhone_(v){ return clean_(v).replace(/[^\d+]/g, ''); }
 function normalizeEmail_(v){ return clean_(v).toLowerCase(); }
 function formatDateTime_(v){ 
@@ -1299,11 +1306,17 @@ function getRecords_(name){
   const records = values.map(function(r,idx){ 
     const o={__row:idx+2}; 
     hm.headers.forEach(function(h,i){
-      o[h]=r[i];
+      var val = r[i];
+      if (h === 'ReceiptTaxID') {
+        val = normalizeTaxId_(val);
+      } else if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0 && val !== null && val !== undefined && val !== '') {
+        val = String(val).trim();
+      }
+      o[h]=val;
       const cleanH = String(h||'').replace(/[\s\r\n]+/g, '');
-      if (cleanH && o[cleanH] === undefined) o[cleanH] = r[i];
+      if (cleanH && o[cleanH] === undefined) o[cleanH] = val;
       const lowH = String(cleanH).toLowerCase();
-      if (lowH && o[lowH] === undefined) o[lowH] = r[i];
+      if (lowH && o[lowH] === undefined) o[lowH] = val;
     }); 
     return o; 
   });
@@ -1344,14 +1357,18 @@ function findMany_(name,criteria){
 function appendRecord_(name,obj){
   const sh=getSheet_(name), hm=headerMap_(name);
   const row=hm.headers.map(function(h){
-    const val = obj[h];
+    var val = obj[h];
+    if (h === 'ReceiptTaxID') val = normalizeTaxId_(val);
     if (val === undefined || val === null) return '';
     if (val instanceof Date) return val;
     if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0) return String(val);
     return val;
   });
   const next=sh.getLastRow()+1;
-  sh.getRange(next,1,1,row.length).setValues([row]);
+  const range=sh.getRange(next,1,1,row.length);
+  const formats=[hm.headers.map(function(h){ return PLAIN_TEXT_FIELDS.indexOf(h)>=0 ? '@' : ''; })];
+  try { range.setNumberFormats(formats); } catch(e){}
+  range.setValues([row]);
   clearRequestCache_(); 
   clearTableCache_(name);
   return next;
@@ -1361,7 +1378,8 @@ function appendRecords_(name, objects) {
   const sh = getSheet_(name), hm = headerMap_(name);
   const rows = objects.map(function(obj) {
     return hm.headers.map(function(h) {
-      const val = obj[h];
+      var val = obj[h];
+      if (h === 'ReceiptTaxID') val = normalizeTaxId_(val);
       if (val === undefined || val === null) return '';
       if (val instanceof Date) return val;
       if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0) return String(val);
@@ -1369,7 +1387,11 @@ function appendRecords_(name, objects) {
     });
   });
   const next = sh.getLastRow() + 1;
-  sh.getRange(next, 1, rows.length, hm.headers.length).setValues(rows);
+  const range = sh.getRange(next, 1, rows.length, hm.headers.length);
+  const formatRow = hm.headers.map(function(h){ return PLAIN_TEXT_FIELDS.indexOf(h)>=0 ? '@' : ''; });
+  const formats = rows.map(function(){ return formatRow; });
+  try { range.setNumberFormats(formats); } catch(e){}
+  range.setValues(rows);
   clearRequestCache_();
   clearTableCache_(name);
   return next;
@@ -1382,11 +1404,13 @@ function updateRecord_(name,rowNumber,patch,skipCacheClear){
     keys.forEach(function(k){ 
       if(hm.map[k]!==undefined){ 
         const cell=sh.getRange(rowNumber,hm.map[k]+1); 
+        var val = patch[k];
+        if (k === 'ReceiptTaxID') val = normalizeTaxId_(val);
         if(PLAIN_TEXT_FIELDS.indexOf(k)>=0) {
-          cell.setNumberFormat('@');
-          cell.setValue(String(patch[k]));
+          try { cell.setNumberFormat('@'); } catch(e){}
+          cell.setValue(String(val !== null && val !== undefined ? val : ''));
         } else {
-          cell.setValue(patch[k]);
+          cell.setValue(val);
         }
       }
     }); 
@@ -1395,7 +1419,12 @@ function updateRecord_(name,rowNumber,patch,skipCacheClear){
     const rowValues = rowRange.getValues()[0];
     keys.forEach(function(k){
       if(hm.map[k] !== undefined){
-        rowValues[hm.map[k]] = (PLAIN_TEXT_FIELDS.indexOf(k) >= 0 && patch[k] !== null && patch[k] !== undefined) ? String(patch[k]) : patch[k];
+        var val = patch[k];
+        if (k === 'ReceiptTaxID') val = normalizeTaxId_(val);
+        rowValues[hm.map[k]] = (PLAIN_TEXT_FIELDS.indexOf(k) >= 0 && val !== null && val !== undefined) ? String(val) : val;
+        if (PLAIN_TEXT_FIELDS.indexOf(k) >= 0) {
+          try { sh.getRange(rowNumber, hm.map[k] + 1).setNumberFormat('@'); } catch(e){}
+        }
       }
     });
     rowRange.setValues([rowValues]);
@@ -3550,8 +3579,9 @@ function submitRegistration(conferenceId,payload){
       AttendanceDay2:bool_(payload.AttendanceDay2),
       AttendanceDay3:bool_(payload.AttendanceDay3),
       WantsSubmitWork:bool_(payload.WantsSubmitWork),
+      ReceiptRequirement:clean_(payload.ReceiptRequirement || ((clean_(payload.ReceiptName) || clean_(payload.ReceiptTaxID)) ? 'NEED_RECEIPT' : 'NO_RECEIPT')),
       ReceiptName:clean_(payload.ReceiptName),
-      ReceiptTaxID:clean_(payload.ReceiptTaxID),
+      ReceiptTaxID:normalizeTaxId_(payload.ReceiptTaxID),
       ReceiptAddress:clean_(payload.ReceiptAddress),
       ReceiptPostalCode:clean_(payload.ReceiptPostalCode),
       ReceiptPhone:clean_(payload.ReceiptPhone),
@@ -3683,8 +3713,9 @@ function saveRegistrationEdit(conferenceId,regId,emailOrPhone,editCode,payload){
       AttendanceDay2:bool_(p.AttendanceDay2),
       AttendanceDay3:bool_(p.AttendanceDay3),
       WantsSubmitWork:bool_(p.WantsSubmitWork),
+      ReceiptRequirement:clean_(incoming.ReceiptRequirement !== undefined ? incoming.ReceiptRequirement : (r.ReceiptRequirement || ((clean_(incoming.ReceiptName) || clean_(incoming.ReceiptTaxID)) ? 'NEED_RECEIPT' : 'NO_RECEIPT'))),
       ReceiptName:clean_(incoming.ReceiptName !== undefined ? incoming.ReceiptName : r.ReceiptName),
-      ReceiptTaxID:clean_(incoming.ReceiptTaxID !== undefined ? incoming.ReceiptTaxID : r.ReceiptTaxID),
+      ReceiptTaxID:normalizeTaxId_(incoming.ReceiptTaxID !== undefined ? incoming.ReceiptTaxID : r.ReceiptTaxID),
       ReceiptAddress:clean_(incoming.ReceiptAddress !== undefined ? incoming.ReceiptAddress : r.ReceiptAddress),
       ReceiptPostalCode:clean_(incoming.ReceiptPostalCode !== undefined ? incoming.ReceiptPostalCode : r.ReceiptPostalCode),
       ReceiptPhone:clean_(incoming.ReceiptPhone !== undefined ? incoming.ReceiptPhone : r.ReceiptPhone),
@@ -3760,7 +3791,8 @@ function adminListPayments(token,conferenceId,filters){
       baseRows=findMany_('Registrations',{ConferenceID:cid}).filter(function(r){const t=types[r.ParticipantType]||{};return bool_(t.PaymentRequired);}).map(function(r){
         const t=types[r.ParticipantType]||{},p=paymentByReg[r.RegID]||{};
         const docs = docsByReg[r.RegID] || [];
-        const receiptStatus = p.ReceiptStatus || (r.ReceiptRequirement === 'NO_RECEIPT' ? 'NO_RECEIPT' : 'WAIT_RECEIPT');
+        const reqReceipt = r.ReceiptRequirement || ((clean_(r.ReceiptName) || clean_(r.ReceiptTaxID)) ? 'NEED_RECEIPT' : 'NO_RECEIPT');
+        const receiptStatus = p.ReceiptStatus || (reqReceipt === 'NO_RECEIPT' ? 'NO_RECEIPT' : 'WAIT_RECEIPT');
         return Object.assign({
           PaymentID:'',
           ConferenceID:cid,
@@ -3773,9 +3805,9 @@ function adminListPayments(token,conferenceId,filters){
           ReceiptStatus:receiptStatus,
           NeedInvoice:bool_(r.NeedInvoice),
           InvoiceStatus:r.InvoiceStatus || (bool_(r.NeedInvoice) ? 'PENDING_INVOICE' : 'NO_INVOICE'),
-          ReceiptRequirement:r.ReceiptRequirement || 'NO_RECEIPT',
+          ReceiptRequirement:reqReceipt,
           ReceiptName:r.ReceiptName || '',
-          ReceiptTaxID:r.ReceiptTaxID || '',
+          ReceiptTaxID:normalizeTaxId_(r.ReceiptTaxID || ''),
           ReceiptPhone:r.ReceiptPhone || '',
           ReceiptAddress:r.ReceiptAddress || '',
           ReceiptPostalCode:r.ReceiptPostalCode || '',
@@ -5642,9 +5674,9 @@ function adminSaveRegistration(token,conferenceId,regId,payload){
       Phone:phone,
       LineID:clean_(payload.LineID),
       Email:email,
-      ReceiptRequirement:clean_(payload.ReceiptRequirement !== undefined ? payload.ReceiptRequirement : r.ReceiptRequirement),
+      ReceiptRequirement:clean_(payload.ReceiptRequirement !== undefined ? payload.ReceiptRequirement : (r.ReceiptRequirement || ((clean_(payload.ReceiptName) || clean_(payload.ReceiptTaxID)) ? 'NEED_RECEIPT' : 'NO_RECEIPT'))),
       ReceiptName:clean_(payload.ReceiptName !== undefined ? payload.ReceiptName : r.ReceiptName),
-      ReceiptTaxID:clean_(payload.ReceiptTaxID !== undefined ? payload.ReceiptTaxID : r.ReceiptTaxID),
+      ReceiptTaxID:normalizeTaxId_(payload.ReceiptTaxID !== undefined ? payload.ReceiptTaxID : r.ReceiptTaxID),
       ReceiptAddress:clean_(payload.ReceiptAddress !== undefined ? payload.ReceiptAddress : r.ReceiptAddress),
       ReceiptPostalCode:clean_(payload.ReceiptPostalCode !== undefined ? payload.ReceiptPostalCode : r.ReceiptPostalCode),
       ReceiptPhone:normalizePhone_(payload.ReceiptPhone !== undefined ? payload.ReceiptPhone : r.ReceiptPhone),
@@ -8567,9 +8599,9 @@ function adminUpdateReceiptInfo(token, conferenceId, regId, payload) {
 
     payload = payload || {};
     const patch = {
-      ReceiptRequirement: clean_(payload.ReceiptRequirement !== undefined ? payload.ReceiptRequirement : r.ReceiptRequirement),
+      ReceiptRequirement: clean_(payload.ReceiptRequirement !== undefined ? payload.ReceiptRequirement : (r.ReceiptRequirement || 'NEED_RECEIPT')),
       ReceiptName: clean_(payload.ReceiptName !== undefined ? payload.ReceiptName : r.ReceiptName),
-      ReceiptTaxID: clean_(payload.ReceiptTaxID !== undefined ? payload.ReceiptTaxID : r.ReceiptTaxID),
+      ReceiptTaxID: normalizeTaxId_(payload.ReceiptTaxID !== undefined ? payload.ReceiptTaxID : r.ReceiptTaxID),
       ReceiptAddress: clean_(payload.ReceiptAddress !== undefined ? payload.ReceiptAddress : r.ReceiptAddress),
       ReceiptPostalCode: clean_(payload.ReceiptPostalCode !== undefined ? payload.ReceiptPostalCode : r.ReceiptPostalCode),
       ReceiptPhone: normalizePhone_(payload.ReceiptPhone !== undefined ? payload.ReceiptPhone : r.ReceiptPhone),
@@ -8688,6 +8720,8 @@ const API_ACTIONS = Object.freeze({
   adminSaveReviewRound: adminSaveReviewRound,
   adminSaveRegistrationType: adminSaveRegistrationType,
   adminSetupCategoryScoringCriteria: adminSetupCategoryScoringCriteria,
+  adminAcceptWorkScores: adminAcceptWorkScores,
+  adminUnlockWorkScores: adminUnlockWorkScores,
   adminGetReviewer: adminGetReviewer,
   adminGetReviewerEvaluationReport: adminGetReviewerEvaluationReport,
   adminGetUserScanHistory: adminGetUserScanHistory,
@@ -8769,6 +8803,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   emailMyMealPass:1, registerNewUser:1,
   replaceWorkFile:1, reviewerSaveReview:1,
   adminSaveScoringCriterion:1, adminDeleteScoringCriterion:1, adminSaveReviewRound:1, adminSaveRegistrationType:1, adminSetupCategoryScoringCriteria:1,
+  adminAcceptWorkScores:1, adminUnlockWorkScores:1,
   saveAdminSettings:1, saveRegistrationEdit:1, submitRegistration:1,
   submitWork:1, uploadExcelForImport:1, uploadPaymentSlip:1
 });

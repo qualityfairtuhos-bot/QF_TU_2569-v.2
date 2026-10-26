@@ -412,6 +412,7 @@ function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามาร�
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
 function fileObj(el){return new Promise((res,rej)=>{const f=el.files[0];if(!f)return res(null);const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
 function formObj(f){const o={};new FormData(f).forEach((v,k)=>o[k]=v);return o}function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
+function normalizeTaxId(v){if(v===undefined||v===null)return '';let s=String(v).replace(/[^\d]/g,'');if(s.length===12)s='0'+s;return s}
 function pad2(n){return String(Number(n)||0).padStart(2,'0')}function parseStoredDate(v){if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0));const d=new Date(s);return isNaN(d)?null:d}
 function formatBeDateTime(v){const d=parseStoredDate(v);if(!d)return v||'';return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`}function formatBeIsoDate(v){const d=parseStoredDate(v);if(!d)return v||'';return `${d.getFullYear()+543}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`}
 function validateRealDate(y,m,d){const x=new Date(y,m-1,d);return x.getFullYear()===y&&x.getMonth()===m-1&&x.getDate()===d}
@@ -1582,13 +1583,14 @@ async function openRegistrationView(id){
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;border:1px solid #e2e8f0">
         <div style="font-weight:600;color:#334155;margin-bottom:6px">🧾 ข้อมูลการออกใบเสร็จรับเงิน</div>
-        <div><b>ความประสงค์:</b> ${r.ReceiptRequirement==='NEED_RECEIPT'?'<span style="color:#006D70;font-weight:bold">ต้องการออกใบเสร็จ</span>':'ไม่ออกใบเสร็จ'}</div>
-        ${r.ReceiptRequirement==='NEED_RECEIPT'?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+        <div><b>ความประสงค์:</b> ${((r.ReceiptRequirement==='NEED_RECEIPT')||(!r.ReceiptRequirement&&(r.ReceiptName||r.ReceiptTaxID||r.ReceiptTaxId)))?'<span style="color:#006D70;font-weight:bold">ต้องการออกใบเสร็จ</span>':'ไม่ออกใบเสร็จ'}</div>
+        ${((r.ReceiptRequirement==='NEED_RECEIPT')||(!r.ReceiptRequirement&&(r.ReceiptName||r.ReceiptTaxID||r.ReceiptTaxId)))?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
           <div><b>ชื่อออกใบเสร็จ:</b> ${esc(r.ReceiptName||'-')}</div>
-          <div><b>เลขประจำตัวผู้เสียภาษี:</b> ${esc(r.ReceiptTaxID||r.ReceiptTaxId||'-')}</div>
+          <div><b>เลขประจำตัวผู้เสียภาษี:</b> <span style="font-family:monospace;font-weight:700;color:#006D70">${esc(normalizeTaxId(r.ReceiptTaxID||r.ReceiptTaxId||''))||'-'}</span></div>
           <div><b>เบอร์โทรศัพท์ใบเสร็จ:</b> ${esc(r.ReceiptPhone||'-')}</div>
           <div><b>รหัสไปรษณีย์:</b> ${esc(r.ReceiptPostalCode||'-')}</div>
           <div style="grid-column:span 2"><b>ที่อยู่ออกใบเสร็จ:</b> ${esc(r.ReceiptAddress||'-')}</div>
+          <div style="grid-column:span 2;font-size:0.8rem;color:#0f766e;margin-top:2px"><i class="fa-solid fa-circle-info"></i> ใบเสร็จรับเงินตัวจริงของทางราชการจะออกโดยระบบงานคลังและพัสดุ รพ.ธรรมศาสตร์เฉลิมพระเกียรติ</div>
         </div>`:''}
       </div>
       <div style="font-size:0.8rem;color:#64748b;display:flex;justify-content:space-between">
@@ -1644,6 +1646,8 @@ function renderRegistrationPrintWindow(win, d){
   const confNameEN = BOOT.conference?.ConferenceNameEN || 'TUH Quality Fair & HA-Regional Forum';
   const shortName = BOOT.conference?.ShortName || 'TUH 19 & HA-Regional 1';
   const fee = typeObj.PaymentRequired ? (Number(typeObj.FeeAmount || 0).toLocaleString('th-TH') + ' บาท') : 'ไม่เสียค่าลงทะเบียน';
+  const hasRc = (r.ReceiptRequirement === 'NEED_RECEIPT') || (!r.ReceiptRequirement && !!(r.ReceiptName || r.ReceiptTaxID || r.ReceiptTaxId));
+  const taxId = normalizeTaxId(r.ReceiptTaxID || r.ReceiptTaxId || '');
 
   const html = `<!doctype html>
 <html lang="th">
@@ -1899,11 +1903,11 @@ function renderRegistrationPrintWindow(win, d){
     <div class="section">
       <div class="section-head">4. ข้อมูลการออกใบเสร็จรับเงิน (Receipt Details)</div>
       <div class="section-body grid2">
-        <div><span class="label">ความประสงค์:</span> <span class="val"><b>${r.ReceiptRequirement === 'NEED_RECEIPT' ? 'ต้องการออกใบเสร็จ' : 'ไม่ออกใบเสร็จ'}</b></span></div>
+        <div><span class="label">ความประสงค์:</span> <span class="val"><b>${hasRc ? 'ต้องการออกใบเสร็จ' : 'ไม่ออกใบเสร็จ'}</b></span></div>
         <div><span class="label">ค่าธรรมเนียมลงทะเบียน:</span> <span class="val">${esc(fee)}</span></div>
-        ${r.ReceiptRequirement === 'NEED_RECEIPT' ? `
+        ${hasRc ? `
           <div><span class="label">ชื่อออกใบเสร็จ:</span> <span class="val">${esc(r.ReceiptName || '-')}</span></div>
-          <div><span class="label">เลขประจำตัวผู้เสียภาษี:</span> <span class="val">${esc(r.ReceiptTaxID || r.ReceiptTaxId || '-')}</span></div>
+          <div><span class="label">เลขประจำตัวผู้เสียภาษี:</span> <span class="val" style="font-family:monospace;font-weight:700;color:#006D70;">${esc(taxId || '-')}</span></div>
           <div><span class="label">เบอร์โทรศัพท์ใบเสร็จ:</span> <span class="val">${esc(r.ReceiptPhone || '-')}</span></div>
           <div><span class="label">รหัสไปรษณีย์:</span> <span class="val">${esc(r.ReceiptPostalCode || '-')}</span></div>
           <div class="span2"><span class="label">ที่อยู่ออกใบเสร็จ:</span> <span class="val">${esc(r.ReceiptAddress || '-')}</span></div>
@@ -1974,6 +1978,8 @@ async function openRegistrationEdit(id){
     const d=await rpc('adminGetRegistration',TOKEN,CID,id);
     hide();
     const r=d.registration,o=d.optionConfig||{},types=d.registrationTypes||[],dates=JSON.parse(BOOT.settings.EVENT_DATES_JSON||'[]');
+    const hasReceipt = (r.ReceiptRequirement === 'NEED_RECEIPT') || (!r.ReceiptRequirement && !!(r.ReceiptName || r.ReceiptTaxID || r.ReceiptTaxId));
+    const taxIdFormatted = normalizeTaxId(r.ReceiptTaxID || r.ReceiptTaxId || '');
     const html=`<div style="text-align:left;max-height:75vh;overflow-y:auto;padding-right:6px;font-size:0.9rem">
       <!-- 1. ข้อมูลผู้ลงทะเบียนและสังกัด -->
       <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
@@ -2096,18 +2102,18 @@ async function openRegistrationEdit(id){
           <div style="margin-bottom:12px">
             <label style="display:block;font-size:0.83rem;font-weight:600;color:#475569;margin-bottom:4px">ความต้องการใบเสร็จ</label>
             <select id="erReceiptReq" onchange="toggleReceiptFormFields(this.value)" style="width:100%;max-width:300px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
-              <option value="NO_RECEIPT" ${r.ReceiptRequirement==='NO_RECEIPT'?'selected':''}>ไม่ออกใบเสร็จ</option>
-              <option value="NEED_RECEIPT" ${r.ReceiptRequirement==='NEED_RECEIPT'?'selected':''}>ต้องการออกใบเสร็จ</option>
+              <option value="NO_RECEIPT" ${!hasReceipt?'selected':''}>ไม่ออกใบเสร็จ</option>
+              <option value="NEED_RECEIPT" ${hasReceipt?'selected':''}>ต้องการออกใบเสร็จ</option>
             </select>
           </div>
-          <div id="erReceiptBlock" style="display:${r.ReceiptRequirement==='NEED_RECEIPT'?'grid':'none'};grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:12px;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0">
+          <div id="erReceiptBlock" style="display:${hasReceipt?'grid':'none'};grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:12px;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0">
             <div>
               <label style="display:block;font-size:0.83rem;font-weight:600;color:#475569;margin-bottom:4px">ชื่อออกใบเสร็จ</label>
               <input id="erReceiptName" value="${esc(r.ReceiptName||'')}" placeholder="ชื่อบุคคล หรือ หน่วยงาน" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
             </div>
             <div>
               <label style="display:block;font-size:0.83rem;font-weight:600;color:#475569;margin-bottom:4px">เลขผู้เสียภาษี / บัตร ปชช. (13 หลัก)</label>
-              <input id="erReceiptTaxId" value="${esc(r.ReceiptTaxID||r.ReceiptTaxId||'')}" maxlength="13" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
+              <input id="erReceiptTaxId" value="${esc(taxIdFormatted)}" maxlength="13" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem">
             </div>
             <div>
               <label style="display:block;font-size:0.83rem;font-weight:600;color:#475569;margin-bottom:4px">เบอร์โทรศัพท์สำหรับใบเสร็จ</label>
@@ -2120,6 +2126,9 @@ async function openRegistrationEdit(id){
             <div style="grid-column:1/-1">
               <label style="display:block;font-size:0.83rem;font-weight:600;color:#475569;margin-bottom:4px">ที่อยู่ออกใบเสร็จ</label>
               <textarea id="erReceiptAddress" rows="2" placeholder="ที่อยู่ออกใบเสร็จรับเงิน" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.9rem;box-sizing:border-box">${esc(r.ReceiptAddress||'')}</textarea>
+            </div>
+            <div style="grid-column:1/-1;font-size:0.82rem;color:#0f766e;background:#f0fdfa;padding:8px 10px;border-radius:6px;border:1px solid #99f6e4;">
+              <i class="fa-solid fa-circle-info"></i> ใบเสร็จรับเงินฉบับจริงของทางราชการจะออกผ่านระบบงานคลังของโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ (ระบบนี้ใช้สำหรับออกใบยืนยันการรับเงินค่าลงทะเบียน)
             </div>
           </div>
         </div>
@@ -2155,11 +2164,11 @@ async function openRegistrationEdit(id){
         AttendanceDay3:$('#erDay3')?.checked||false,
         WantsSubmitWork:$('#erWork').checked,
         ReceiptRequirement:$('#erReceiptReq').value,
-        ReceiptName:$('#erReceiptName').value,
-        ReceiptTaxID:$('#erReceiptTaxId').value,
-        ReceiptPhone:$('#erReceiptPhone').value,
-        ReceiptAddress:$('#erReceiptAddress').value,
-        ReceiptPostalCode:$('#erReceiptPostalCode').value
+        ReceiptName:$('#erReceiptName')?.value||'',
+        ReceiptTaxID:normalizeTaxId($('#erReceiptTaxId')?.value||''),
+        ReceiptPhone:$('#erReceiptPhone')?.value||'',
+        ReceiptAddress:$('#erReceiptAddress')?.value||'',
+        ReceiptPostalCode:$('#erReceiptPostalCode')?.value||''
       })
     });
     if(!x.isConfirmed)return;
@@ -2424,7 +2433,7 @@ async function loadPayments(forceRefresh = false){
       const needInv=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;
       const isIssued=p.InvoiceStatus==='ISSUED'||p.ReceiptStatus==='ISSUED'||p.ReceiptIssued;
       const toggleBtn=isIssued?`<button class="btn btn-sm btn-success" style="background-color:#16a34a;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-check-circle"></i> ออกใบเสร็จแล้ว</button>`:`<button class="btn btn-sm btn-danger" style="background-color:#dc2626;color:#fff;border:none;" onclick="toggleReceiptStatus('${esc(p.RegID)}')"><i class="fa-solid fa-clock"></i> ยังไม่ออกใบเสร็จ</button>`;
-      return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`
+      return `<tr><td><b>${esc(p.RegID)}</b></td><td><b>${esc(p.FullName||p.Registration?.FullName||'')}</b><br><span class="muted">${esc(p.Email||p.Registration?.Email||'')}</span></td><td>${Number(p.RequiredAmount||p.Amount||p.PaidAmount||0).toLocaleString('th-TH')} บาท</td><td>${statusBadge(p.PaymentStatus||p.Status)}</td><td>${needInv?'<span class="badge badge-warn" style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:4px;font-size:0.8rem;"><i class="fa-solid fa-file-invoice-dollar"></i> ต้องการใบแจ้งหนี้</span>':'<span class="badge badge-subtle" style="color:#64748b;">ทั่วไป/ไม่ต้องการ</span>'}</td><td>${toggleBtn}</td><td>${p.SlipFileUrl?`<a target="_blank" href="${esc(p.SlipFileUrl)}" class="btn btn-sm btn-outline"><i class="fa-solid fa-image"></i> สลิป</a>`:'<span class="muted">ยังไม่ส่ง</span>'}</td><td class="actions" style="display:flex;flex-wrap:wrap;gap:4px;"><button class="btn btn-sm btn-outline" onclick="viewRegistration('${esc(p.RegID)}')"><i class="fa-solid fa-eye"></i> ดู</button><button class="btn btn-sm btn-outline" style="color:#006D70;border-color:#006D70;" onclick="printPaymentConfirmation('${esc(p.RegID)}')"><i class="fa-solid fa-receipt"></i> ใบยืนยันรับเงิน</button><button class="btn btn-sm btn-outline" onclick="openEditReceiptModal('${esc(p.RegID)}')"><i class="fa-solid fa-pen"></i> แก้ไข</button><button class="btn btn-sm btn-outline" onclick="openFinanceDocModal('${esc(p.RegID)}')"><i class="fa-solid fa-upload"></i> เอกสาร</button><button class="btn btn-sm btn-outline" onclick="openSendEmailModal('${esc(p.RegID)}','${esc(p.Email||p.Registration?.Email||'')}','${esc(p.FullName||p.Registration?.FullName||'')}')"><i class="fa-solid fa-paper-plane"></i> อีเมล</button>${canAct?`<button class="btn btn-primary btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','APPROVE')">อนุมัติ</button><button class="btn btn-gold btn-sm" onclick="verifyPay('${esc(p.PaymentID)}','RETURN')">ส่งคืน</button>`:''}</td></tr>`
     }).join(''):'<tr><td colspan="8" class="muted">ไม่พบข้อมูล</td></tr>';
     reapplyTableSort($('#payRows')?.closest('table'));
     refreshTableSortHeaders();
@@ -2434,11 +2443,244 @@ async function loadPayments(forceRefresh = false){
   }
 }
 
-function openEditReceiptModal(regId){const p=(window.PAYMENT_ROWS||[]).find(x=>x.RegID===regId)||{};const name=p.ReceiptName||p.FullName||p.Registration?.FullName||'';const taxId=p.ReceiptTaxID||p.ReceiptTaxId||'';const address=p.ReceiptAddress||'';const postalCode=p.ReceiptPostalCode||'';const phone=p.ReceiptPhone||p.Phone||p.Registration?.Phone||'';const needInvoice=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||p.Registration?.NeedInvoice;const invoiceStatus=p.InvoiceStatus||p.ReceiptStatus||'NOT_ISSUED';const receiptNo=p.ReceiptNo||'';editReceiptInfoModal(regId,name,taxId,address,postalCode,phone,needInvoice,invoiceStatus,receiptNo);}
+async function printPaymentConfirmation(regId){
+  let p = (window.PAYMENT_ROWS || []).find(x => x.RegID === regId);
+  let r = p?.Registration;
+  if (!r) {
+    show('กำลังเตรียมเอกสารใบยืนยันรับเงิน...');
+    try {
+      const d = await rpc('adminGetRegistration', TOKEN, CID, regId);
+      if (d && d.registration) {
+        r = d.registration;
+      }
+    } catch(e) {
+      console.warn(e);
+    }
+    hide();
+  }
+  if (!p && !r) return Swal.fire({icon:'warning', title:'ไม่พบข้อมูลสำหรับพิมพ์ใบยืนยันรับเงิน'});
+  
+  const win = window.open('', '_blank');
+  if (!win) return Swal.fire({icon:'warning', title:'เบราว์เซอร์บล็อกหน้าต่างใหม่', text:'กรุณาอนุญาต Pop-up แล้วลองใหม่อีกครั้ง'});
+  win.document.write('<p style="font-family:sans-serif;padding:20px">กำลังเตรียมเอกสารสำหรับพิมพ์...</p>');
 
-async function viewRegistration(regId){show('กำลังดึงข้อมูลผู้ลงทะเบียน');try{let r=(window.PAYMENT_ROWS||[]).find(x=>x.RegID===regId)?.Registration;if(!r){const rows=await rpc('adminListRegistrations',TOKEN,CID,{q:regId});r=(rows||[]).find(x=>x.RegID===regId)||(rows||[])[0];}hide();if(!r)return Swal.fire({icon:'warning',title:'ไม่พบข้อมูลผู้ลงทะเบียน',text:regId});const html=`<div style="text-align:left;font-size:0.9rem;line-height:1.6;"><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px;"><h4 style="margin:0 0 8px;color:#006D70;">👤 ข้อมูลผู้ลงทะเบียน (${esc(r.RegID)})</h4><b>ชื่อ-นามสกุล:</b> ${esc(r.Prefix||'')}${esc(r.FirstName||'')} ${esc(r.LastName||'')}<br><b>ประเภท:</b> ${esc(r.ParticipantType||'')}<br><b>เลขบัตรประชาชน/CID:</b> ${esc(r.CID||'-')}<br><b>ตำแหน่ง/วิชาชีพ:</b> ${esc(r.Position||'-')} / ${esc(r.Profession||'-')}<br><b>สังกัด/หน่วยงาน:</b> ${esc(r.OrganizationGroup||'-')} ${esc(r.Institution||r.OrganizationUnit||'')}<br><b>อีเมล:</b> ${esc(r.Email||'-')}<br><b>เบอร์โทรศัพท์:</b> ${esc(r.Phone||'-')}<br><b>Line ID:</b> ${esc(r.LineID||'-')}</div><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px;"><h4 style="margin:0 0 8px;color:#006D70;">🍽️ วันเข้าร่วม & อาหาร</h4><b>ประเภทอาหาร:</b> ${esc(r.FoodType||'ทั่วไป')}<br><b>การแพ้อาหาร:</b> ${esc(r.FoodAllergyDetail||'-')}<br><b>วันที่เข้าร่วม:</b> ${[r.AttendanceDay1&&'วันที่ 1',r.AttendanceDay2&&'วันที่ 2',r.AttendanceDay3&&'วันที่ 3'].filter(Boolean).join(', ')||'ไม่ได้เลือก'}</div><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;"><h4 style="margin:0 0 8px;color:#006D70;">🧾 ข้อมูลใบเสร็จ / ใบแจ้งหนี้</h4><b>ต้องการใบเสร็จ:</b> ${r.ReceiptRequirement==='NEED_RECEIPT'?'ต้องการ':'ไม่ต้องการ'}<br><b>ต้องการใบแจ้งหนี้:</b> ${r.NeedInvoice?'ต้องการ':'ไม่ต้องการ'}<br><b>ชื่อออกใบเสร็จ:</b> ${esc(r.ReceiptName||'-')}<br><b>เลขประจำตัวผู้เสียภาษี:</b> ${esc(r.ReceiptTaxID||r.ReceiptTaxId||'-')}<br><b>ที่อยู่:</b> ${esc(r.ReceiptAddress||'-')}<br><b>เบอร์โทรใบเสร็จ:</b> ${esc(r.ReceiptPhone||'-')}<br><b>สถานะใบเสร็จ:</b> ${esc(r.InvoiceStatus||r.ReceiptStatus||'NOT_ISSUED')}<br><b>เลขที่ใบเสร็จ:</b> ${esc(r.ReceiptNo||'-')}</div></div>`;Swal.fire({title:`รายละเอียดผู้ลงทะเบียน ${esc(regId)}`,html,customClass:{popup:'swal-wide'},confirmButtonText:'ปิดหน้าต่าง',confirmButtonColor:'#006D70'})}catch(e){err(e)}}
+  const fullName = esc(r?.FullName || p?.FullName || ((r?.Prefix||'')+' '+(r?.FirstName||'')+' '+(r?.LastName||'')).trim() || '-');
+  const participantType = esc(r?.ParticipantType || p?.ParticipantType || '-');
+  const org = esc(r?.Institution || r?.OrganizationUnit || r?.OrganizationGroup || '-');
+  const phone = esc(r?.Phone || p?.Phone || '-');
+  const email = esc(r?.Email || p?.Email || '-');
+  const amount = Number(p?.RequiredAmount || p?.Amount || p?.PaidAmount || 0);
+  const formattedAmount = amount.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  
+  const hasRc = (r?.ReceiptRequirement === 'NEED_RECEIPT') || (p?.ReceiptRequirement === 'NEED_RECEIPT') || (!r?.ReceiptRequirement && !!(r?.ReceiptName || p?.ReceiptName || r?.ReceiptTaxID || p?.ReceiptTaxID));
+  const rcName = esc(r?.ReceiptName || p?.ReceiptName || fullName);
+  const rcTaxId = esc(normalizeTaxId(r?.ReceiptTaxID || r?.ReceiptTaxId || p?.ReceiptTaxID || p?.ReceiptTaxId || r?.CID || ''));
+  const rcAddress = esc(r?.ReceiptAddress || p?.ReceiptAddress || '-');
+  const rcPhone = esc(r?.ReceiptPhone || p?.ReceiptPhone || phone);
+  const rcPostcode = esc(r?.ReceiptPostalCode || p?.ReceiptPostalCode || '-');
+  const confNameTH = BOOT.conference?.ConferenceNameTH || 'การประชุมวิชาการ TUH Quality Fair';
+  const confNameEN = BOOT.conference?.ConferenceNameEN || 'TUH Quality Fair & HA-Regional Forum';
+  const shortName = BOOT.conference?.ShortName || 'TUH 19 & HA-Regional 1';
+  const receiptNo = p?.ReceiptNo || r?.ReceiptNo || `PCR-${regId}`;
 
-async function editReceiptInfoModal(regId,name,taxId,address,postalCode,phone,needInvoice,invoiceStatus,receiptNo){const html=`<div style="text-align:left;font-size:0.9rem;"><div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;">ชื่อออกใบเสร็จ / ใบแจ้งหนี้:</label><input id="swalRcName" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(name||'')}" placeholder="ชื่อบุคคล หรือ หน่วยงาน"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><label style="display:block;font-weight:600;margin-bottom:4px;">เลขประจำตัวผู้เสียภาษี (13 หลัก):</label><input id="swalRcTaxId" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(taxId||'')}" maxlength="13"></div><div><label style="display:block;font-weight:600;margin-bottom:4px;">เบอร์โทรศัพท์ออกใบเสร็จ:</label><input id="swalRcPhone" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(phone||'')}"></div></div><div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;">ที่อยู่ออกใบเสร็จ:</label><textarea id="swalRcAddress" class="swal2-textarea" style="width:100%;margin:0;height:70px;box-sizing:border-box;">${esc(address||'')}</textarea></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><label style="display:block;font-weight:600;margin-bottom:4px;">รหัสไปรษณีย์:</label><input id="swalRcPostcode" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(postalCode||'')}" maxlength="5"></div><div><label style="display:block;font-weight:600;margin-bottom:4px;">เลขที่ใบเสร็จ:</label><input id="swalRcNo" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(receiptNo||'')}"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><label style="display:block;font-weight:600;margin-bottom:4px;">ต้องการใบแจ้งหนี้:</label><select id="swalRcNeedInvoice" class="swal2-select" style="width:100%;margin:0;"><option value="true" ${needInvoice?'selected':''}>ต้องการใบแจ้งหนี้</option><option value="false" ${!needInvoice?'selected':''}>ไม่ต้องการใบแจ้งหนี้</option></select></div><div><label style="display:block;font-weight:600;margin-bottom:4px;">สถานะใบเสร็จ/ใบแจ้งหนี้:</label><select id="swalRcStatus" class="swal2-select" style="width:100%;margin:0;"><option value="NOT_ISSUED" ${invoiceStatus==='NOT_ISSUED'||!invoiceStatus?'selected':''}>ยังไม่ออกใบเสร็จ</option><option value="ISSUED" ${invoiceStatus==='ISSUED'?'selected':''}>ออกใบเสร็จแล้ว</option><option value="PENDING" ${invoiceStatus==='PENDING'?'selected':''}>รอออกใบเสร็จ</option></select></div></div></div>`;const x=await Swal.fire({title:`แก้ไขข้อมูลการออกใบเสร็จ (${esc(regId)})`,html,showCancelButton:true,confirmButtonText:'บันทึกข้อมูลใบเสร็จ',confirmButtonColor:'#006D70',cancelButtonText:'ยกเลิก',preConfirm:()=>({ReceiptName:$('#swalRcName').value,ReceiptTaxID:$('#swalRcTaxId').value,ReceiptPhone:$('#swalRcPhone').value,ReceiptAddress:$('#swalRcAddress').value,ReceiptPostalCode:$('#swalRcPostcode').value,ReceiptNo:$('#swalRcNo').value,NeedInvoice:$('#swalRcNeedInvoice').value==='true',InvoiceStatus:$('#swalRcStatus').value,ReceiptRequirement:'NEED_RECEIPT'})});if(!x.isConfirmed)return;show('กำลังบันทึกข้อมูลใบเสร็จ');try{await rpc('adminUpdateReceiptInfo',TOKEN,CID,regId,x.value);hide();await Swal.fire({icon:'success',title:'บันทึกข้อมูลใบเสร็จเรียบร้อย',confirmButtonColor:'#006D70'});loadPayments()}catch(e){err(e)}}
+  const html = `<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ใบยืนยันการรับเงินค่าลงทะเบียน - ${esc(regId)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4 portrait; margin: 12mm 15mm 12mm 15mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Sarabun', 'Prompt', sans-serif; color: #1e293b; background: #fff; margin: 0; padding: 0; font-size: 13.5px; line-height: 1.5; }
+    .print-container { width: 100%; max-width: 180mm; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #006D70; padding-bottom: 8px; margin-bottom: 12px; }
+    .header-logos { display: flex; align-items: center; gap: 12px; }
+    .header-logos img { height: 48px; object-fit: contain; }
+    .header-title { text-align: right; }
+    .header-title h1 { margin: 0; font-size: 14px; color: #006D70; font-weight: 700; }
+    .header-title p { margin: 2px 0 0; font-size: 11px; color: #64748b; }
+    .doc-banner { background: #f0fdfa; border: 1.5px solid #006D70; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+    .doc-title { font-size: 16px; font-weight: 700; color: #0f766e; }
+    .doc-no { font-size: 13px; font-weight: 600; color: #006D70; text-align: right; }
+    .section { margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
+    .section-head { background: #f8fafc; padding: 5px 12px; font-weight: 700; font-size: 12.5px; color: #006D70; border-bottom: 1px solid #cbd5e1; }
+    .section-body { padding: 8px 12px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; row-gap: 6px; }
+    .label { font-weight: 600; color: #475569; }
+    .val { color: #0f172a; }
+    .pay-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    .pay-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; font-size: 12.5px; text-align: left; }
+    .pay-table td { border: 1px solid #cbd5e1; padding: 8px 10px; font-size: 13px; }
+    .total-row { background: #fafafa; font-weight: 700; }
+    .official-box { margin-top: 14px; border: 1px dashed #94a3b8; border-radius: 6px; padding: 10px 14px; background: #fafafa; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; text-align: center; }
+    .sig-line { border-bottom: 1px dotted #475569; margin: 25px 25px 4px; }
+    .disclaimer { margin-top: 12px; padding: 8px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 11px; color: #92400e; line-height: 1.45; }
+    .footer-note { text-align: right; font-size: 9.5px; color: #94a3b8; margin-top: 10px; }
+    .print-actions { position: fixed; bottom: 20px; right: 20px; background: #fff; padding: 8px 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; border: 1px solid #cbd5e1; display: flex; gap: 8px; z-index: 999; }
+    .btn-print { background: #006D70; color: #fff; border: none; padding: 8px 16px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; }
+    .btn-close { background: #e2e8f0; color: #334155; border: none; padding: 8px 16px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; }
+    @media print { .print-actions { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <div class="print-actions">
+    <button class="btn-print" onclick="window.print()">🖨️ พิมพ์ใบยืนยันรับเงิน</button>
+    <button class="btn-close" onclick="window.close()">ปิดหน้าต่าง</button>
+  </div>
+  <div class="print-container">
+    <div class="header">
+      <div class="header-logos">
+        <img src="/images/tuh-logo.png" alt="TUH">
+        <img src="/images/hacc-logo.png" alt="HACC">
+      </div>
+      <div class="header-title">
+        <h1>${esc(confNameTH)}</h1>
+        <p>${esc(confNameEN)} (${esc(shortName)})</p>
+      </div>
+    </div>
+
+    <div class="doc-banner">
+      <div>
+        <div class="doc-title">ใบยืนยันการรับเงินค่าลงทะเบียน (Payment Confirmation Receipt)</div>
+        <div style="font-size:11.5px;color:#475569;margin-top:2px;">หลักฐานการรับชำระเงินค่าลงทะเบียนเข้าร่วมประชุมวิชาการ</div>
+      </div>
+      <div class="doc-no">
+        <div>เลขที่: <b>${esc(receiptNo)}</b></div>
+        <div>วันที่: <b>${esc(formatBeDateTime(new Date().toISOString()).split(' ')[0])}</b></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">1. ข้อมูลผู้ลงทะเบียน (Participant Details)</div>
+      <div class="section-body grid2">
+        <div><span class="label">รหัสลงทะเบียน (Reg ID):</span> <span class="val"><b>${esc(regId)}</b></span></div>
+        <div><span class="label">ชื่อ-นามสกุล:</span> <span class="val"><b>${fullName}</b></span></div>
+        <div><span class="label">ประเภทผู้สมัคร:</span> <span class="val">${participantType}</span></div>
+        <div><span class="label">สังกัด / หน่วยงาน:</span> <span class="val">${org}</span></div>
+        <div><span class="label">เบอร์โทรศัพท์:</span> <span class="val">${phone}</span></div>
+        <div><span class="label">อีเมล:</span> <span class="val">${email}</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">2. รายละเอียดการชำระเงิน (Payment Summary)</div>
+      <div class="section-body">
+        <table class="pay-table">
+          <thead>
+            <tr>
+              <th style="width:40px;text-align:center;">ลำดับ</th>
+              <th>รายการ</th>
+              <th style="width:120px;text-align:right;">จำนวนเงิน (บาท)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align:center;">1</td>
+              <td>
+                <b>ค่าธรรมเนียมลงทะเบียนเข้าร่วมประชุมวิชาการ</b><br>
+                <span style="font-size:11px;color:#64748b;">${esc(confNameTH)} (${esc(shortName)})</span>
+              </td>
+              <td style="text-align:right;font-weight:600;">${formattedAmount}</td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="2" style="text-align:right;">รวมทั้งสิ้น (Total Paid Amount):</td>
+              <td style="text-align:right;color:#006D70;font-size:14px;">${formattedAmount} บาท</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:8px;font-size:12px;display:flex;justify-content:space-between;">
+          <span>วิธีการชำระ: <b>โอนเงินผ่านบัญชีธนาคาร (หลักฐานผ่านการตรวจสอบแล้ว)</b></span>
+          <span style="color:#16a34a;font-weight:700;">สถานะ: ชำระเงินเรียบร้อยแล้ว</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">3. ข้อมูลสำหรับออกใบเสร็จรับเงินราชการ (Official Tax Invoice / Receipt Info)</div>
+      <div class="section-body grid2">
+        <div><span class="label">ความประสงค์ใบเสร็จ:</span> <span class="val"><b>${hasRc ? 'ต้องการออกใบเสร็จ' : 'ไม่ออกใบเสร็จ'}</b></span></div>
+        <div><span class="label">เลขประจำตัวผู้เสียภาษี (13 หลัก):</span> <span class="val" style="font-family:monospace;font-size:13.5px;letter-spacing:1px;font-weight:700;color:#006D70;">${rcTaxId || '-'}</span></div>
+        <div style="grid-column:span 2;"><span class="label">ชื่อระบุในใบเสร็จ:</span> <span class="val"><b>${rcName}</b></span></div>
+        <div style="grid-column:span 2;"><span class="label">ที่อยู่ออกใบเสร็จ:</span> <span class="val">${rcAddress} ${rcPostcode ? 'รหัสไปรษณีย์ ' + rcPostcode : ''}</span></div>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <b>📌 ข้อชี้แจงสำคัญเกี่ยวกับการออกใบเสร็จรับเงิน:</b><br>
+      เอกสารฉบับนี้เป็น <u>ใบยืนยันการรับเงินค่าลงทะเบียนของฝ่ายจัดประชุม</u> เพื่อใช้เป็นหลักฐานยืนยันสิทธิ์การเข้าร่วมงาน สำหรับ "ใบเสร็จรับเงินตัวจริงของทางราชการ" (e-Receipt) จะออกและจัดส่งโดยระบบงานคลังและพัสดุ โรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ตามข้อมูลผู้เสียภาษีข้างต้น
+    </div>
+
+    <div class="official-box">
+      <div style="font-weight:700;font-size:11.5px;color:#475569;">ฝ่ายการเงินและลงทะเบียน คณะผู้จัดงานประชุมวิชาการ</div>
+      <div class="signatures">
+        <div>
+          <div class="sig-line"></div>
+          <div>(.......................................................................)</div>
+          <div style="font-size:10.5px;margin-top:2px;color:#64748b;">เจ้าหน้าที่ผู้ตรวจสอบการชำระเงิน</div>
+          <div style="font-size:10.5px;color:#64748b;">วันที่ ........ / ........ / ................</div>
+        </div>
+        <div>
+          <div class="sig-line"></div>
+          <div>(.......................................................................)</div>
+          <div style="font-size:10.5px;margin-top:2px;color:#64748b;">หัวหน้าฝ่ายการเงิน / ทะเบียนการจัดงาน</div>
+          <div style="font-size:10.5px;color:#64748b;">วันที่ ........ / ........ / ................</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      เอกสารพิมพ์จากระบบ TUH Conference Management เมื่อ ${esc(formatBeDateTime(new Date().toISOString()))}
+    </div>
+  </div>
+</body>
+</html>`;
+
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
+function openEditReceiptModal(regId){
+  const p=(window.PAYMENT_ROWS||[]).find(x=>x.RegID===regId)||{};
+  const r=p.Registration||{};
+  const name=p.ReceiptName||r.ReceiptName||p.FullName||r.FullName||'';
+  const taxId=normalizeTaxId(p.ReceiptTaxID||p.ReceiptTaxId||r.ReceiptTaxID||r.ReceiptTaxId||'');
+  const address=p.ReceiptAddress||r.ReceiptAddress||'';
+  const postalCode=p.ReceiptPostalCode||r.ReceiptPostalCode||'';
+  const phone=p.ReceiptPhone||r.ReceiptPhone||p.Phone||r.Phone||'';
+  const needInvoice=p.NeedInvoice||p.ReceiptRequirement==='INVOICE'||r.NeedInvoice;
+  const invoiceStatus=p.InvoiceStatus||p.ReceiptStatus||r.InvoiceStatus||r.ReceiptStatus||'NOT_ISSUED';
+  const receiptNo=p.ReceiptNo||r.ReceiptNo||'';
+  editReceiptInfoModal(regId,name,taxId,address,postalCode,phone,needInvoice,invoiceStatus,receiptNo);
+}
+
+async function viewRegistration(regId){
+  show('กำลังดึงข้อมูลผู้ลงทะเบียน');
+  try{
+    let r=(window.PAYMENT_ROWS||[]).find(x=>x.RegID===regId)?.Registration;
+    if(!r){
+      const rows=await rpc('adminListRegistrations',TOKEN,CID,{q:regId});
+      r=(rows||[]).find(x=>x.RegID===regId)||(rows||[])[0];
+    }
+    hide();
+    if(!r)return Swal.fire({icon:'warning',title:'ไม่พบข้อมูลผู้ลงทะเบียน',text:regId});
+    const hasRc = (r.ReceiptRequirement==='NEED_RECEIPT')||(!r.ReceiptRequirement&&(r.ReceiptName||r.ReceiptTaxID||r.ReceiptTaxId));
+    const taxIdFormatted = normalizeTaxId(r.ReceiptTaxID||r.ReceiptTaxId||'');
+    const html=`<div style="text-align:left;font-size:0.9rem;line-height:1.6;"><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px;"><h4 style="margin:0 0 8px;color:#006D70;">👤 ข้อมูลผู้ลงทะเบียน (${esc(r.RegID)})</h4><b>ชื่อ-นามสกุล:</b> ${esc(r.Prefix||'')}${esc(r.FirstName||'')} ${esc(r.LastName||'')}<br><b>ประเภท:</b> ${esc(r.ParticipantType||'')}<br><b>เลขบัตรประชาชน/CID:</b> ${esc(r.CID||'-')}<br><b>ตำแหน่ง/วิชาชีพ:</b> ${esc(r.Position||'-')} / ${esc(r.Profession||'-')}<br><b>สังกัด/หน่วยงาน:</b> ${esc(r.OrganizationGroup||'-')} ${esc(r.Institution||r.OrganizationUnit||'')}<br><b>อีเมล:</b> ${esc(r.Email||'-')}<br><b>เบอร์โทรศัพท์:</b> ${esc(r.Phone||'-')}<br><b>Line ID:</b> ${esc(r.LineID||'-')}</div><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px;"><h4 style="margin:0 0 8px;color:#006D70;">🍽️ วันเข้าร่วม & อาหาร</h4><b>ประเภทอาหาร:</b> ${esc(r.FoodType||'ทั่วไป')}<br><b>การแพ้อาหาร:</b> ${esc(r.FoodAllergyDetail||'-')}<br><b>วันที่เข้าร่วม:</b> ${[r.AttendanceDay1&&'วันที่ 1',r.AttendanceDay2&&'วันที่ 2',r.AttendanceDay3&&'วันที่ 3'].filter(Boolean).join(', ')||'ไม่ได้เลือก'}</div><div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;"><h4 style="margin:0 0 8px;color:#006D70;">🧾 ข้อมูลใบเสร็จ / ใบแจ้งหนี้</h4><b>ต้องการใบเสร็จ:</b> ${hasRc?'<span style="color:#16a34a;font-weight:700;">ต้องการใบเสร็จ</span>':'<span style="color:#64748b;">ไม่ต้องการ</span>'}<br><b>ต้องการใบแจ้งหนี้:</b> ${r.NeedInvoice?'ต้องการ':'ไม่ต้องการ'}<br><b>ชื่อออกใบเสร็จ:</b> ${esc(r.ReceiptName||'-')}<br><b>เลขประจำตัวผู้เสียภาษี:</b> <span style="font-family:monospace;font-weight:700;color:#006D70;">${esc(taxIdFormatted||'-')}</span><br><b>ที่อยู่:</b> ${esc(r.ReceiptAddress||'-')}<br><b>เบอร์โทรใบเสร็จ:</b> ${esc(r.ReceiptPhone||'-')}<br><b>สถานะใบเสร็จ:</b> ${esc(r.InvoiceStatus||r.ReceiptStatus||'NOT_ISSUED')}<br><b>เลขที่ใบเสร็จ:</b> ${esc(r.ReceiptNo||'-')}</div></div>`;
+    Swal.fire({title:`รายละเอียดผู้ลงทะเบียน ${esc(regId)}`,html,customClass:{popup:'swal-wide'},confirmButtonText:'ปิดหน้าต่าง',confirmButtonColor:'#006D70'})
+  }catch(e){err(e)}
+}
+
+async function editReceiptInfoModal(regId,name,taxId,address,postalCode,phone,needInvoice,invoiceStatus,receiptNo){
+  const cleanTaxId = normalizeTaxId(taxId || '');
+  const html=`<div style="text-align:left;font-size:0.9rem;"><div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;">ชื่อออกใบเสร็จ / ใบแจ้งหนี้:</label><input id="swalRcName" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(name||'')}" placeholder="ชื่อบุคคล หรือ หน่วยงาน"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><label style="display:block;font-weight:600;margin-bottom:4px;">เลขประจำตัวผู้เสียภาษี (13 หลัก):</label><input id="swalRcTaxId" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(cleanTaxId)}" maxlength="13"></div><div><label style="display:block;font-weight:600;margin-bottom:4px;">เบอร์โทรศัพท์ออกใบเสร็จ:</label><input id="swalRcPhone" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(phone||'')}"></div></div><div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;">ที่อยู่ออกใบเสร็จ:</label><textarea id="swalRcAddress" class="swal2-textarea" style="width:100%;margin:0;height:70px;box-sizing:border-box;">${esc(address||'')}</textarea></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><label style="display:block;font-weight:600;margin-bottom:4px;">รหัสไปรษณีย์:</label><input id="swalRcPostcode" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(postalCode||'')}" maxlength="5"></div><div><label style="display:block;font-weight:600;margin-bottom:4px;">เลขที่ใบเสร็จ:</label><input id="swalRcNo" class="swal2-input" style="width:100%;margin:0;box-sizing:border-box;" value="${esc(receiptNo||'')}"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;"><div><label style="display:block;font-weight:600;margin-bottom:4px;">ต้องการใบแจ้งหนี้:</label><select id="swalRcNeedInvoice" class="swal2-select" style="width:100%;margin:0;"><option value="true" ${needInvoice?'selected':''}>ต้องการใบแจ้งหนี้</option><option value="false" ${!needInvoice?'selected':''}>ไม่ต้องการใบแจ้งหนี้</option></select></div><div><label style="display:block;font-weight:600;margin-bottom:4px;">สถานะใบเสร็จ/ใบแจ้งหนี้:</label><select id="swalRcStatus" class="swal2-select" style="width:100%;margin:0;"><option value="NOT_ISSUED" ${invoiceStatus==='NOT_ISSUED'||!invoiceStatus?'selected':''}>ยังไม่ออกใบเสร็จ</option><option value="ISSUED" ${invoiceStatus==='ISSUED'?'selected':''}>ออกใบเสร็จแล้ว</option><option value="PENDING" ${invoiceStatus==='PENDING'?'selected':''}>รอออกใบเสร็จ</option></select></div></div></div>`;
+  const x=await Swal.fire({title:`แก้ไขข้อมูลการออกใบเสร็จ (${esc(regId)})`,html,showCancelButton:true,confirmButtonText:'บันทึกข้อมูลใบเสร็จ',confirmButtonColor:'#006D70',cancelButtonText:'ยกเลิก',preConfirm:()=>({ReceiptName:$('#swalRcName').value,ReceiptTaxID:normalizeTaxId($('#swalRcTaxId').value),ReceiptPhone:$('#swalRcPhone').value,ReceiptAddress:$('#swalRcAddress').value,ReceiptPostalCode:$('#swalRcPostcode').value,ReceiptNo:$('#swalRcNo').value,NeedInvoice:$('#swalRcNeedInvoice').value==='true',InvoiceStatus:$('#swalRcStatus').value,ReceiptRequirement:'NEED_RECEIPT'})});
+  if(!x.isConfirmed)return;
+  show('กำลังบันทึกข้อมูลใบเสร็จ');
+  try{await rpc('adminUpdateReceiptInfo',TOKEN,CID,regId,x.value);hide();await Swal.fire({icon:'success',title:'บันทึกข้อมูลใบเสร็จเรียบร้อย',confirmButtonColor:'#006D70'});loadPayments()}catch(e){err(e)}
+}
 
 async function toggleReceiptStatus(regId){show('กำลังเปลี่ยนสถานะใบเสร็จ');try{const res=await rpc('adminToggleReceiptStatus',TOKEN,CID,regId);hide();await Swal.fire({icon:'success',title:res.isIssued?'เปลี่ยนเป็น: ออกใบเสร็จแล้ว':'เปลี่ยนเป็น: ยังไม่ออกใบเสร็จ',timer:1500,showConfirmButton:false});loadPayments()}catch(e){err(e)}}
 
