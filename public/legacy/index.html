@@ -942,7 +942,7 @@ async function lookupAuthorWorks(forceRefresh){
   const cacheKey = regId + '_' + key;
   if(!forceRefresh && AUTHOR_WORKS_CACHE[cacheKey]){
     const cached = AUTHOR_WORKS_CACHE[cacheKey];
-    renderAuthorWorks(cached.works, cached.registration, {oral: cached.oralTemplateUrl, poster: cached.posterTemplateUrl});
+    renderAuthorWorks(cached.works, cached.registration, {oral: cached.oralTemplateUrl, poster: cached.posterTemplateUrl, deadline: cached.presentationDeadline});
   } else {
     load('กำลังค้นหาข้อมูลผลงาน');
   }
@@ -954,11 +954,37 @@ async function lookupAuthorWorks(forceRefresh){
       sessionStorage.setItem('TUH_AUTHOR_SEARCH', JSON.stringify({regId, key}));
     }catch(e){}
     done();
-    renderAuthorWorks(r.works,r.registration,{oral:r.oralTemplateUrl,poster:r.posterTemplateUrl});
+    renderAuthorWorks(r.works,r.registration,{oral:r.oralTemplateUrl,poster:r.posterTemplateUrl,deadline:r.presentationDeadline});
   }catch(e){
     done();
     alertErr(e);
   }
+}
+
+function formatPresentationDeadlineDisplay(raw){
+  if(!raw) return '10 พ.ย. 2569 เวลา 23:59 น.';
+  let str = String(raw).trim();
+  let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if(m){
+    const d = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10);
+    const y = parseInt(m[3], 10);
+    const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const moName = thMonths[mo - 1] || `${mo}`;
+    const timePart = (m[4] !== undefined) ? `${pad2(m[4])}:${pad2(m[5])} น.` : '23:59 น.';
+    return `${d} ${moName} ${y} เวลา ${timePart}`;
+  }
+  const parsed = parseStoredDate(str);
+  if(parsed){
+    const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const d = parsed.getDate();
+    const moName = thMonths[parsed.getMonth()] || `${parsed.getMonth() + 1}`;
+    const y = parsed.getFullYear() + (parsed.getFullYear() < 2500 ? 543 : 0);
+    const hr = pad2(parsed.getHours());
+    const mn = pad2(parsed.getMinutes());
+    return `${d} ${moName} ${y} เวลา ${hr}:${mn} น.`;
+  }
+  return str;
 }
 
 function renderAuthorWorks(works,reg,templates){
@@ -969,6 +995,8 @@ function renderAuthorWorks(works,reg,templates){
   }
   const oralTpl = (templates && templates.oral) || (BOOT && BOOT.settings && BOOT.settings.ORAL_TEMPLATE_URL) || '';
   const posterTpl = (templates && templates.poster) || (BOOT && BOOT.settings && BOOT.settings.POSTER_TEMPLATE_URL) || '';
+  const presentationDeadlineRaw = (templates && templates.deadline) || (BOOT && BOOT.settings && BOOT.settings.PRESENTATION_SUBMISSION_CLOSE_AT) || '10/11/2569 23:59';
+  const presentationDeadlineFormatted = formatPresentationDeadlineDisplay(presentationDeadlineRaw);
 
   const html=works.map(w=>{
     const st=String(w.Status||'').toUpperCase();
@@ -996,12 +1024,21 @@ function renderAuthorWorks(works,reg,templates){
             </div>
             ${hasUploadedPres 
               ? `<span style="background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #86efac;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-circle-check"></i> ส่งไฟล์นำเสนอเรียบร้อยแล้ว</span>` 
-              : `<span style="background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #fde68a;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-clock"></i> รอส่งไฟล์นำเสนอเข้าระบบ</span>`}
+              : `<span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;border:1px solid #fca5a5;display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid fa-clock"></i> รอส่งไฟล์นำเสนอเข้าระบบ</span>`}
           </div>
           <div style="font-size:0.88rem;color:#14532d;margin-top:6px;line-height:1.5;">
             รูปแบบการนำเสนอที่ได้รับการคัดเลือก: <b>${isOral ? 'แบบบรรยาย (Oral Presentation)' : (isPoster ? 'แบบโปสเตอร์ (e-Poster Presentation)' : esc(w.PresentationTypeName||'แบบนำเสนอ'))}</b>
           </div>
-          <div style="font-size:0.84rem;color:#15803d;margin-top:4px;">
+          <div style="margin-top:10px;padding:10px 14px;background:#fff5f5;border:1.5px solid #fecaca;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="color:#b91c1c;font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:6px;">
+              <i class="fa-solid fa-clock" style="font-size:1.1rem;color:#dc2626;"></i>
+              <span>กำหนดส่งไฟล์นำเสนอ:</span>
+            </div>
+            <div style="color:#991b1b;font-weight:800;font-size:0.95rem;background:#fee2e2;padding:3px 10px;border-radius:6px;border:1px solid #fca5a5;">
+              ปิดส่งไฟล์นำเสนอภายในวันที่ ${esc(presentationDeadlineFormatted)}
+            </div>
+          </div>
+          <div style="font-size:0.84rem;color:#15803d;margin-top:8px;">
             ท่านสามารถคลิกดาวน์โหลด Template ด้านล่าง เพื่อเตรียมไฟล์นำเสนอตามข้อกำหนด และอัปโหลดไฟล์นำเสนอ (.pptx / .pdf) เข้าระบบได้ทันที
           </div>
         </div>

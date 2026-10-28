@@ -4080,7 +4080,8 @@ function verifyWorkAccess(conferenceId,regId,emailOrPhone){
       works: serialize_(outWorks),
       canSubmitNewWork: canSubmitNewWork,
       oralTemplateUrl: oralTpl,
-      posterTemplateUrl: posterTpl
+      posterTemplateUrl: posterTpl,
+      presentationDeadline: settings.PRESENTATION_SUBMISSION_CLOSE_AT || '10/11/2569 23:59'
     };
 
     try {
@@ -8373,9 +8374,17 @@ function adminAcceptWorkScores(token, conferenceId, workId, lockReviewers) {
     var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || findOne_('Works', { WorkID: workId });
     if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
 
+    var rounds = findMany_('ReviewRounds', { ConferenceID: cid });
+    var round1 = rounds.find(function(r){ return Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'); });
+    var r1Id = round1 ? round1.ReviewRoundID : 'RR-2026-000001';
+
     var assignments = findMany_('ReviewAssignments', { ConferenceID: cid, WorkID: w.WorkID });
     var updates = [];
     assignments.forEach(function(a) {
+      // STRICTLY LOCK ROUND 1 ONLY! Do not lock Round 2 (รอบตัดสิน)
+      var isRound1 = (a.ReviewRoundID === r1Id) || (Number(a.RoundNo) === 1) || (!a.ReviewRoundID && !a.RoundNo);
+      if (!isRound1) return;
+
       var patch = {
         ScoreAcceptedByAdmin: true,
         AdminLocked: !!lockReviewers,
@@ -8395,8 +8404,8 @@ function adminAcceptWorkScores(token, conferenceId, workId, lockReviewers) {
     }
     try { cacheRemoveLarge_('REV_ASG_' + w.WorkID); } catch(e) {}
     try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
-    logAudit_(cid, ctx.user, ctx.role, 'ACCEPT_WORK_SCORES', 'Works', workId, { locked: !!lockReviewers, count: updates.length });
-    return { success: true, count: updates.length, locked: !!lockReviewers };
+    logAudit_(cid, ctx.user, ctx.role, 'ACCEPT_WORK_SCORES', 'Works', workId, { locked: !!lockReviewers, count: updates.length, round: 1 });
+    return { success: true, count: updates.length, locked: !!lockReviewers, round: 1 };
   });
 }
 
@@ -8407,9 +8416,17 @@ function adminUnlockWorkScores(token, conferenceId, workId) {
     var w = findOne_('Works', { ConferenceID: cid, WorkID: workId }) || findOne_('Works', { WorkID: workId });
     if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
 
+    var rounds = findMany_('ReviewRounds', { ConferenceID: cid });
+    var round1 = rounds.find(function(r){ return Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'); });
+    var r1Id = round1 ? round1.ReviewRoundID : 'RR-2026-000001';
+
     var assignments = findMany_('ReviewAssignments', { ConferenceID: cid, WorkID: w.WorkID });
     var updates = [];
     assignments.forEach(function(a) {
+      // STRICTLY UNLOCK ROUND 1 ONLY
+      var isRound1 = (a.ReviewRoundID === r1Id) || (Number(a.RoundNo) === 1) || (!a.ReviewRoundID && !a.RoundNo);
+      if (!isRound1) return;
+
       updates.push({
         rowNumber: a.__row,
         patch: {
@@ -8425,8 +8442,8 @@ function adminUnlockWorkScores(token, conferenceId, workId) {
     }
     try { cacheRemoveLarge_('REV_ASG_' + w.WorkID); } catch(e) {}
     try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
-    logAudit_(cid, ctx.user, ctx.role, 'UNLOCK_WORK_SCORES', 'Works', workId, { count: updates.length });
-    return { success: true, count: updates.length };
+    logAudit_(cid, ctx.user, ctx.role, 'UNLOCK_WORK_SCORES', 'Works', workId, { count: updates.length, round: 1 });
+    return { success: true, count: updates.length, round: 1 };
   });
 }
 

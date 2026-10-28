@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const SETTINGS_FILE = path.join(process.cwd(), "persisted_settings.json");
+const WORK_LOCKS_FILE = path.join(process.cwd(), "persisted_work_locks.json");
 
 function getPersistedSettings(): Record<string, any> {
   try {
@@ -20,6 +21,27 @@ function getPersistedSettings(): Record<string, any> {
     console.error("Failed to read persisted_settings.json", err);
   }
   return {};
+}
+
+function getPersistedWorkLocks(): Record<string, { lockedRound1: boolean; timestamp: string }> {
+  try {
+    if (fs.existsSync(WORK_LOCKS_FILE)) {
+      return JSON.parse(fs.readFileSync(WORK_LOCKS_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.error("Failed to read persisted_work_locks.json", err);
+  }
+  return {};
+}
+
+function savePersistedWorkLock(workId: string, locked: boolean) {
+  try {
+    const current = getPersistedWorkLocks();
+    current[workId] = { lockedRound1: locked, timestamp: new Date().toISOString() };
+    fs.writeFileSync(WORK_LOCKS_FILE, JSON.stringify(current, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to write persisted_work_locks.json", err);
+  }
 }
 
 const rateLimits = new Map<string, { count: number; reset: number }>();
@@ -89,6 +111,7 @@ const DEFAULT_BOOTSTRAP: any = {
   eventDates: ["2026-11-18", "2026-11-19", "2026-11-20"],
   settings: {
     EVENT_DATES_JSON: '["2026-11-18","2026-11-19","2026-11-20"]',
+    PRESENTATION_SUBMISSION_CLOSE_AT: "10/11/2569 23:59",
     BANNER_SLIDES_JSON: JSON.stringify([{
       id: "b_tuh_forum2569",
       title: "งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569",
@@ -454,6 +477,62 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      if (action === "adminAcceptWorkScores") {
+        const workId = String(args[2] || "").trim();
+        savePersistedWorkLock(workId, true);
+        invalidateCache("adminGetWorkScoreSummary");
+        invalidateCache("adminListWorks");
+        memoryCache.clear();
+        staleCache.clear();
+        try {
+          if (getGasUrls().length > 0) {
+            const gasRes = await fetchGasWithRetry(payload, 1);
+            if (gasRes.success) return NextResponse.json(gasRes);
+          }
+        } catch (e) {
+          console.log("Upstream adminAcceptWorkScores error, using local fallback:", e);
+        }
+        return NextResponse.json({
+          success: true,
+          data: {
+            workId,
+            locked: true,
+            round: 1,
+            count: 3,
+            savedLocally: true,
+            message: "รับคะแนนและล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว",
+          },
+        });
+      }
+
+      if (action === "adminUnlockWorkScores") {
+        const workId = String(args[2] || "").trim();
+        savePersistedWorkLock(workId, false);
+        invalidateCache("adminGetWorkScoreSummary");
+        invalidateCache("adminListWorks");
+        memoryCache.clear();
+        staleCache.clear();
+        try {
+          if (getGasUrls().length > 0) {
+            const gasRes = await fetchGasWithRetry(payload, 1);
+            if (gasRes.success) return NextResponse.json(gasRes);
+          }
+        } catch (e) {
+          console.log("Upstream adminUnlockWorkScores error, using local fallback:", e);
+        }
+        return NextResponse.json({
+          success: true,
+          data: {
+            workId,
+            locked: false,
+            round: 1,
+            count: 3,
+            savedLocally: true,
+            message: "ปลดล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว",
+          },
+        });
+      }
+
       result = await fetchGasWithRetry(payload, isRead ? 2 : 1);
     }
 
@@ -462,6 +541,45 @@ export async function POST(req: NextRequest) {
         const persisted = getPersistedSettings();
         if (result.data.settings && typeof result.data.settings === "object") {
           result.data.settings = { ...result.data.settings, ...persisted };
+        }
+      }
+
+      if (action === "getAdminSettings" && result.data && Array.isArray(result.data.settings)) {
+        const persisted = getPersistedSettings();
+        Object.keys(persisted).forEach((k) => {
+          const item = result.data.settings.find((s: any) => s.SettingKey === k);
+          if (item) item.SettingValue = persisted[k];
+          else result.data.settings.push({ SettingKey: k, SettingValue: persisted[k] });
+        });
+      }
+
+      if (action === "verifyWorkAccess" && result.data && typeof result.data === "object") {
+        const persisted = getPersistedSettings();
+        if (persisted.PRESENTATION_SUBMISSION_CLOSE_AT) {
+          result.data.presentationDeadline = persisted.PRESENTATION_SUBMISSION_CLOSE_AT;
+        } else if (!result.data.presentationDeadline) {
+          result.data.presentationDeadline = "10/11/2569 23:59";
+        }
+      }
+
+      if (action === "adminGetWorkScoreSummary" && result.data && typeof result.data === "object") {
+        const locks = getPersistedWorkLocks();
+        const workId = String(args[2] || "").trim();
+        const lockInfo = locks[workId];
+        if (lockInfo !== undefined) {
+          const isLocked = lockInfo.lockedRound1;
+          result.data.isRound1Locked = isLocked;
+          if (Array.isArray(result.data.assignments)) {
+            result.data.assignments.forEach((a: any) => {
+              const isRound1 = (a.ReviewRoundID === 'RR-2026-000001') || (Number(a.RoundNo) === 1) || (!a.ReviewRoundID && !a.RoundNo) || !String(a.ReviewRoundID || '').includes('000002');
+              if (isRound1) {
+                a.Locked = isLocked;
+                a.ScoreAcceptedByAdmin = isLocked;
+                a.AdminLocked = isLocked;
+                if (isLocked) a.AllowEditAfterSubmit = false;
+              }
+            });
+          }
         }
       }
       setCache(action, args, result);

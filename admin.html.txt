@@ -139,10 +139,22 @@
           <div class="field"><label>Reviewer ขั้นต่ำ<input name="MIN_REVIEWERS_PER_WORK" type="number"></label></div><div class="field"><label>Reviewer สูงสุด<input name="MAX_REVIEWERS_PER_WORK" type="number"></label></div>
           <div class="field"><label>วันจัดงาน JSON (ปี พ.ศ.)<input name="EVENT_DATES_JSON" placeholder='["2569-11-18","2569-11-19","2569-11-20"]'></label><small>สูงสุด 3 วัน</small></div>
         </div>
-        <h4>ลิงก์ Template สำหรับผู้นำเสนอผลงาน<span class="en">Presentation Templates</span></h4><div class="info-box">กรอก URL หรือลิงก์ Google Drive ของไฟล์ Template เพื่อให้ผู้ส่งผลงานที่ผ่านการคัดเลือกสามารถกดดาวน์โหลดได้จากหน้า "สถานะผลงาน"</div>
+        <h4>ลิงก์ Template และกำหนดส่งไฟล์นำเสนอผลงาน<span class="en">Presentation Templates & Deadline</span></h4><div class="info-box">กรอก URL หรือลิงก์ Google Drive ของไฟล์ Template เพื่อให้ผู้ส่งผลงานที่ผ่านการคัดเลือกสามารถกดดาวน์โหลดได้จากหน้า "สถานะผลงาน"</div>
         <div class="grid">
           <div class="field"><label><b><i class="fa-solid fa-file-powerpoint" style="color:#d97706;"></i> ลิงก์ Template นำเสนอแบบบรรยาย (Oral)</b><span class="en">Oral Presentation Template URL</span><input name="ORAL_TEMPLATE_URL" placeholder="https://drive.google.com/... หรือ https://..."></label></div>
           <div class="field"><label><b><i class="fa-solid fa-file-image" style="color:#0284c7;"></i> ลิงก์ Template โปสเตอร์ (Poster)</b><span class="en">Poster Template URL</span><input name="POSTER_TEMPLATE_URL" placeholder="https://drive.google.com/... หรือ https://..."></label></div>
+        </div>
+        <div style="margin-top:10px; background:#f0fdf4; border:1.5px solid #86efac; border-radius:8px; padding:12px 14px;">
+          <div class="field" style="margin-bottom:0;">
+            <label style="color:#166534; font-weight:700;">
+              <b><i class="fa-solid fa-clock" style="color:#dc2626;"></i> ปิดส่งไฟล์นำเสนอภายในวันที่ ...... เวลาคือ 23.59 น.</b>
+              <span class="en">Final Presentation Submission Deadline</span>
+              <input class="date-input" type="text" name="PRESENTATION_SUBMISSION_CLOSE_AT" placeholder="10/11/2569 23:59" style="margin-top:6px; font-weight:700; color:#0f172a; background:#fff; border:1px solid #006D70;">
+            </label>
+            <div style="font-size:0.82rem; color:#15803d; margin-top:5px; line-height:1.4;">
+              <i class="fa-solid fa-circle-info"></i> กำหนดวันและเวลาปิดส่งไฟล์นำเสนอฉบับจริง (เช่น <b>10/11/2569 23:59</b>) เพื่อแสดงให้ผู้ส่งผลงานที่ผ่านการคัดเลือกเห็นในหน้า "สถานะผลงาน"
+            </div>
+          </div>
         </div>
         <h4>กำหนดตัวเลือกในแบบลงทะเบียน<span class="en">Registration dropdown options</span></h4><div class="info-box">กรอกหนึ่งตัวเลือกต่อหนึ่งบรรทัด สามารถเพิ่ม ลบ หรือเรียงลำดับใหม่ได้เอง</div>
         <div class="grid3">
@@ -838,7 +850,7 @@ async function loadSettings(forceRefresh = false){
     DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));
     const sm={};
     d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);
-    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL'].forEach(k=>f.elements[k].value=sm[k]||'');
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL','PRESENTATION_SUBMISSION_CLOSE_AT'].forEach(k=>f.elements[k].value=sm[k]||(k==='PRESENTATION_SUBMISSION_CLOSE_AT'?'10/11/2569 23:59':''));
     f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);
     const o=d.optionConfig||{};
     f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');
@@ -1136,7 +1148,7 @@ $('#settingsForm').onsubmit=async e=>{
     ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);
     DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
     const settings={};
-    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL'].forEach(k=>settings[k]=o[k]||'');
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL','PRESENTATION_SUBMISSION_CLOSE_AT'].forEach(k=>settings[k]=o[k]||(k==='PRESENTATION_SUBMISSION_CLOSE_AT'?'10/11/2569 23:59':''));
     settings.INTERNAL_DAILY_QUOTA = o.INTERNAL_QUOTA || '400';
     settings.EXTERNAL_DAILY_QUOTA = o.EXTERNAL_QUOTA || '200';
     settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
@@ -4114,29 +4126,31 @@ async function openScoreSummary(wid){
       }
     }
 
-    const anyLocked = assignments.some(a => a.Locked || a.ScoreAcceptedByAdmin || a.AdminLocked);
+    const isRound1 = (a) => (a.ReviewRoundID === 'RR-2026-000001') || (Number(a.RoundNo) === 1) || (!a.ReviewRoundID && !a.RoundNo) || !String(a.ReviewRoundID || '').includes('000002');
+    const round1Assignments = (assignments || []).filter(isRound1);
+    const round1Locked = (res.isRound1Locked) || (round1Assignments.length > 0 && round1Assignments.some(a => a.Locked || a.ScoreAcceptedByAdmin || a.AdminLocked));
     html += `
       <div style="margin-top:20px; padding:12px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
           <div style="font-weight:600; font-size:0.9rem; color:#1e293b;">
-            สถานะแบบประเมินของกรรมการ: 
-            ${anyLocked 
-              ? '<span class="badge" style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:999px;">🔒 ล็อกแล้ว (กรรมการแก้ไขไม่ได้)</span>' 
-              : '<span class="badge" style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:999px;">🔓 เปิดให้กรรมการแก้ไขคะแนนได้</span>'}
+            สถานะแบบประเมินรอบที่ 1: 
+            ${round1Locked 
+              ? '<span class="badge" style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:999px;">🔒 ล็อกรอบที่ 1 แล้ว (รอบตัดสินยังคงเปิดให้ประเมินปกติ)</span>' 
+              : '<span class="badge" style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:999px;">🔓 เปิดให้กรรมการรอบที่ 1 แก้ไขคะแนนได้</span>'}
           </div>
           <div style="font-size:0.8rem; color:#64748b; margin-top:3px;">
-            ${anyLocked 
-              ? 'ผู้ดูแลระบบได้รับคะแนนแล้ว หรือผลงานอยู่ในขั้นตอนสรุปผล' 
-              : 'กรรมการสามารถเข้าแก้ไขหรือส่งคะแนนใหม่ได้ตลอดจนกว่าผู้ดูแลจะกดรับคะแนน'}
+            ${round1Locked 
+              ? 'คะแนนรอบที่ 1 ได้รับการล็อกแล้ว กรรมการรอบตัดสินยังสามารถเข้าประเมินได้ตามปกติ' 
+              : 'กรรมการรอบที่ 1 สามารถเข้าแก้ไขคะแนนได้ตลอดจนกว่าผู้ดูแลจะกดล็อกรอบที่ 1'}
           </div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button type="button" class="btn primary" style="font-size:0.85rem; background:#006D70; display:inline-flex; align-items:center; gap:6px;" onclick="openPrintWorkScoreSelector('${esc(wid)}')">
             <i class="fa-solid fa-print"></i> พิมพ์ใบรายงานคะแนน
           </button>
-          ${anyLocked 
-            ? `<button type="button" class="btn soft" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; font-size:0.85rem;" onclick="adminUnlockScoresAction('${esc(wid)}')">🔓 ปลดล็อกให้กรรมการแก้ไข</button>`
-            : `<button type="button" class="btn soft" style="background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:0.85rem;" onclick="adminLockScoresAction('${esc(wid)}')">🔒 รับคะแนนและล็อกแบบประเมิน</button>`}
+          ${round1Locked 
+            ? `<button type="button" class="btn soft" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; font-size:0.85rem;" onclick="adminUnlockScoresAction('${esc(wid)}')">🔓 ปลดล็อกรอบที่ 1</button>`
+            : `<button type="button" class="btn soft" style="background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:0.85rem;" onclick="adminLockScoresAction('${esc(wid)}')">🔒 รับคะแนนและล็อกรอบที่ 1</button>`}
           <button type="button" class="btn primary" style="font-size:0.85rem;" onclick="Swal.close(); openUpdateWorkStatus('${esc(wid)}', '${esc(work.Status)}')">📝 ตัดสินผลงาน</button>
         </div>
       </div>
@@ -4501,20 +4515,20 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
 
 async function adminLockScoresAction(wid) {
   const conf = await Swal.fire({
-    title: 'ยืนยันรับคะแนนและล็อกแบบประเมิน?',
-    text: 'เมื่อล็อกแล้ว กรรมการจะไม่สามารถแก้ไขคะแนนของผลงานนี้ได้อีก จนกว่าจะได้รับการปลดล็อก',
+    title: 'ยืนยันรับคะแนนและล็อกแบบประเมินรอบที่ 1?',
+    text: 'ระบบจะล็อกเฉพาะคะแนนของกรรมการในรอบที่ 1 (รอบคัดกรอง) เท่านั้น โดยรอบตัดสิน (รอบที่ 2) จะยังคงเปิดให้กรรมการประเมินได้ตามปกติ',
     icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'ยืนยันล็อก',
+    confirmButtonText: 'ยืนยันล็อกรอบที่ 1',
     cancelButtonText: 'ยกเลิก',
     confirmButtonColor: '#b42318'
   });
   if (!conf.isConfirmed) return;
-  show('กำลังบันทึกสถานะ...');
+  show('กำลังบันทึกสถานะล็อกรอบที่ 1...');
   try {
     await rpc('adminAcceptWorkScores', TOKEN, CID, wid, true);
     hide();
-    toast('รับคะแนนและล็อกแบบประเมินเรียบร้อยแล้ว');
+    toast('รับคะแนนและล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว');
     openScoreSummary(wid);
   } catch (e) {
     err(e);
@@ -4523,20 +4537,20 @@ async function adminLockScoresAction(wid) {
 
 async function adminUnlockScoresAction(wid) {
   const conf = await Swal.fire({
-    title: 'ยืนยันปลดล็อกแบบประเมิน?',
-    text: 'ระบบจะอนุญาตให้กรรมการเข้าประเมินและปรับปรุงคะแนนของผลงานนี้ได้อีกครั้ง',
+    title: 'ยืนยันปลดล็อกแบบประเมินรอบที่ 1?',
+    text: 'ระบบจะอนุญาตให้กรรมการรอบที่ 1 เข้าแก้ไขคะแนนได้อีกครั้ง (รอบตัดสินไม่ได้รับผลกระทบ)',
     icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'ยืนยันปลดล็อก',
+    confirmButtonText: 'ยืนยันปลดล็อกรอบที่ 1',
     cancelButtonText: 'ยกเลิก',
     confirmButtonColor: '#006D70'
   });
   if (!conf.isConfirmed) return;
-  show('กำลังปลดล็อก...');
+  show('กำลังปลดล็อกรอบที่ 1...');
   try {
     await rpc('adminUnlockWorkScores', TOKEN, CID, wid);
     hide();
-    toast('ปลดล็อกให้กรรมการแก้ไขคะแนนเรียบร้อยแล้ว');
+    toast('ปลดล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว');
     openScoreSummary(wid);
   } catch (e) {
     err(e);
