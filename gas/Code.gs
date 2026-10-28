@@ -1551,6 +1551,16 @@ function invalidateCache_(conferenceId){
   } catch(e) {}
 }
 
+function uuid_(){
+  if (typeof Utilities !== 'undefined' && Utilities.getUuid) {
+    return Utilities.getUuid().replace(/-/g, '');
+  }
+  return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 function getAuthSecret_(){ const p=PropertiesService.getScriptProperties(); let s=p.getProperty(APP.PROPERTY_KEYS.AUTH_SECRET); if(!s){s=uuid_()+uuid_();p.setProperty(APP.PROPERTY_KEYS.AUTH_SECRET,s);} return s; }
 function bytesHex_(bytes){return bytes.map(function(b){const x=(b<0?b+256:b).toString(16);return x.length===1?'0'+x:x;}).join('');}
 function hashText_(text){return bytesHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(text),Utilities.Charset.UTF_8));}
