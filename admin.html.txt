@@ -132,7 +132,7 @@
           <div class="field"><label>วันเริ่มงาน<input class="date-input" type="text" name="EventStartAt" placeholder="18/11/2569 08:30"></label></div><div class="field"><label>วันสิ้นสุด<input class="date-input" type="text" name="EventEndAt" placeholder="20/11/2569 17:00"></label></div>
           <div class="field"><label>เปิดลงทะเบียน<input class="date-input" type="text" name="RegistrationOpenAt" placeholder="01/07/2569 08:30"></label></div><div class="field"><label>ปิดลงทะเบียน<input class="date-input" type="text" name="RegistrationCloseAt" placeholder="06/11/2569 23:59"></label></div>
           <div class="field"><label>ปิดชำระเงิน<input class="date-input" type="text" name="PaymentCloseAt" placeholder="18/11/2569 23:59"></label></div><div class="field"><label>เปิดส่งผลงาน<input class="date-input" type="text" name="SubmissionOpenAt" placeholder="01/07/2569 00:01"></label></div>
-          <div class="field"><label>ปิดส่งผลงาน<input class="date-input" type="text" name="SubmissionCloseAt" placeholder="31/08/2569 23:59"></label></div><div class="field"><label>ประกาศผล<input class="date-input" type="text" name="ResultAnnouncementAt" placeholder="22/10/2569 09:00"></label></div>
+          <div class="field"><label>ปิดส่งผลงาน<input class="date-input" type="text" name="SubmissionCloseAt" placeholder="31/08/2569 23:59"></label></div><div class="field"><label>ประกาศผล<input class="date-input" type="text" name="ResultAnnouncementAt" placeholder="22/10/2569 09:00"></label></div><div class="field"><label><b><i class="fa-solid fa-clock" style="color:#dc2626;"></i> ปิดส่งไฟล์นำเสนอ</b><span class="en">Presentation Deadline</span><input class="date-input" type="text" name="PresentationUploadCloseAt" placeholder="10/11/2569 23:59"></label></div>
         </div>
         <h4>ค่าตั้งค่าระบบ<span class="en">System options</span></h4><div class="grid3">
           <div class="field"><label>โควตารายวัน บุคลากรภายใน (ท่าน/วัน)<input name="INTERNAL_QUOTA" type="number" placeholder="400"></label></div><div class="field"><label>โควตารายวัน บุคคลทั่วไป (ท่าน/วัน)<input name="EXTERNAL_QUOTA" type="number" placeholder="200"></label></div><div class="field"><label>จำนวนผลงานสูงสุด (0=ไม่จำกัด)<input name="MAX_WORKS_PER_REGISTRATION" type="number"></label></div>
@@ -414,7 +414,7 @@ window.addEventListener('DOMContentLoaded',installDirectAccessGuard);
 
 const LOGO_TUH='/images/tuh-logo.png';
 const LOGO_HACC='/images/hacc-logo.png';
-const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','RegistrationCloseAt','PaymentCloseAt','SubmissionOpenAt','SubmissionCloseAt','ResultAnnouncementAt'];
+const DATE_FIELDS=['EventStartAt','EventEndAt','RegistrationOpenAt','RegistrationCloseAt','PaymentCloseAt','SubmissionOpenAt','SubmissionCloseAt','ResultAnnouncementAt','PresentationUploadCloseAt'];
 const OPTION_KEYS=['PREFIX_OPTIONS_JSON','POSITION_OPTIONS_JSON','PROFESSION_OPTIONS_JSON','ORGANIZATION_GROUP_OPTIONS_JSON','ORGANIZATION_OPTIONS_JSON','FOOD_TYPE_OPTIONS_JSON'];
 let TOKEN='',BOOT=null,CURRENT='dashboard',FOOD_ROWS=[];
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
@@ -1149,6 +1149,9 @@ $('#settingsForm').onsubmit=async e=>{
     DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
     const settings={};
     ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL','PRESENTATION_SUBMISSION_CLOSE_AT'].forEach(k=>settings[k]=o[k]||(k==='PRESENTATION_SUBMISSION_CLOSE_AT'?'10/11/2569 23:59':''));
+    const finalDl = o.PRESENTATION_SUBMISSION_CLOSE_AT || o.PresentationUploadCloseAt || '10/11/2569 23:59';
+    settings.PRESENTATION_SUBMISSION_CLOSE_AT = finalDl;
+    conf.PresentationUploadCloseAt = parseBeDateTime(finalDl, 'PresentationUploadCloseAt');
     settings.INTERNAL_DAILY_QUOTA = o.INTERNAL_QUOTA || '400';
     settings.EXTERNAL_DAILY_QUOTA = o.EXTERNAL_QUOTA || '200';
     settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);

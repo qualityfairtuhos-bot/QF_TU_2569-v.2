@@ -6,7 +6,7 @@ type PortalName = "index" | "admin" | "reviewer" | "scanner";
 
 export function LegacyPortal({ portal }: { portal: PortalName }) {
   const query = useSearchParams().toString();
-  const version = "20261025-v5-action-buttons-fix";
+  const version = "20261028-v8-presentation-deadline";
   const fullQuery = query ? `${query}&v=${version}` : `v=${version}`;
   const src = `/legacy/${portal}.html?${fullQuery}`;
   return <iframe src={src} title={`${portal} portal`} allow="camera" style={{width:"100%",height:"100dvh",border:0,display:"block"}} />;
