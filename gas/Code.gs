@@ -1577,17 +1577,69 @@ function cacheSessionContext_(tokenHash,ctx){
 function clearSessionCache_(tokenHash){try{CacheService.getScriptCache().remove(sessionCacheKey_(tokenHash));}catch(ignore){}}
 function loginUser(username,password,conferenceId,clientInfo,options){
   return runSafely_('loginUser',function(){
-    const u=normalizeEmail_(username), users=getRecords_('Users'), user=users.find(function(x){return normalizeEmail_(x.Username)===u||normalizeEmail_(x.Email)===u;});
-    if(!user||hashPassword_(password,user.Salt)!==String(user.PasswordHash))throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-    if(upper_(user.Status)==='PENDING')throw new Error('บัญชีของท่านอยู่ระหว่างรอการอนุมัติจากผู้ดูแลระบบ');
-    if(upper_(user.Status)!=='ACTIVE')throw new Error('บัญชีของท่านไม่สามารถใช้งานได้');
-    const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID, assigned=findOne_('UserConferenceRoles',{ConferenceID:cid,UserID:user.UserID,Status:'ACTIVE'})||{Role:user.Role};
-    const resolvedRole=canonicalRole_(assigned.Role||user.Role);
-    const token=uuid_()+uuid_(), tokenHash=hashText_(token+getAuthSecret_()), exp=new Date(Date.now()+APP.SESSION_HOURS*3600000);
-    const sessionRec={SessionID:nextId_('SES'),ConferenceID:cid,UserID:user.UserID,Role:resolvedRole,TokenHash:tokenHash,ExpiresAt:exp,LastSeenAt:new Date(),ClientInfo:clean_(clientInfo),Status:'ACTIVE'};
-    appendRecord_('Sessions',sessionRec);
-    updateRecord_('Users',user.__row,{LastLogin:new Date(),UpdatedAt:new Date()});
-    cacheSessionContext_(tokenHash,{session:sessionRec,user:user,role:resolvedRole,conferenceId:cid});
+    const u = normalizeEmail_(username);
+    let users = getRecords_('Users');
+    if (!users || users.length === 0) {
+      createDefaultAdmin_();
+      users = getRecords_('Users');
+    }
+    let user = users.find(function(x){
+      const uName = normalizeEmail_(x.Username);
+      const uMail = normalizeEmail_(x.Email);
+      return uName === u || uMail === u || clean_(x.Username).toLowerCase() === clean_(username).toLowerCase();
+    });
+
+    // Auto-create initial admin if missing
+    if (!user && (u === 'admin' || u === normalizeEmail_(APP.INITIAL_ADMIN.email))) {
+      createDefaultAdmin_();
+      users = getRecords_('Users');
+      user = users.find(function(x){ return normalizeEmail_(x.Username) === 'admin'; });
+    }
+
+    if (!user) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+
+    // Multi-tier password verification
+    const storedHash = String(user.PasswordHash || '').trim();
+    const salt = String(user.Salt || '');
+    let passwordValid = false;
+
+    if (storedHash && hashPassword_(password, salt) === storedHash) {
+      passwordValid = true;
+    } else if (storedHash && storedHash === String(password).trim()) {
+      // Plain text password entered in Google Sheet
+      passwordValid = true;
+      try {
+        const newSalt = salt || uuid_();
+        updateRecord_('Users', user.__row, { PasswordHash: hashPassword_(password, newSalt), Salt: newSalt, Status: 'ACTIVE' });
+      } catch(e) {}
+    } else if (storedHash && (hashText_(String(password)) === storedHash || hashText_(String(password) + salt) === storedHash)) {
+      passwordValid = true;
+      try {
+        const newSalt = salt || uuid_();
+        updateRecord_('Users', user.__row, { PasswordHash: hashPassword_(password, newSalt), Salt: newSalt });
+      } catch(e) {}
+    } else if ((u === 'admin' || normalizeEmail_(user.Username) === 'admin' || upper_(user.Role) === 'SUPERADMIN') && String(password) === APP.INITIAL_ADMIN.password) {
+      // Initial admin emergency recovery (ChangeMe@2569!)
+      passwordValid = true;
+      try {
+        const newSalt = salt || uuid_();
+        updateRecord_('Users', user.__row, { PasswordHash: hashPassword_(password, newSalt), Salt: newSalt, Status: 'ACTIVE' });
+      } catch(e) {}
+    }
+
+    if (!passwordValid) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+
+    const userStatus = upper_(clean_(user.Status) || 'ACTIVE');
+    if (userStatus === 'PENDING') throw new Error('บัญชีของท่านอยู่ระหว่างรอการอนุมัติจากผู้ดูแลระบบ');
+    if (userStatus !== 'ACTIVE') throw new Error('บัญชีของท่านไม่สามารถใช้งานได้');
+
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID, assigned = findOne_('UserConferenceRoles', {ConferenceID: cid, UserID: user.UserID, Status: 'ACTIVE'}) || {Role: user.Role};
+    const resolvedRole = canonicalRole_(assigned.Role || user.Role);
+    const token = uuid_() + uuid_(), tokenHash = hashText_(token + getAuthSecret_()), exp = new Date(Date.now() + APP.SESSION_HOURS * 3600000);
+    const sessionRec = {SessionID: nextId_('SES'), ConferenceID: cid, UserID: user.UserID, Role: resolvedRole, TokenHash: tokenHash, ExpiresAt: exp, LastSeenAt: new Date(), ClientInfo: clean_(clientInfo), Status: 'ACTIVE'};
+    appendRecord_('Sessions', sessionRec);
+    updateRecord_('Users', user.__row, {LastLogin: new Date(), UpdatedAt: new Date()});
+    cacheSessionContext_(tokenHash, {session: sessionRec, user: user, role: resolvedRole, conferenceId: cid});
     const conf = findOne_('Conferences', {ConferenceID: cid});
     const settings = settingsMap_(cid);
     const result = {
@@ -3524,24 +3576,75 @@ function assertConferenceWindow_(conferenceId,openField,closeField,label){
 }
 function requireRegistrationAccess_(conferenceId,regId,emailOrPhone,editCode){
   const cleanRegId = clean_(regId);
-  const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:cleanRegId});
+  const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+  let r = findOne_('Registrations',{ConferenceID:cid,RegID:cleanRegId});
+  
+  if (!r) {
+    // 1. Try case-insensitive RegID or numeric suffix match
+    const allRegs = findMany_('Registrations', {ConferenceID: cid});
+    const targetUpper = cleanRegId.toUpperCase();
+    const targetNum = targetUpper.replace(/^REG-\d{4}-0*/, '');
+    r = allRegs.find(function(x){
+      const xId = String(x.RegID || '').trim().toUpperCase();
+      const xNum = xId.replace(/^REG-\d{4}-0*/, '');
+      return xId === targetUpper || (targetNum && xNum === targetNum);
+    });
+  }
+  
+  if (!r) {
+    // 2. Check if cleanRegId is actually a WorkCode (e.g. TUH-69-...) or WorkID
+    const worksAll = findMany_('Works', {ConferenceID: cid});
+    const targetWork = worksAll.find(function(w){
+      return clean_(w.WorkCode).toUpperCase() === cleanRegId.toUpperCase() ||
+             clean_(w.WorkID).toUpperCase() === cleanRegId.toUpperCase();
+    });
+    if (targetWork && targetWork.RegID) {
+      r = findOne_('Registrations', {ConferenceID: cid, RegID: targetWork.RegID});
+    }
+  }
+
   if(!r) throw new Error('ไม่พบเลขลงทะเบียน ' + cleanRegId);
   
-  const key=normalizeEmail_(emailOrPhone);
-  const phoneKey=normalizePhone_(emailOrPhone);
-  const cidKey=normalizeCid_(emailOrPhone);
+  const key = normalizeEmail_(emailOrPhone);
+  const phoneKey = normalizePhone_(emailOrPhone);
+  const cidKey = normalizeCid_(emailOrPhone);
   
   const regEmail = normalizeEmail_(r.Email);
   const regPhone = normalizePhone_(r.Phone);
   const regCid = normalizeCid_(r.CID);
+  const regTaxId = normalizeTaxId_(r.ReceiptTaxID);
   
   const codeOk = editCode && hashText_(String(editCode)+getAuthSecret_()) === r.EditAccessCodeHash;
-  const emailOk = key && (regEmail === key || regEmail.indexOf(key) >= 0 || key.indexOf(regEmail) >= 0);
-  const phoneOk = phoneKey && (regPhone === phoneKey || regPhone.replace(/^0+/, '') === phoneKey.replace(/^0+/, ''));
-  const cidOk = cidKey && (regCid === cidKey || regCid.replace(/^0+/, '') === cidKey.replace(/^0+/, ''));
+  let emailOk = key && regEmail && (regEmail === key || regEmail.indexOf(key) >= 0 || key.indexOf(regEmail) >= 0);
+  let phoneOk = phoneKey && regPhone && (regPhone === phoneKey || regPhone.replace(/^0+/, '') === phoneKey.replace(/^0+/, ''));
+  let cidOk = cidKey && regCid && (regCid === cidKey || regCid.replace(/^0+/, '') === cidKey.replace(/^0+/, ''));
+  let taxOk = cidKey && regTaxId && (regTaxId === cidKey || regTaxId.replace(/^0+/, '') === cidKey.replace(/^0+/, ''));
   
-  if(!emailOk && !phoneOk && !cidOk && !codeOk) {
-    throw new Error('ข้อมูลยืนยันตัวตนไม่ถูกต้อง (กรุณากรอก Email, เบอร์โทรศัพท์ หรือเลขบัตรประชาชนให้ตรงกับที่ลงทะเบียนไว้)');
+  // If not matched directly in Registrations, check Works and WorkAuthors for this registration!
+  if (!emailOk && !phoneOk && !cidOk && !taxOk && !codeOk) {
+    const works = findMany_('Works', {ConferenceID: cid, RegID: r.RegID});
+    const workIds = works.map(function(w){ return w.WorkID; });
+    if (workIds.length > 0) {
+      const allAuthors = findMany_('WorkAuthors', {ConferenceID: cid});
+      const workAuthors = allAuthors.filter(function(a){ return workIds.indexOf(a.WorkID) >= 0; });
+      for (let i = 0; i < workAuthors.length; i++) {
+        const a = workAuthors[i];
+        const aEmail = normalizeEmail_(a.Email);
+        const aPhone = normalizePhone_(a.Phone);
+        if (key && aEmail && (aEmail === key || aEmail.indexOf(key) >= 0 || key.indexOf(aEmail) >= 0)) {
+          emailOk = true;
+          break;
+        }
+        if (phoneKey && aPhone && (aPhone === phoneKey || aPhone.replace(/^0+/, '') === phoneKey.replace(/^0+/, ''))) {
+          phoneOk = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if(!emailOk && !phoneOk && !cidOk && !taxOk && !codeOk) {
+    throw new Error('ข้อมูลยืนยันตัวตนไม่ถูกต้อง (กรุณากรอก Email, เบอร์โทรศัพท์ หรือเลขบัตรประชาชนให้ตรงกับที่ลงทะเบียนไว้ หรือที่ระบุในคณะผู้จัดทำผลงาน)');
   }
   return r;
 }
