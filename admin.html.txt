@@ -391,7 +391,7 @@
       </div>
     </section>
 
-    <section class="page" id="page-food"><div class="card"><div class="actions" style="justify-content:space-between"><div><h3 style="margin:0">คูปองอาหาร QR Code<span class="en">Meal pass management</span></h3><div class="muted">เลือกผู้สมัครได้หลายคนเพื่อสร้างและส่ง QR Code ไปยัง Email</div></div><a class="btn btn-blue" target="_blank" id="scannerLink">เปิดหน้าสแกนอาหาร</a></div><div class="toolbar" style="margin-top:15px"><div class="wide"><label class="muted">ค้นหา</label><input id="foodSearch" placeholder="RegID ชื่อ Email โทรศัพท์"></div><div><label class="muted">สิทธิ์</label><select id="foodEligibility"><option value="">ทั้งหมด</option><option value="ELIGIBLE">พร้อมออกคูปอง</option><option value="NOT_ELIGIBLE">ยังไม่พร้อม</option></select></div><div><label class="muted">การชำระเงิน</label><select id="foodPayment"><option value="">ทั้งหมด</option><option>NOT_REQUIRED</option><option>UNPAID</option><option>PENDING_VERIFY</option><option>APPROVED</option></select></div><div><label class="muted">การส่ง Email</label><select id="foodSent"><option value="">ทั้งหมด</option><option value="SENT">ส่งแล้ว</option><option value="NOT_SENT">ยังไม่ส่ง</option></select></div><div><button class="btn btn-primary" onclick="loadFood()">กรองข้อมูล</button></div></div><div class="actions" style="margin-bottom:12px"><button class="btn btn-soft" onclick="toggleAllFood(true)">เลือกผู้มีสิทธิ์ทั้งหมดที่แสดง</button><button class="btn btn-soft" onclick="toggleAllFood(false)">ยกเลิกการเลือก</button><button class="btn btn-gold" id="sendSelectedBtn" onclick="sendSelectedFood()">สร้างและส่ง QR ที่เลือก</button><span class="count-pill" id="foodSelectedCount">เลือก 0 คน</span></div><div class="table-wrap"><table class="table"><thead><tr><th><input type="checkbox" id="foodAll" onchange="toggleAllFood(this.checked)"></th><th>ผู้ลงทะเบียน</th><th>ประเภท</th><th>สถานะลงทะเบียน</th><th>การเงิน</th><th>สิทธิ์คูปอง</th><th>ส่งแล้ว</th><th>ส่งล่าสุด</th><th>จัดการ</th></tr></thead><tbody id="foodRows"></tbody></table></div></div></section>
+    <section class="page" id="page-food"><div class="card"><div class="actions" style="justify-content:space-between"><div><h3 style="margin:0">คูปองอาหาร QR Code<span class="en">Meal pass management</span></h3><div class="muted">เลือกผู้สมัครได้หลายคนเพื่อสร้างและส่ง QR Code ไปยัง Email</div></div><a class="btn btn-blue" target="_blank" id="scannerLink">เปิดหน้าสแกนอาหาร</a></div><div class="toolbar" style="margin-top:15px"><div class="wide"><label class="muted">ค้นหา</label><input id="foodSearch" placeholder="RegID ชื่อ Email โทรศัพท์"></div><div><label class="muted">สิทธิ์</label><select id="foodEligibility"><option value="">ทั้งหมด</option><option value="ELIGIBLE">พร้อมออกคูปอง</option><option value="NOT_ELIGIBLE">ยังไม่พร้อม</option></select></div><div><label class="muted">การชำระเงิน</label><select id="foodPayment"><option value="">ทั้งหมด</option><option>NOT_REQUIRED</option><option>UNPAID</option><option>PENDING_VERIFY</option><option>APPROVED</option></select></div><div><label class="muted">การส่ง Email</label><select id="foodSent"><option value="">ทั้งหมด</option><option value="SENT">ส่งแล้ว</option><option value="NOT_SENT">ยังไม่ส่ง</option></select></div><div><button class="btn btn-primary" onclick="loadFood()">กรองข้อมูล</button></div></div><div class="actions" style="margin-bottom:12px"><button class="btn btn-soft" onclick="toggleAllFood(true)">เลือกผู้มีสิทธิ์ทั้งหมดที่แสดง</button><button class="btn btn-soft" onclick="toggleAllFood(false)">ยกเลิกการเลือก</button><button class="btn btn-gold" id="sendSelectedBtn" onclick="sendSelectedFood()">สร้างและส่ง QR ที่เลือก</button><button class="btn btn-soft" onclick="repairAttendanceDays()"><i class="fa-solid fa-wrench"></i> ตรวจสอบ/ซ่อมแซมวันและคูปอง</button><span class="count-pill" id="foodSelectedCount">เลือก 0 คน</span></div><div class="table-wrap"><table class="table"><thead><tr><th><input type="checkbox" id="foodAll" onchange="toggleAllFood(this.checked)"></th><th>ผู้ลงทะเบียน</th><th>ประเภท</th><th>สถานะลงทะเบียน</th><th>การเงิน</th><th>สิทธิ์คูปอง</th><th>ส่งแล้ว</th><th>ส่งล่าสุด</th><th>จัดการ</th></tr></thead><tbody id="foodRows"></tbody></table></div></div></section>
   </main></div>
 </section>
 <div class="loading" id="loading"><div class="loading-box"><span class="spin"></span><b id="loadText">กำลังประมวลผล</b></div></div>
@@ -5847,6 +5847,32 @@ async function loadFood(forceRefresh = false){
 }
 
 function toggleAllFood(on){$$('.food-check:not(:disabled)').forEach(x=>x.checked=!!on);$('#foodAll').checked=!!on;updateFoodCount()}function selectedFood(){return $$('.food-check:checked').map(x=>x.value)}function updateFoodCount(){$('#foodSelectedCount').textContent=`เลือก ${selectedFood().length} คน`}
+async function repairAttendanceDays(){
+  const c = await Swal.fire({
+    title: 'ตรวจสอบและซ่อมแซมวันเข้าร่วมงานและคูปองอาหาร?',
+    text: 'ระบบจะตรวจทานข้อมูลดิบจากการนำเข้า Google Form / Excel อีกครั้ง เพื่อแก้ไขวันที่เข้าร่วมงานที่คลาดเคลื่อน (เช่น ผู้สมัครเลือกวันที่ 20 พ.ย. หรือ 19 พ.ย.) พร้อมปรับปรุงสิทธิ์คูปองอาหารให้ตรงกับวันที่เลือกโดยอัตโนมัติ',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'เริ่มตรวจสอบและซ่อมแซม',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70'
+  });
+  if(!c.isConfirmed) return;
+  show('กำลังตรวจสอบและซ่อมแซมข้อมูล...');
+  try {
+    const res = await rpc('adminRepairAttendanceDays', TOKEN, CID);
+    hide();
+    await Swal.fire({
+      icon: 'success',
+      title: 'ดำเนินการเรียบร้อย',
+      text: `ตรวจสอบและปรับปรุงข้อมูลสำเร็จ ${res.fixedCount || 0} รายการ`,
+      confirmButtonColor: '#006D70'
+    });
+    loadFood(true);
+  } catch(e) {
+    err(e);
+  }
+}
 async function previewFood(id){
   show('กำลังสร้างตัวอย่าง QR');
   try{

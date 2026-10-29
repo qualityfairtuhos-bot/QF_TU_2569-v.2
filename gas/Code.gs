@@ -2079,13 +2079,104 @@ function normalizeNameKey_(fullName) {
 
 function parseAttendanceDays_(text) {
   const t = clean_(text);
-  const isAll = t.indexOf('ทั้ง 3') >= 0 || t.indexOf('ทั้ง3') >= 0 || t.indexOf('ทุกวัน') >= 0 || t.indexOf('ทุก วัน') >= 0;
+  if (!t) return { day1: false, day2: false, day3: false };
 
-  const day1 = isAll || t.indexOf('วันที่ 1') >= 0 || t.indexOf('วันที่1') >= 0 || t.indexOf('Day 1') >= 0 || t.indexOf('day 1') >= 0;
-  const day2 = isAll || t.indexOf('วันที่ 2') >= 0 || t.indexOf('วันที่2') >= 0 || t.indexOf('Day 2') >= 0 || t.indexOf('day 2') >= 0;
-  const day3 = isAll || t.indexOf('วันที่ 3') >= 0 || t.indexOf('วันที่3') >= 0 || t.indexOf('Day 3') >= 0 || t.indexOf('day 3') >= 0;
+  // All days check
+  const isAll = /ทั้ง\s*3|ทุก\s*วัน|All\s*3|18\s*[-–—ถึง]+\s*20/i.test(t);
 
-  return { day1: day1, day2: day2, day3: day3 };
+  // Calendar dates check (18 = Day 1, 19 = Day 2, 20 = Day 3)
+  const has18 = /(?:^|[^\d])18(?:[^\d]|$)|18\s*พ\.?ย|18\s*พฤศจิกายน|2026-11-18|18\/11/i.test(t);
+  const has19 = /(?:^|[^\d])19(?:[^\d]|$)|19\s*พ\.?ย|19\s*พฤศจิกายน|2026-11-19|19\/11/i.test(t);
+  const has20 = /(?:^|[^\d])20(?:[^\d]|$)|20\s*พ\.?ย|20\s*พฤศจิกายน|2026-11-20|20\/11/i.test(t);
+
+  // Ordinal day checks (วันที่ 1, วันที่ 2, วันที่ 3) - negative lookahead (?!\d) prevents 18/19/20 from matching
+  const hasDay1 = /วันที่\s*1(?!\d)|Day\s*1(?!\d)|วันแรก/i.test(t);
+  const hasDay2 = /วันที่\s*2(?!\d)|Day\s*2(?!\d)/i.test(t);
+  const hasDay3 = /วันที่\s*3(?!\d)|Day\s*3(?!\d)/i.test(t);
+
+  const day1 = isAll || has18 || hasDay1;
+  const day2 = isAll || has19 || hasDay2;
+  const day3 = isAll || has20 || hasDay3;
+
+  return { day1: !!day1, day2: !!day2, day3: !!day3 };
+}
+
+function repairRegistrationAttendanceDaysIfCorrupted_(r) {
+  if (!r || !r.RegID) return r;
+  try {
+    const cid = r.ConferenceID || APP.DEFAULT_CONFERENCE_ID;
+    const impRow = findOne_('ImportRows', { ImportedRegID: r.RegID }) || findOne_('ImportRows', { ConferenceID: cid, ImportedRegID: r.RegID });
+    if (impRow && impRow.SourceDataJson) {
+      const srcData = jsonParse_(impRow.SourceDataJson, {});
+      const rawAttendance = importValue_(srcData, ['วันเข้าร่วมงาน']);
+      if (rawAttendance) {
+        const correct = parseAttendanceDays_(rawAttendance);
+        const cur1 = bool_(r.AttendanceDay1);
+        const cur2 = bool_(r.AttendanceDay2);
+        const cur3 = bool_(r.AttendanceDay3);
+        if (cur1 !== correct.day1 || cur2 !== correct.day2 || cur3 !== correct.day3) {
+          updateRecord_('Registrations', r.__row, {
+            AttendanceDay1: correct.day1,
+            AttendanceDay2: correct.day2,
+            AttendanceDay3: correct.day3,
+            UpdatedAt: new Date(),
+            LastModifiedBy: 'SYSTEM_AUTO_REPAIR_ATTENDANCE'
+          });
+          r.AttendanceDay1 = correct.day1;
+          r.AttendanceDay2 = correct.day2;
+          r.AttendanceDay3 = correct.day3;
+          clearTableCache_('Registrations');
+          invalidateCache_(cid);
+        }
+      }
+    }
+  } catch (ignore) {}
+  return r;
+}
+
+function repairAllAttendanceDays(conferenceId) {
+  const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+  const impRows = findMany_('ImportRows', {});
+  let fixedCount = 0;
+  impRows.forEach(function(imp) {
+    if (!imp.ImportedRegID || !imp.SourceDataJson) return;
+    const r = findOne_('Registrations', { RegID: imp.ImportedRegID });
+    if (!r) return;
+    const srcData = jsonParse_(imp.SourceDataJson, {});
+    const rawAttendance = importValue_(srcData, ['วันเข้าร่วมงาน']);
+    if (!rawAttendance) return;
+    const correct = parseAttendanceDays_(rawAttendance);
+    const cur1 = bool_(r.AttendanceDay1);
+    const cur2 = bool_(r.AttendanceDay2);
+    const cur3 = bool_(r.AttendanceDay3);
+    if (cur1 !== correct.day1 || cur2 !== correct.day2 || cur3 !== correct.day3) {
+      updateRecord_('Registrations', r.__row, {
+        AttendanceDay1: correct.day1,
+        AttendanceDay2: correct.day2,
+        AttendanceDay3: correct.day3,
+        UpdatedAt: new Date(),
+        LastModifiedBy: 'SYSTEM_BULK_REPAIR_ATTENDANCE'
+      });
+      r.AttendanceDay1 = correct.day1;
+      r.AttendanceDay2 = correct.day2;
+      r.AttendanceDay3 = correct.day3;
+      try {
+        ensureMealEntitlements_(r.ConferenceID || cid, r.RegID);
+      } catch (e) {}
+      fixedCount++;
+    }
+  });
+  clearTableCache_('Registrations');
+  clearTableCache_('MealEntitlements');
+  invalidateCache_(cid);
+  return { success: true, fixedCount: fixedCount };
+}
+
+function adminRepairAttendanceDays(token, conferenceId) {
+  return runSafely_('adminRepairAttendanceDays', function() {
+    requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'REGISTRATION_STAFF'], conferenceId);
+    return repairAllAttendanceDays(conferenceId);
+  });
 }
 
 function uploadExcelForImport(token, conferenceId, file) {
@@ -3788,7 +3879,8 @@ function incrementTypeQuota_(cid,typeCode,delta){const t=findOne_('RegistrationT
 function lookupRegistrationForEdit(conferenceId,regId,emailOrPhone,editCode){
   return runSafely_('lookupRegistrationForEdit',function(){
     const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID;
-    const r=requireRegistrationAccess_(cid,regId,emailOrPhone,editCode);
+    let r=requireRegistrationAccess_(cid,regId,emailOrPhone,editCode);
+    r=repairRegistrationAttendanceDaysIfCorrupted_(r);
     const p=findOne_('Payments',{ConferenceID:cid,RegID:r.RegID})||{};
     const reg=publicRegistration_(r);
     reg.PaymentSlipUrl=p.SlipFileUrl||'';
@@ -3862,6 +3954,7 @@ function saveRegistrationEdit(conferenceId,regId,emailOrPhone,editCode,payload){
     }
 
     updateRecord_('Registrations',r.__row,patch);invalidateCache_(cid);
+    try{ ensureMealEntitlements_(cid,r.RegID); }catch(ignore){}
     let mealPass={sent:false,reason:''};try{mealPass=maybeAutoIssueMealPass_(cid,r.RegID,'PARTICIPANT_EDIT');}catch(ignore){}
     return {RegID:r.RegID,warnings:duplicateWarnings_(patch,cid,r.RegID),mealPass:mealPass};
   });
@@ -5436,7 +5529,8 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
 }
 
 function ensureMealEntitlements_(conferenceId,regId){
-  const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
+  let r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
+  r=repairRegistrationAttendanceDaysIfCorrupted_(r);
   const dates=jsonParse_(getSetting_(conferenceId,'EVENT_DATES_JSON','[]'),[]).slice(0,3),meals=jsonParse_(getSetting_(conferenceId,'MEALS_JSON','[]'),[]),selected=[bool_(r.AttendanceDay1),bool_(r.AttendanceDay2),bool_(r.AttendanceDay3)];
   if(!dates.length)throw new Error('ผู้ดูแลระบบยังไม่ได้กำหนดวันจัดงาน');
   if(!meals.length)throw new Error('ผู้ดูแลระบบยังไม่ได้กำหนดรายการอาหาร');
@@ -5473,7 +5567,7 @@ function getMealPass(conferenceId,regId,emailOrPhone){
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
     const cleanId = clean_(regId);
     if(!cleanId) throw new Error('กรุณาระบุเลขลงทะเบียน');
-    const r = findOne_('Registrations', {ConferenceID: cid, RegID: cleanId});
+    let r = findOne_('Registrations', {ConferenceID: cid, RegID: cleanId});
     if(!r) throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน ' + cleanId);
     const key = clean_(emailOrPhone);
     if(!key) throw new Error('กรุณาระบุ Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน');
@@ -5482,6 +5576,7 @@ function getMealPass(conferenceId,regId,emailOrPhone){
     if(normalizeEmail_(r.Email) !== keyEmail && normalizePhone_(r.Phone) !== keyPhone){
       throw new Error('Email หรือเบอร์โทรศัพท์ไม่ตรงกับข้อมูลในระบบ');
     }
+    r = repairRegistrationAttendanceDaysIfCorrupted_(r);
     const type = registrationTypeMap_(cid)[r.ParticipantType] || {};
     const elig = mealPassEligibility_(r, type);
     if(!elig.ok){
@@ -5751,7 +5846,7 @@ function sendRegistrationStatusEmail_(conferenceId,r,status,note,user){
   const res = sendEmailLogged_(conferenceId,r.Email,subject,html,'REGISTRATION_STATUS',r.RegID,user);
   return res === true || (res && res.success);
 }
-function adminGetRegistration(token,conferenceId,regId){return runSafely_('adminGetRegistration',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF'],conferenceId);const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');return {registration:serialize_(r),optionConfig:getRegistrationOptionMap_(conferenceId),registrationTypes:serialize_(findMany_('RegistrationTypes',{ConferenceID:conferenceId}).filter(function(t){return bool_(t.Active);}))};});}
+function adminGetRegistration(token,conferenceId,regId){return runSafely_('adminGetRegistration',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF'],conferenceId);let r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');r=repairRegistrationAttendanceDaysIfCorrupted_(r);return {registration:serialize_(r),optionConfig:getRegistrationOptionMap_(conferenceId),registrationTypes:serialize_(findMany_('RegistrationTypes',{ConferenceID:conferenceId}).filter(function(t){return bool_(t.Active);}))};});}
 function adminSaveRegistration(token,conferenceId,regId,payload){
   return runSafely_('adminSaveRegistration',function(){
     const ctx=requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF'],conferenceId),r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');payload=payload||{};
@@ -5808,7 +5903,9 @@ function adminSaveRegistration(token,conferenceId,regId,payload){
       LastModifiedBy:ctx.user.Email
     };
     if(!patch.AttendanceDay1&&!patch.AttendanceDay2&&!patch.AttendanceDay3)throw new Error('กรุณาเลือกวันเข้าร่วมงานอย่างน้อย 1 วัน');
-    updateRecord_('Registrations',r.__row,patch);invalidateCache_(conferenceId);let mealPass={sent:false,reason:''};try{mealPass=maybeAutoIssueMealPass_(conferenceId,regId,'ADMIN_EDIT');}catch(e){mealPass={sent:false,reason:e.message||String(e)};}
+    updateRecord_('Registrations',r.__row,patch);invalidateCache_(conferenceId);
+    try{ ensureMealEntitlements_(conferenceId,regId); }catch(ignore){}
+    let mealPass={sent:false,reason:''};try{mealPass=maybeAutoIssueMealPass_(conferenceId,regId,'ADMIN_EDIT');}catch(e){mealPass={sent:false,reason:e.message||String(e)};}
     logAudit_(conferenceId,ctx.user,ctx.role,'EDIT_REGISTRATION','Registration',regId,patch);return {registration:publicRegistration_(Object.assign({},r,patch)),warnings:duplicateWarnings_(patch,conferenceId,regId),mealPass:mealPass};
   });
 }
@@ -5846,8 +5943,9 @@ function adminListMealPasses(token,conferenceId,filters){
 function adminPreviewMealPass(token,conferenceId,regId){
   return runSafely_('adminPreviewMealPass',function(){
     requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF','FOOD_STAFF'],conferenceId);
-    const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});
+    let r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});
     if(!r)throw new Error('ไม่พบผู้ลงทะเบียน');
+    r=repairRegistrationAttendanceDaysIfCorrupted_(r);
     const type=registrationTypeMap_(conferenceId)[r.ParticipantType]||{},elig=mealPassEligibility_(r,type);
     if(!elig.ok)throw new Error(elig.reason);
     ensureMealEntitlements_(conferenceId,regId);
@@ -8863,6 +8961,7 @@ const API_ACTIONS = Object.freeze({
   adminListUsers: adminListUsers,
   adminListWorks: adminListWorks,
   adminPreviewMealPass: adminPreviewMealPass,
+  adminRepairAttendanceDays: adminRepairAttendanceDays,
   adminResendReviewerCreds: adminResendReviewerCreds,
   adminSaveRegistration: adminSaveRegistration,
   adminSearchDriveFiles: adminSearchDriveFiles,
@@ -8923,7 +9022,7 @@ const API_ACTIONS = Object.freeze({
 
 const API_WRITE_ACTIONS = Object.freeze({
   adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminSyncWorkRoundReviewers:1,
-  adminResendReviewerCreds:1, adminSaveRegistration:1, adminSendDirectEmail:1,
+  adminResendReviewerCreds:1, adminSaveRegistration:1, adminRepairAttendanceDays:1, adminSendDirectEmail:1,
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
   adminVerifyPayment:1, adminToggleReceiptStatus:1, adminUpdateReceiptInfo:1,
