@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for adding Final Round evaluation criteria (Service-CQI-Primary & Research-Innovation), enabling Admin to assign previous reviewers to Final Round works, and providing distinct round tabs and historical score visibility for Reviewers without aggregating scores.",
-  "updatedAt":  "2026-10-21T14:35:48.796719633Z",
+  "summary":  "Summary of completed updates:\n1. Added email notification pop-up modal when admin updates the status of an academic work, pre-filled with the exact requested instructions and timeline for oral and poster presentations, allowing the admin to customize or skip sending.\n2. Fixed the works status filter in admin panel to properly handle all granular statuses such as ACCEPTED_ORAL, ACCEPTED_POSTER, etc.",
+  "updatedAt":  "2026-10-30T08:41:48.631735478Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

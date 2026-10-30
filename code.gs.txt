@@ -8049,7 +8049,26 @@ function adminListWorks(token, conferenceId, filters) {
       });
     }
     if (filters.status) {
-      rows = rows.filter(function(x) { return upper_(x.Status) === upper_(filters.status); });
+      var filterStatus = upper_(filters.status);
+      rows = rows.filter(function(x) {
+        var st = upper_(x.Status || x.CurrentStatus);
+        if (filterStatus === 'ACCEPTED' || filterStatus === 'ACCEPTED_ALL') {
+          return st.indexOf('ACCEPTED') === 0 || st === 'PASS' || st === 'APPROVED' || st === 'PRESENTATION_FILE_SUBMITTED' || st === 'PRESENTATION_FILE_APPROVED' || st === 'SCHEDULED' || st === 'PUBLISHED';
+        }
+        if (filterStatus === 'SUBMITTED' || filterStatus === 'RECEIVED') {
+          return st === 'SUBMITTED' || st === 'RECEIVED' || st === 'ACADEMIC_SCREENING';
+        }
+        if (filterStatus === 'WAITING_REVIEWER_ASSIGN' || filterStatus === 'ASSIGN') {
+          return st === 'WAITING_REVIEWER_ASSIGN' || st === 'ASSIGN';
+        }
+        if (filterStatus === 'UNDER_REVIEW') {
+          return st === 'UNDER_REVIEW' || st === 'REVIEW' || st === 'IN_REVIEW';
+        }
+        if (filterStatus === 'REJECTED' || filterStatus === 'REJECT') {
+          return st === 'REJECTED' || st === 'REJECT' || st === 'FAIL' || st === 'NOT_PASS';
+        }
+        return st === filterStatus;
+      });
     }
     if (filters.presentationType) {
       var ptFilter = clean_(filters.presentationType).toLowerCase();

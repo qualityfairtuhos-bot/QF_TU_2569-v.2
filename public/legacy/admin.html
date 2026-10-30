@@ -286,13 +286,31 @@
             <option value="แบบบรรยาย">แบบบรรยาย</option>
             <option value="แบบโปสเตอร์">แบบโปสเตอร์ (e-poster)</option>
           </select>
-          <select id="workStatus" class="field" style="width:150px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
-            <option value="">ทุกสถานะ</option>
-            <option value="RECEIVED">RECEIVED</option>
-            <option value="WAITING_REVIEWER_ASSIGN">รอจ่ายงาน</option>
-            <option value="UNDER_REVIEW">กำลังพิจารณา (Under Review)</option>
-            <option value="ACCEPTED">ผ่านการพิจารณา (Accepted)</option>
-            <option value="REJECTED">ไม่ผ่าน (Rejected)</option>
+          <select id="workStatus" class="field" style="width:230px; margin:0; padding:10px; border-radius:8px; border:1px solid #ccc" onchange="renderWorksTable()">
+            <option value="">ทุกสถานะผลงาน</option>
+            <optgroup label="กลุ่มสถานะหลัก">
+              <option value="ACCEPTED">★ ผ่านการพิจารณา (Accepted ทั้งหมด)</option>
+              <option value="ACCEPTED_ORAL">ผ่าน - นำเสนอวาจา (ACCEPTED_ORAL)</option>
+              <option value="ACCEPTED_POSTER">ผ่าน - โปสเตอร์ (ACCEPTED_POSTER)</option>
+              <option value="UNDER_REVIEW">กำลังพิจารณา (UNDER_REVIEW)</option>
+              <option value="WAITING_REVIEWER_ASSIGN">รอจ่ายงาน (WAITING_REVIEWER_ASSIGN)</option>
+              <option value="SUBMITTED">ส่งผลงานแล้ว (SUBMITTED / RECEIVED)</option>
+              <option value="REJECTED">ไม่ผ่านการพิจารณา (REJECTED)</option>
+            </optgroup>
+            <optgroup label="สถานะไฟล์และการนำเสนอ">
+              <option value="WAITING_PRESENTATION_FILE">รอไฟล์นำเสนอ (WAITING_PRESENTATION_FILE)</option>
+              <option value="PRESENTATION_FILE_SUBMITTED">ส่งไฟล์นำเสนอแล้ว (PRESENTATION_FILE_SUBMITTED)</option>
+              <option value="PRESENTATION_FILE_APPROVED">ไฟล์นำเสนอผ่านแล้ว (PRESENTATION_FILE_APPROVED)</option>
+              <option value="SCHEDULED">จัดตารางนำเสนอแล้ว (SCHEDULED)</option>
+              <option value="PUBLISHED">ตีพิมพ์เผยแพร่ (PUBLISHED)</option>
+            </optgroup>
+            <optgroup label="สถานะการแก้ไข/ตรวจสอบ">
+              <option value="ACADEMIC_SCREENING">ตรวจสอบวิชาการ (ACADEMIC_SCREENING)</option>
+              <option value="RETURNED_FOR_EDIT">ส่งคืนให้แก้ไข (RETURNED_FOR_EDIT)</option>
+              <option value="REVISION_REQUIRED">ต้องแก้ไข (REVISION_REQUIRED)</option>
+              <option value="DRAFT">ร่าง (DRAFT)</option>
+              <option value="WITHDRAWN">ยกเลิก (WITHDRAWN)</option>
+            </optgroup>
           </select>
           <button class="btn btn-soft" onclick="loadWorks(true)"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
         </div>
@@ -3265,17 +3283,23 @@ function renderWorksTable(){
     const sTarget = statusVal.toUpperCase();
     filteredRows = filteredRows.filter(w => {
       const st = String(w.Status || w.CurrentStatus || '').toUpperCase();
+      if (sTarget === 'ACCEPTED' || sTarget === 'ACCEPTED_ALL') {
+        return st.startsWith('ACCEPTED') || st === 'PASS' || st === 'APPROVED' || st === 'PRESENTATION_FILE_SUBMITTED' || st === 'PRESENTATION_FILE_APPROVED' || st === 'SCHEDULED' || st === 'PUBLISHED';
+      }
+      if (sTarget === 'ACCEPTED_ORAL') {
+        return st === 'ACCEPTED_ORAL';
+      }
+      if (sTarget === 'ACCEPTED_POSTER') {
+        return st === 'ACCEPTED_POSTER';
+      }
       if (sTarget === 'WAITING_REVIEWER_ASSIGN') {
         return st === 'WAITING_REVIEWER_ASSIGN' || st === 'WAIT_ASSIGN' || st === 'SCREENING_PASSED' || st === 'WAIT_REVIEWER';
       }
-      if (sTarget === 'RECEIVED') {
+      if (sTarget === 'RECEIVED' || sTarget === 'SUBMITTED') {
         return st === 'RECEIVED' || st === 'SUBMITTED';
       }
       if (sTarget === 'UNDER_REVIEW') {
         return st === 'UNDER_REVIEW' || st === 'REVIEWING' || st === 'IN_REVIEW';
-      }
-      if (sTarget === 'ACCEPTED') {
-        return st === 'ACCEPTED' || st === 'APPROVED' || st === 'PASS';
       }
       if (sTarget === 'REJECTED') {
         return st === 'REJECTED' || st === 'FAIL';
@@ -3399,7 +3423,7 @@ function renderWorksTable(){
       <!-- แถวที่ 2: ปรับสถานะ, ส่งอีเมล, จัดการไฟล์, และลบผลงาน -->
       <div style="display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
         <button class="btn btn-gold btn-sm btn-sq" title="ปรับสถานะ/ประเภทผลงาน" onclick="openUpdateWorkStatus('${esc(w.WorkID)}', '${esc(w.Status||w.CurrentStatus)}')"><i class="fa-solid fa-pen-to-square"></i></button>
-        <button class="btn btn-soft btn-sm btn-sq" title="ส่งอีเมลแจ้งผู้แต่ง" onclick="openEmail('${esc(pInfo.email)}','แจ้งผลงาน ${esc(w.WorkCode||'')}','เรียน ${esc(pInfo.name)}', '${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
+        <button class="btn btn-soft btn-sm btn-sq" title="ส่งอีเมลแจ้งผลการประเมิน/สถานะผลงาน" onclick="promptWorkStatusNotificationEmail('${esc(w.WorkID)}')"><i class="fa-solid fa-envelope"></i></button>
         <button class="btn btn-gold btn-sm btn-sq" title="แนบ/จัดการไฟล์" onclick="openUploadModal('${esc(w.WorkID)}','${esc(w.RegID||'')}')"><i class="fa-solid fa-cloud-arrow-up"></i></button>
         <button class="btn btn-sm btn-sq" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="ลบผลงานนี้ (รวมไฟล์แนบ)" onclick="deleteWorkItem('${esc(w.WorkID)}', '${esc(w.WorkCode||w.WorkID)}', '${esc((w.TitleTH||w.TitleEN||'').replace(/['\"\\`]/g, ' '))}')"><i class="fa-solid fa-trash-can"></i></button>
         ${fileBadges}
@@ -4922,6 +4946,119 @@ async function openUpdateWorkStatus(wid, currentStatus) {
       hide();
       toast('อัปเดตข้อมูลและสถานะผลงานสำเร็จ');
       await loadWorks();
+      await promptWorkStatusNotificationEmail(wid, x.value.status, w);
+    } catch(e) {
+      hide();
+      err(e);
+    }
+  }
+}
+
+async function promptWorkStatusNotificationEmail(wid, newStatus, workData) {
+  const w = workData || (window.WORK_ROWS || []).find(x => x.WorkID === wid) || {};
+  const pInfo = getWorkPresenterDisplay(w);
+  const recipientEmail = pInfo.email || w.PresenterEmail || w.RegistrationEmail || '';
+  const recipientName = pInfo.name && pInfo.name !== '-' ? pInfo.name : (w.PresenterName || 'ผู้ส่งผลงาน');
+  const workCode = w.WorkCode || wid || '';
+  const workTitle = w.TitleTH || w.ThaiTitle || w.TitleEN || '';
+
+  const defaultSubject = `[TUH Quality Fair 2569] แจ้งสถานะและผลการประเมินผลงาน (${workCode})`;
+  const defaultBody = `แจ้งผู้ส่งผลงานทุกท่าน
+1. ขอให้ผู้ส่งผลงานเข้าตรวจสอบผลการประเมินได้ที่ https://qf-2569.vercel.app  เลือกเมนูสถานะงาน 
+2. กรณีท่านนำเสนอผลงาน ขอแจ้งกำหนดเวลานำเสนอผลงานดังนี้
+กำหนดระยะเวลาในการนำเสนอผลงาน
+        2.1 Oral Presentation กำหนดระยะเวลานำเสนอผลงานละ 12 นาที โดยแบ่งเป็น
+           - การนำเสนอผลงาน 10 นาที
+           - ช่วงถาม–ตอบ 2 นาที
+
+        2.2 Poster Presentation กำหนดระยะเวลานำเสนอผลงานละ 5 นาที โดยแบ่งเป็น
+           - การนำเสนอผลงาน 5 นาที
+           ทั้งนี้ หากมีเวลาเหลือ กรรมการสามารถซักถามหรือขอข้อมูลเพิ่มเติมจากผู้นำเสนอได้ตามความเหมาะสม
+
+หากมีข้อสอบถามเพิ่มเติมได้ที่ qualityfair.tuhos@gmail.com`;
+
+  const html = `
+    <div style="text-align:left; font-size:0.9rem; line-height:1.5;">
+      <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:0.85rem; color:#0f766e;">
+        <i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><b>บันทึกสถานะเรียบร้อยแล้ว</b> ต้องการส่งอีเมลแจ้งผู้ส่งผลงานหรือไม่? ท่านสามารถแก้ไขข้อความหรือเลือกไม่ส่งอีเมลได้
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <b style="color:#0C385B; font-size:0.95rem;">รหัสผลงาน: ${esc(workCode)}</b>
+          <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:600; padding:2px 8px; border-radius:4px; font-size:0.8rem;">สถานะ: ${esc(newStatus || w.Status || '-')}</span>
+        </div>
+        <div style="color:#334155; font-size:0.85rem; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${esc(workTitle)}">${esc(workTitle)}</div>
+        <div style="color:#64748b; font-size:0.8rem; margin-top:2px;">ผู้ส่ง/นำเสนอ: <b>${esc(recipientName)}</b></div>
+      </div>
+
+      <div class="field" style="margin-bottom:10px;">
+        <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
+          <i class="fa-solid fa-envelope" style="color:#006D70; margin-right:4px;"></i>อีเมลผู้รับ (To):
+        </label>
+        <input id="swalEmailTo" class="swal2-input" style="width:100%; margin:0; box-sizing:border-box; font-size:0.9rem; height:38px; padding:6px 10px;" value="${esc(recipientEmail)}" placeholder="ระบุอีเมลผู้รับ เช่น example@domain.com">
+      </div>
+
+      <div class="field" style="margin-bottom:10px;">
+        <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
+          <i class="fa-solid fa-heading" style="color:#006D70; margin-right:4px;"></i>หัวข้ออีเมล (Subject):
+        </label>
+        <input id="swalEmailSubj" class="swal2-input" style="width:100%; margin:0; box-sizing:border-box; font-size:0.9rem; height:38px; padding:6px 10px;" value="${esc(defaultSubject)}" placeholder="หัวข้ออีเมล">
+      </div>
+
+      <div class="field" style="margin-bottom:6px;">
+        <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
+          <i class="fa-solid fa-file-lines" style="color:#006D70; margin-right:4px;"></i>เนื้อหาอีเมล (Message Body - สามารถแก้ไขหรือเพิ่มเติมได้):
+        </label>
+        <textarea id="swalEmailBody" class="swal2-textarea" style="width:100%; margin:0; box-sizing:border-box; font-size:0.88rem; height:230px; line-height:1.6; padding:8px 10px; font-family:sans-serif;" placeholder="พิมพ์ข้อความที่ต้องการแจ้งผู้ส่งผลงาน...">${esc(defaultBody)}</textarea>
+      </div>
+    </div>
+  `;
+
+  const result = await Swal.fire({
+    title: '<span style="font-size:1.15rem; color:#006D70;"><i class="fa-solid fa-envelope-open-text"></i> ส่งอีเมลแจ้งผู้ส่งผลงาน</span>',
+    html: html,
+    width: 680,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> ส่งอีเมลแจ้งผู้ส่งผลงาน',
+    denyButtonText: 'ไม่ส่งอีเมล (เสร็จสิ้น)',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#006D70',
+    denyButtonColor: '#64748b',
+    cancelButtonColor: '#94a3b8',
+    focusConfirm: false,
+    preConfirm: () => {
+      const to = ($('#swalEmailTo')?.value || '').trim();
+      const subj = ($('#swalEmailSubj')?.value || '').trim();
+      const body = ($('#swalEmailBody')?.value || '').trim();
+      if (!to) {
+        Swal.showValidationMessage('กรุณาระบุอีเมลผู้รับ');
+        return false;
+      }
+      if (!subj) {
+        Swal.showValidationMessage('กรุณาระบุหัวข้ออีเมล');
+        return false;
+      }
+      if (!body) {
+        Swal.showValidationMessage('กรุณาระบุเนื้อหาอีเมล');
+        return false;
+      }
+      return { to, subj, body };
+    }
+  });
+
+  if (result.isConfirmed && result.value) {
+    show('กำลังส่งอีเมลแจ้งผู้ส่งผลงาน...');
+    try {
+      await rpc('adminSendDirectEmail', TOKEN, CID, result.value.to, result.value.subj, result.value.body, []);
+      hide();
+      await Swal.fire({
+        icon: 'success',
+        title: 'ส่งอีเมลเรียบร้อยแล้ว',
+        text: `ส่งอีเมลแจ้งไปยัง ${result.value.to} สำเร็จ`,
+        confirmButtonColor: '#006D70'
+      });
     } catch(e) {
       hide();
       err(e);
