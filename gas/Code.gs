@@ -4028,7 +4028,34 @@ function adminListPayments(token,conferenceId,filters){
     }
 
     let rows = baseRows;
-    if(filters.q){const q=clean_(filters.q).toLowerCase();rows=rows.filter(function(x){return [x.RegID,x.Registration.FullName,x.Registration.Email,x.Registration.Phone].join(' ').toLowerCase().indexOf(q)>=0;});}
+    if(filters.q){
+      const q=clean_(filters.q).toLowerCase();
+      const qTokens = q.split(/\s+/).filter(Boolean);
+      rows=rows.filter(function(x){
+        var r = x.Registration || {};
+        var str = [
+          x.RegID,
+          x.PaymentID,
+          x.FullName,
+          r.FullName,
+          r.Prefix,
+          r.FirstName,
+          r.LastName,
+          x.Email,
+          r.Email,
+          x.Phone,
+          r.Phone,
+          x.ReceiptName,
+          r.ReceiptName,
+          x.ReceiptTaxID,
+          r.ReceiptTaxID,
+          x.ReceiptNo,
+          x.Amount,
+          x.RequiredAmount
+        ].filter(Boolean).join(' ').toLowerCase();
+        return qTokens.every(function(tok){ return str.indexOf(tok) >= 0; });
+      });
+    }
     if(filters.status)rows=rows.filter(function(x){return upper_(x.Status)===upper_(filters.status);});
     return rows;
   });
@@ -5933,7 +5960,14 @@ function adminListMealPasses(token,conferenceId,filters){
     }
 
     let rows = baseRows;
-    if(filters.q){const q=clean_(filters.q).toLowerCase();rows=rows.filter(function(x){return [x.RegID,x.FullName,x.Email,x.Phone].join(' ').toLowerCase().indexOf(q)>=0;});}
+    if(filters.q){
+      const q=clean_(filters.q).toLowerCase();
+      const qTokens = q.split(/\s+/).filter(Boolean);
+      rows=rows.filter(function(x){
+        var str = [x.RegID, x.FullName, x.Email, x.Phone, x.ParticipantTypeName, x.EligibilityReason].filter(Boolean).join(' ').toLowerCase();
+        return qTokens.every(function(tok){ return str.indexOf(tok) >= 0; });
+      });
+    }
     if(filters.eligibility==='ELIGIBLE')rows=rows.filter(function(x){return x.Eligible;});if(filters.eligibility==='NOT_ELIGIBLE')rows=rows.filter(function(x){return !x.Eligible;});
     if(filters.paymentStatus)rows=rows.filter(function(x){return upper_(x.PaymentStatus)===upper_(filters.paymentStatus);});
     if(filters.sentStatus==='SENT')rows=rows.filter(function(x){return x.DispatchCount>0;});if(filters.sentStatus==='NOT_SENT')rows=rows.filter(function(x){return x.DispatchCount===0;});
@@ -7623,8 +7657,25 @@ function adminListRegistrations(token, conferenceId, filters) {
     let rows = baseRows;
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
+      var qTokens = q.split(/\s+/).filter(Boolean);
       rows = rows.filter(function(r) {
-        return [r.RegID, r.FullName, r.Email, r.Phone, r.CID, r.Institution, r.OrganizationGroup, r.OrganizationUnit].join(' ').toLowerCase().indexOf(q) >= 0;
+        var str = [
+          r.RegID,
+          r.FullName,
+          r.Prefix,
+          r.FirstName,
+          r.LastName,
+          r.Email,
+          r.Phone,
+          r.CID,
+          r.Institution,
+          r.OrganizationGroup,
+          r.OrganizationUnit,
+          r.Position,
+          r.Profession,
+          r.ParticipantType
+        ].filter(Boolean).join(' ').toLowerCase();
+        return qTokens.every(function(tok) { return str.indexOf(tok) >= 0; });
       });
     }
     if (filters.status) {
@@ -7978,8 +8029,23 @@ function adminListWorks(token, conferenceId, filters) {
     let rows = baseRows;
     if (filters.q) {
       var q = clean_(filters.q).toLowerCase();
+      var qTokens = q.split(/\s+/).filter(Boolean);
       rows = rows.filter(function(x) {
-        return [x.WorkCode, x.RegID, x.TitleTH, x.TitleEN, x.PresenterName, x.RegistrationFullName, x.CategoryName, x.PresentationType, x.PresentationTypeName].join(' ').toLowerCase().indexOf(q) >= 0;
+        var str = [
+          x.WorkCode,
+          x.WorkID,
+          x.RegID,
+          x.TitleTH,
+          x.TitleEN,
+          x.PresenterName,
+          x.PresenterEmail,
+          x.RegistrationFullName,
+          x.RegistrationEmail,
+          x.CategoryName,
+          x.PresentationType,
+          x.PresentationTypeName
+        ].filter(Boolean).join(' ').toLowerCase();
+        return qTokens.every(function(tok) { return str.indexOf(tok) >= 0; });
       });
     }
     if (filters.status) {
