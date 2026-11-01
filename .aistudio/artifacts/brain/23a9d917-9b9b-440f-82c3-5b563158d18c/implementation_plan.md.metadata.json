@@ -1,6 +1,6 @@
 {
-  "summary":  "Summary of completed updates:\n1. Added email notification pop-up modal when admin updates the status of an academic work, pre-filled with the exact requested instructions and timeline for oral and poster presentations, allowing the admin to customize or skip sending.\n2. Fixed the works status filter in admin panel to properly handle all granular statuses such as ACCEPTED_ORAL, ACCEPTED_POSTER, etc.",
-  "updatedAt":  "2026-10-30T08:41:48.631735478Z",
+  "summary":  "Completed updates:\n1. Differentiated notification email templates for Oral Presentation, Poster Presentation, and Not Selected (Rejected) based on official hospital evaluation documents.\n2. Added 'ผลการประเมิน' menu and button linking directly to https://hospital.tu.ac.th/qualityfair/th/results in both the top navigation bar and the Participant Services section.\n3. Fixed dev server startup and installed missing package dependencies.",
+  "updatedAt":  "2026-11-01T09:41:32.957506126Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

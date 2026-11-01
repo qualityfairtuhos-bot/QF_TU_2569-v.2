@@ -4962,25 +4962,96 @@ async function promptWorkStatusNotificationEmail(wid, newStatus, workData) {
   const workCode = w.WorkCode || wid || '';
   const workTitle = w.TitleTH || w.ThaiTitle || w.TitleEN || '';
 
-  const defaultSubject = `[TUH Quality Fair 2569] แจ้งสถานะและผลการประเมินผลงาน (${workCode})`;
-  const defaultBody = `แจ้งผู้ส่งผลงานทุกท่าน
-1. ขอให้ผู้ส่งผลงานเข้าตรวจสอบผลการประเมินได้ที่ https://qf-2569.vercel.app  เลือกเมนูสถานะงาน 
-2. กรณีท่านนำเสนอผลงาน ขอแจ้งกำหนดเวลานำเสนอผลงานดังนี้
-กำหนดระยะเวลาในการนำเสนอผลงาน
-        2.1 Oral Presentation กำหนดระยะเวลานำเสนอผลงานละ 12 นาที โดยแบ่งเป็น
-           - การนำเสนอผลงาน 10 นาที
-           - ช่วงถาม–ตอบ 2 นาที
+  const stUpper = String(newStatus || w.Status || w.CurrentStatus || '').toUpperCase();
+  const ptText = String(w.PresentationTypeName || w.PresentationType || w.PresentationTypeRequested || '').toLowerCase();
 
-        2.2 Poster Presentation กำหนดระยะเวลานำเสนอผลงานละ 5 นาที โดยแบ่งเป็น
-           - การนำเสนอผลงาน 5 นาที
-           ทั้งนี้ หากมีเวลาเหลือ กรรมการสามารถซักถามหรือขอข้อมูลเพิ่มเติมจากผู้นำเสนอได้ตามความเหมาะสม
+  // 3 รูปแบบอีเมลมาตรฐานตามเอกสารประกาศผลงานวิชาการ งานมหกรรมคุณภาพ รพ. ครั้งที่ 19
+  const EMAIL_TEMPLATES = {
+    ORAL: {
+      key: 'ORAL',
+      label: '1. สถานะผ่าน – Oral Presentation',
+      subject: `แจ้งผลการคัดเลือกผลงานวิชาการ ประเภท Oral Presentation – งานมหกรรมคุณภาพโรงพยาบาลฯ ครั้งที่ 19 ประจำปี 2569 (${workCode})`,
+      body: `เรียน ผู้ส่งผลงาน
 
-หากมีข้อสอบถามเพิ่มเติมได้ที่ qualityfair.tuhos@gmail.com`;
+ฝ่ายประกวดผลงานวิชาการ งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแสดงความยินดีที่ผลงานของท่าน ผ่านการคัดเลือกให้เข้าร่วมนำเสนอผลงานในงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ครั้งที่ 19 ประจำปี 2569 ในรูปแบบ Oral Presentation
+
+โดยมีกำหนดระยะเวลาในการนำเสนอผลงานละ 12 นาที แบ่งเป็น
+- การนำเสนอผลงาน 10 นาที
+- ช่วงถาม–ตอบ 2 นาที
+
+ขอให้ท่านเตรียมความพร้อมและบริหารเวลาในการนำเสนอให้เป็นไปตามระยะเวลาที่กำหนด
+ทั้งนี้ รายละเอียดเกี่ยวกับวัน เวลา และสถานที่นำเสนอ จะแจ้งให้ทราบเพิ่มเติมในลำดับต่อไป
+
+ขอแสดงความยินดีและขอบคุณที่ร่วมเป็นส่วนหนึ่งในการพัฒนาคุณภาพโรงพยาบาล
+
+ฝ่ายประกวดผลงานวิชาการ งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ`
+    },
+    POSTER: {
+      key: 'POSTER',
+      label: '2. สถานะผ่าน – Poster Presentation (e-Poster)',
+      subject: `แจ้งผลการคัดเลือกผลงานวิชาการ ประเภท Poster Presentation – งานมหกรรมคุณภาพโรงพยาบาลฯ ครั้งที่ 19 ประจำปี 2569 (${workCode})`,
+      body: `เรียน ผู้ส่งผลงาน
+
+ฝ่ายประกวดผลงานวิชาการ งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแสดงความยินดีที่ผลงานของท่าน ผ่านการคัดเลือกให้เข้าร่วมนำเสนอผลงานในงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ครั้งที่ 19 ประจำปี 2569 ในรูปแบบ Poster Presentation (e-Poster)
+
+โดยมีรายละเอียดการนำเสนอ ดังนี้
+1. นำเสนอผลงานในรูปแบบ e-Poster
+2. กำหนดระยะเวลาในการนำเสนอผลงานละ 5 นาที
+เมื่อใกล้ครบกำหนดเวลาการนำเสนอ จะมีทีมงานยกป้ายแจ้งเตือนเพื่อให้ผู้นำเสนอทราบ
+3. หากมีเวลาเหลือ กรรมการอาจซักถามหรือขอข้อมูลเพิ่มเติมจากผู้นำเสนอได้ตามความเหมาะสม
+
+ขอให้ท่านเตรียมความพร้อมสำหรับการนำเสนอผลงานตามกำหนดการที่จะแจ้งให้ทราบต่อไป
+
+ขอแสดงความยินดีและขอบคุณที่ร่วมเป็นส่วนหนึ่งในการพัฒนาคุณภาพโรงพยาบาล
+
+ฝ่ายประกวดผลงานวิชาการ งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ`
+    },
+    REJECTED: {
+      key: 'REJECTED',
+      label: '3. สถานะไม่ผ่าน – ไม่ได้รับการคัดเลือก',
+      subject: `แจ้งผลการพิจารณาผลงานวิชาการ – งานมหกรรมคุณภาพโรงพยาบาลฯ ครั้งที่ 19 ประจำปี 2569 (${workCode})`,
+      body: `เรียน ผู้ส่งผลงาน
+
+ฝ่ายประกวดผลงานวิชาการ งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ขอแจ้งให้ท่านทราบว่า ผลงานของท่าน ไม่ได้รับการคัดเลือกให้เข้าร่วมนำเสนอในงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ ครั้งที่ 19 ประจำปี 2569
+
+ฝ่ายประกวดผลงานวิชาการขอขอบพระคุณท่านเป็นอย่างยิ่งที่ให้ความสนใจและส่งผลงานเข้าร่วมประกวดในครั้งนี้ การมีส่วนร่วมของท่านถือเป็นส่วนสำคัญในการส่งเสริมและพัฒนาคุณภาพการให้บริการของโรงพยาบาล
+
+หวังเป็นอย่างยิ่งว่าจะได้รับเกียรติจากท่านในการส่งผลงานเข้าร่วมกิจกรรมในโอกาสต่อไป
+
+ขอขอบพระคุณมา ณ โอกาสนี้
+
+ฝ่ายประกวดผลงานวิชาการ งานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์เฉลิมพระเกียรติ`
+    }
+  };
+
+  // ตรวจสอบผลการประเมินเพื่อเลือก Template อัตโนมัติให้ตรงกับผลงาน
+  let defaultTemplateKey = 'POSTER';
+  if (stUpper.includes('REJECT') || stUpper.includes('FAIL') || stUpper.includes('NOT_PASS')) {
+    defaultTemplateKey = 'REJECTED';
+  } else if (stUpper.includes('ORAL') || ptText.includes('oral') || ptText.includes('บรรยาย') || ptText.includes('วาจา')) {
+    defaultTemplateKey = 'ORAL';
+  } else if (stUpper.includes('POSTER') || ptText.includes('poster') || ptText.includes('โปสเตอร์')) {
+    defaultTemplateKey = 'POSTER';
+  } else if (stUpper.startsWith('ACCEPTED') || stUpper === 'PASS' || stUpper === 'APPROVED') {
+    defaultTemplateKey = (ptText.includes('oral') || ptText.includes('บรรยาย') || ptText.includes('วาจา')) ? 'ORAL' : 'POSTER';
+  }
+
+  const initialTemplate = EMAIL_TEMPLATES[defaultTemplateKey] || EMAIL_TEMPLATES.POSTER;
+  window._WORK_EMAIL_TEMPLATES = EMAIL_TEMPLATES;
+  window.changeWorkStatusEmailTemplate = function(type) {
+    const t = window._WORK_EMAIL_TEMPLATES ? window._WORK_EMAIL_TEMPLATES[type] : null;
+    if (t) {
+      const subjEl = document.getElementById('swalEmailSubj');
+      const bodyEl = document.getElementById('swalEmailBody');
+      if (subjEl) subjEl.value = t.subject;
+      if (bodyEl) bodyEl.value = t.body;
+    }
+  };
 
   const html = `
     <div style="text-align:left; font-size:0.9rem; line-height:1.5;">
       <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:0.85rem; color:#0f766e;">
-        <i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><b>บันทึกสถานะเรียบร้อยแล้ว</b> ต้องการส่งอีเมลแจ้งผู้ส่งผลงานหรือไม่? ท่านสามารถแก้ไขข้อความหรือเลือกไม่ส่งอีเมลได้
+        <i class="fa-solid fa-circle-check" style="margin-right:6px;"></i><b>บันทึกสถานะเรียบร้อยแล้ว</b> ท่านต้องการส่งอีเมลแจ้งผลการประเมินไปยังผู้ส่งผลงานหรือไม่?
       </div>
 
       <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
@@ -4994,6 +5065,17 @@ async function promptWorkStatusNotificationEmail(wid, newStatus, workData) {
 
       <div class="field" style="margin-bottom:10px;">
         <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
+          <i class="fa-solid fa-layer-group" style="color:#006D70; margin-right:4px;"></i>รูปแบบข้อความแจ้งผล (Template แบ่งตามผลการประเมิน):
+        </label>
+        <select id="swalEmailTemplateSelect" class="swal2-select" style="width:100%; margin:0; box-sizing:border-box; font-size:0.9rem; height:38px; padding:6px 10px;" onchange="window.changeWorkStatusEmailTemplate(this.value)">
+          <option value="ORAL" ${defaultTemplateKey === 'ORAL' ? 'selected' : ''}>1. สถานะผ่าน – Oral Presentation</option>
+          <option value="POSTER" ${defaultTemplateKey === 'POSTER' ? 'selected' : ''}>2. สถานะผ่าน – Poster Presentation (e-Poster)</option>
+          <option value="REJECTED" ${defaultTemplateKey === 'REJECTED' ? 'selected' : ''}>3. สถานะไม่ผ่าน – ไม่ได้รับการคัดเลือก</option>
+        </select>
+      </div>
+
+      <div class="field" style="margin-bottom:10px;">
+        <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
           <i class="fa-solid fa-envelope" style="color:#006D70; margin-right:4px;"></i>อีเมลผู้รับ (To):
         </label>
         <input id="swalEmailTo" class="swal2-input" style="width:100%; margin:0; box-sizing:border-box; font-size:0.9rem; height:38px; padding:6px 10px;" value="${esc(recipientEmail)}" placeholder="ระบุอีเมลผู้รับ เช่น example@domain.com">
@@ -5003,20 +5085,20 @@ async function promptWorkStatusNotificationEmail(wid, newStatus, workData) {
         <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
           <i class="fa-solid fa-heading" style="color:#006D70; margin-right:4px;"></i>หัวข้ออีเมล (Subject):
         </label>
-        <input id="swalEmailSubj" class="swal2-input" style="width:100%; margin:0; box-sizing:border-box; font-size:0.9rem; height:38px; padding:6px 10px;" value="${esc(defaultSubject)}" placeholder="หัวข้ออีเมล">
+        <input id="swalEmailSubj" class="swal2-input" style="width:100%; margin:0; box-sizing:border-box; font-size:0.9rem; height:38px; padding:6px 10px;" value="${esc(initialTemplate.subject)}" placeholder="หัวข้ออีเมล">
       </div>
 
       <div class="field" style="margin-bottom:6px;">
         <label style="display:block; font-weight:600; color:#334155; margin-bottom:4px; font-size:0.85rem;">
           <i class="fa-solid fa-file-lines" style="color:#006D70; margin-right:4px;"></i>เนื้อหาอีเมล (Message Body - สามารถแก้ไขหรือเพิ่มเติมได้):
         </label>
-        <textarea id="swalEmailBody" class="swal2-textarea" style="width:100%; margin:0; box-sizing:border-box; font-size:0.88rem; height:230px; line-height:1.6; padding:8px 10px; font-family:sans-serif;" placeholder="พิมพ์ข้อความที่ต้องการแจ้งผู้ส่งผลงาน...">${esc(defaultBody)}</textarea>
+        <textarea id="swalEmailBody" class="swal2-textarea" style="width:100%; margin:0; box-sizing:border-box; font-size:0.88rem; height:240px; line-height:1.6; padding:8px 10px; font-family:sans-serif;" placeholder="พิมพ์ข้อความที่ต้องการแจ้งผู้ส่งผลงาน...">${esc(initialTemplate.body)}</textarea>
       </div>
     </div>
   `;
 
   const result = await Swal.fire({
-    title: '<span style="font-size:1.15rem; color:#006D70;"><i class="fa-solid fa-envelope-open-text"></i> ส่งอีเมลแจ้งผู้ส่งผลงาน</span>',
+    title: '<span style="font-size:1.15rem; color:#006D70;"><i class="fa-solid fa-envelope-open-text"></i> ส่งอีเมลแจ้งผลการประเมิน</span>',
     html: html,
     width: 680,
     showCancelButton: true,
@@ -5056,7 +5138,7 @@ async function promptWorkStatusNotificationEmail(wid, newStatus, workData) {
       await Swal.fire({
         icon: 'success',
         title: 'ส่งอีเมลเรียบร้อยแล้ว',
-        text: `ส่งอีเมลแจ้งไปยัง ${result.value.to} สำเร็จ`,
+        text: `ส่งอีเมลแจ้งผลการประเมินไปยัง ${result.value.to} สำเร็จ`,
         confirmButtonColor: '#006D70'
       });
     } catch(e) {
