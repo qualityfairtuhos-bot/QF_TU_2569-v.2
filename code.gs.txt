@@ -4369,10 +4369,54 @@ function submitWork(conferenceId,regId,emailOrPhone,payload,files){
     invalidateCache_(cid);sendEmailLogged_(cid,r.Email,'รับผลงาน '+workCode,'<p>ระบบได้รับผลงาน <b>'+workCode+'</b> เรียบร้อยแล้ว</p><p>รูปแบบการนำเสนอ: '+clean_(presentation.TypeNameTH)+'</p>','WORK',workId,null);return {WorkID:workId,WorkCode:workCode};
   });
 }
+function parseStoredDateTimeToMs_(val) {
+  if (!val) return null;
+  if (Object.prototype.toString.call(val) === '[object Date]') return isNaN(val.getTime()) ? null : val.getTime();
+  const raw = String(val).trim();
+  if (!raw) return null;
+  try {
+    const norm = normalizeConferenceDateTime_(raw);
+    if (!norm) return null;
+    const d = new Date(norm);
+    return isNaN(d.getTime()) ? null : d.getTime();
+  } catch(e) {
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+}
+
 function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
-  if(!file || !file.base64) return null;
+  if(!file) return null;
   const filePrefix = prefix || (workId+'_'+category);
-  const up=uploadBase64File_(file,folder,filePrefix);
+  let up = null;
+  const driveUrlOrId = file.driveUrl || file.driveFileId || file.url || '';
+  if (driveUrlOrId) {
+    const driveId = extractDriveId_(driveUrlOrId);
+    if (!driveId) throw new Error('ไม่พบ Google Drive File ID หรือ URL ที่ถูกต้อง');
+    const targetFolder = resolveUploadFolder_(folder);
+    const safeName = clean_(file.name || (category + '_presentation')).replace(/[\\/:*?"<>|]/g, '_');
+    try {
+      const sourceFile = DriveApp.getFileById(driveId);
+      const newFile = sourceFile.makeCopy(filePrefix + '_' + Date.now() + '_' + safeName, targetFolder);
+      up = {
+        fileId: newFile.getId(),
+        fileUrl: newFile.getUrl(),
+        fileName: newFile.getName(),
+        mimeType: newFile.getMimeType(),
+        fileSize: newFile.getSize()
+      };
+    } catch(errDrive) {
+      up = {
+        fileId: driveId,
+        fileUrl: 'https://drive.google.com/file/d/' + driveId + '/view',
+        fileName: safeName,
+        mimeType: file.mimeType || 'application/vnd.google-apps.presentation',
+        fileSize: file.fileSize || 0
+      };
+    }
+  } else if (file.base64) {
+    up = uploadBase64File_(file, folder, filePrefix);
+  }
   if(!up || !up.fileId) return null;
   const old=findMany_('WorkFiles',{ConferenceID:cid,WorkID:workId}).filter(function(x){return x.FileCategory===category&&bool_(x.Active);});
   old.forEach(function(x){updateRecord_('WorkFiles',x.__row,{Active:false});});
@@ -4382,6 +4426,7 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
     ConferenceID:cid,
     WorkID:workId,
     RegID:regId,
+    AssignmentID:'',
     FileCategory:category,
     VersionNo:version,
     FileName:up.fileName,
@@ -4407,7 +4452,7 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
     const st=upper_(w.Status);
     const canOriginal=['DRAFT','SUBMITTED','ACADEMIC_SCREENING','RETURNED_FOR_EDIT'].indexOf(st)>=0;
     const canRevise=['REVISION_REQUIRED','REVISION_REQUESTED','REVISION_SUBMITTED'].indexOf(st)>=0;
-    const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED'].indexOf(st)>=0;
+    const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED'].indexOf(st)>=0;
     
     if(['ORIGINAL','ETHICS','PRESENTER_BIO'].indexOf(category)>=0){
       if(!canOriginal)throw new Error('บทความถูกส่งให้คณะกรรมการประเมิน (Reviewer) แล้ว หากต้องการแก้ไขไฟล์ กรุณาติดต่อผู้ดูแลระบบ (Admin)');
@@ -4416,8 +4461,11 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
     if(category==='FINAL_PRESENTATION'){
       if(!canPresent)throw new Error('ไม่สามารถอัปโหลดไฟล์นำเสนอในสถานะนี้ได้');
       const conf=findOne_('Conferences',{ConferenceID:cid});
-      if(conf&&conf.PresentationUploadCloseAt&&new Date(conf.PresentationUploadCloseAt).getTime()<Date.now()){
-        throw new Error('ระบบปิดรับไฟล์นำเสนอแล้ว');
+      if(conf&&conf.PresentationUploadCloseAt){
+        const closeMs = parseStoredDateTimeToMs_(conf.PresentationUploadCloseAt);
+        if(closeMs && closeMs < Date.now()){
+          throw new Error('ระบบปิดรับไฟล์นำเสนอแล้ว');
+        }
       }
     }
     const folderMap={

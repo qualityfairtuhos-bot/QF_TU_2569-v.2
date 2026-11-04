@@ -1,6 +1,6 @@
 {
-  "summary":  "Completed updates:\n1. Differentiated notification email templates for Oral Presentation, Poster Presentation, and Not Selected (Rejected) based on official hospital evaluation documents.\n2. Added 'ผลการประเมิน' menu and button linking directly to https://hospital.tu.ac.th/qualityfair/th/results in both the top navigation bar and the Participant Services section.\n3. Fixed dev server startup and installed missing package dependencies.",
-  "updatedAt":  "2026-11-01T09:41:32.957506126Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "สรุปการแก้ไขปัญหาการอัปโหลดไฟล์นำเสนอขนาด 12MB และการแก้ไขรูปแบบวันที่ปิดรับไฟล์นำเสนอผลงานในการตั้งค่าระบบ",
+  "updatedAt": "2026-11-04T02:55:15.733140758Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

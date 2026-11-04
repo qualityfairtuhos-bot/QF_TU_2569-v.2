@@ -441,12 +441,113 @@ function show(t){$('#loadText').textContent=t||'กำลังประมว�
 function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามารถดำเนินการได้',text:e.message||String(e),confirmButtonColor:'#006D70'})}
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
 function fileObj(el){return new Promise((res,rej)=>{const f=el.files[0];if(!f)return res(null);const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
+async function uploadFileInChunks(file, onProgress){
+  const b64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result;
+      resolve(typeof res === 'string' ? res.split(',')[1] : '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const CHUNK_SIZE = 1500000;
+  if(b64.length <= CHUNK_SIZE){
+    return { name: file.name, mimeType: file.type || 'application/octet-stream', base64: b64, fileSize: file.size };
+  }
+  const uploadId = 'up_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  const totalChunks = Math.ceil(b64.length / CHUNK_SIZE);
+  for(let i = 0; i < totalChunks; i++){
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, b64.length);
+    const chunkData = b64.substring(start, end);
+    if(onProgress) onProgress(Math.round(((i + 1) / totalChunks) * 100), i + 1, totalChunks);
+    const res = await fetch('/api/gas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'uploadFileChunk',
+        args: [{ uploadId, chunkIndex: i, totalChunks, chunkData }],
+        requestId: crypto.randomUUID(),
+        timestamp: Date.now()
+      })
+    });
+    const json = await res.json();
+    if(!json.success) throw new Error(json.message || ('เกิดข้อผิดพลาดในการส่งข้อมูลส่วนที่ ' + (i + 1)));
+  }
+  return {
+    name: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    fileSize: file.size,
+    chunkUploadId: uploadId
+  };
+}
 function formObj(f){const o={};new FormData(f).forEach((v,k)=>o[k]=v);return o}function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 function normalizeTaxId(v){if(v===undefined||v===null)return '';let s=String(v).replace(/[^\d]/g,'');if(s.length===12)s='0'+s;return s}
-function pad2(n){return String(Number(n)||0).padStart(2,'0')}function parseStoredDate(v){if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0));const d=new Date(s);return isNaN(d)?null:d}
-function formatBeDateTime(v){const d=parseStoredDate(v);if(!d)return v||'';return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`}function formatBeIsoDate(v){const d=parseStoredDate(v);if(!d)return v||'';return `${d.getFullYear()+543}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`}
+function pad2(n){return String(Number(n)||0).padStart(2,'0')}
+function parseStoredDate(v){
+  if(!v)return null;
+  if(v instanceof Date)return isNaN(v)?null:v;
+  const s=String(v).trim();
+  const mThai=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if(mThai){
+    let yr=+mThai[3];
+    if(yr>=2400) yr-=543;
+    return new Date(yr,+mThai[2]-1,+mThai[1],+(mThai[4]||0),+(mThai[5]||0));
+  }
+  const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?(?::(\d{2}))?(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?/);
+  if(m){
+    let yr=Number(m[1]);
+    if(yr>=2400) yr-=543;
+    return new Date(yr,Number(m[2])-1,Number(m[3]),Number(m[4]||0),Number(m[5]||0),Number(m[6]||0));
+  }
+  const d=new Date(s);
+  if(isNaN(d)) return null;
+  if(d.getFullYear()>=2400) d.setFullYear(d.getFullYear()-543);
+  return d;
+}
+function formatBeDateTime(v){
+  if(!v)return '';
+  const str=String(v).trim();
+  if(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/.test(str)){
+    const parts=str.split(/[\/\s:]/);
+    return `${pad2(parts[0])}/${pad2(parts[1])}/${parts[2]} ${pad2(parts[3])}:${pad2(parts[4])}`;
+  }
+  const d=parseStoredDate(v);
+  if(!d)return v||'';
+  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function formatBeIsoDate(v){const d=parseStoredDate(v);if(!d)return v||'';return `${d.getFullYear()+543}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`}
 function validateRealDate(y,m,d){const x=new Date(y,m-1,d);return x.getFullYear()===y&&x.getMonth()===m-1&&x.getDate()===d}
-function parseBeDateTime(value,label){const raw=String(value||'').trim();if(!raw)return '';let m=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);let day,month,year,hour=0,minute=0;if(m){day=+m[1];month=+m[2];year=+m[3];hour=+(m[4]||0);minute=+(m[5]||0)}else{m=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?$/);if(!m)throw new Error(`${label}: กรุณากรอกเป็น dd/mm/พ.ศ. HH:mm`);year=+m[1];month=+m[2];day=+m[3];hour=+(m[4]||0);minute=+(m[5]||0)}if(year<2500)throw new Error(`${label}: พบปี ${year} กรุณากรอกเป็นปี พ.ศ.`);const ce=year-543;if(!validateRealDate(ce,month,day)||hour>23||minute>59)throw new Error(`${label}: วันที่หรือเวลาไม่ถูกต้อง`);return `${ce}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:00+07:00`}
+function parseBeDateTime(value,label){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+  let m=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  let day,month,year,hour=0,minute=0;
+  if(m){
+    day=+m[1];month=+m[2];year=+m[3];hour=+(m[4]||0);minute=+(m[5]||0);
+  }else{
+    m=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?(?::(\d{2}))?(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?$/);
+    if(m){
+      year=+m[1];month=+m[2];day=+m[3];hour=+(m[4]||0);minute=+(m[5]||0);
+    }else{
+      const parsed=new Date(raw);
+      if(!isNaN(parsed.getTime())){
+        year=parsed.getFullYear()>=2400?parsed.getFullYear():parsed.getFullYear()+543;
+        month=parsed.getMonth()+1;
+        day=parsed.getDate();
+        hour=parsed.getHours();
+        minute=parsed.getMinutes();
+      }else{
+        throw new Error(`${label}: กรุณากรอกเป็น dd/mm/พ.ศ. HH:mm`);
+      }
+    }
+  }
+  if(year<2400) year+=543;
+  const ce=year-543;
+  if(!validateRealDate(ce,month,day)||hour>23||minute>59)throw new Error(`${label}: วันที่หรือเวลาไม่ถูกต้อง`);
+  return `${ce}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:00+07:00`;
+}
 function parseBeEventDate(value){const raw=String(value||'').trim();let m=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);let y,mo,d;if(m){y=+m[1];mo=+m[2];d=+m[3]}else{m=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(!m)throw new Error(`วันจัดงาน '${raw}' ไม่ถูกต้อง`);d=+m[1];mo=+m[2];y=+m[3]}if(y<2500)throw new Error(`วันจัดงาน '${raw}' ต้องใช้ปี พ.ศ.`);const ce=y-543;if(!validateRealDate(ce,mo,d))throw new Error(`วันจัดงาน '${raw}' ไม่มีอยู่จริง`);return `${ce}-${pad2(mo)}-${pad2(d)}`}
 function convertEventDatesJsonToCe(raw){let arr;try{arr=JSON.parse(raw||'[]')}catch(e){throw new Error('วันจัดงาน JSON ไม่ถูกต้อง')}if(!Array.isArray(arr)||arr.length>3)throw new Error('วันจัดงานต้องเป็น Array และไม่เกิน 3 วัน');return JSON.stringify(arr.map(parseBeEventDate))}function storedEventJsonToBe(raw){try{return JSON.stringify(JSON.parse(raw||'[]').map(formatBeIsoDate))}catch(e){return '[]'}}
 function listTextToJson(v){return JSON.stringify([...new Set(String(v||'').split(/\r?\n|,/).map(x=>x.trim()).filter(Boolean))])}function warnGregorianInput(el){const years=String(el.value||'').match(/\d{4}/g)||[];const y=years.length?+years.at(-1):0;if(y&&y<2500){el.classList.add('invalid-year');Swal.fire({icon:'warning',title:'กรุณากรอกปี พ.ศ.',text:`พบปี ${y} ซึ่งต่ำกว่า 2500`})}else el.classList.remove('invalid-year')}
@@ -868,7 +969,16 @@ async function loadSettings(forceRefresh = false){
     DATE_FIELDS.forEach(k=>f.elements[k].value=formatBeDateTime(d.conference[k]));
     const sm={};
     d.settings.forEach(x=>sm[x.SettingKey]=x.SettingValue);
-    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL','PRESENTATION_SUBMISSION_CLOSE_AT'].forEach(k=>f.elements[k].value=sm[k]||(k==='PRESENTATION_SUBMISSION_CLOSE_AT'?'10/11/2569 23:59':''));
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL'].forEach(k=>f.elements[k].value=sm[k]||'');
+    const presDl = formatBeDateTime(sm.PRESENTATION_SUBMISSION_CLOSE_AT || d.conference?.PresentationUploadCloseAt || '2569-11-10T23:59:00+07:00') || '10/11/2569 23:59';
+    if(f.elements['PresentationUploadCloseAt']) f.elements['PresentationUploadCloseAt'].value = presDl;
+    if(f.elements['PRESENTATION_SUBMISSION_CLOSE_AT']) f.elements['PRESENTATION_SUBMISSION_CLOSE_AT'].value = presDl;
+    const topClose = f.elements['PresentationUploadCloseAt'];
+    const btmClose = f.elements['PRESENTATION_SUBMISSION_CLOSE_AT'];
+    if(topClose && btmClose){
+      topClose.oninput = () => { btmClose.value = topClose.value; };
+      btmClose.oninput = () => { topClose.value = btmClose.value; };
+    }
     f.elements.EVENT_DATES_JSON.value=storedEventJsonToBe(sm.EVENT_DATES_JSON);
     const o=d.optionConfig||{};
     f.elements.PREFIX_OPTIONS_JSON.value=(o.prefixes||[]).join('\n');
@@ -1166,10 +1276,11 @@ $('#settingsForm').onsubmit=async e=>{
     ['ConferenceNameTH','ConferenceNameEN','ShortName','LogoUrl','Venue','Address'].forEach(k=>conf[k]=o[k]);
     DATE_FIELDS.forEach(k=>conf[k]=parseBeDateTime(o[k],k));
     const settings={};
-    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL','PRESENTATION_SUBMISSION_CLOSE_AT'].forEach(k=>settings[k]=o[k]||(k==='PRESENTATION_SUBMISSION_CLOSE_AT'?'10/11/2569 23:59':''));
-    const finalDl = o.PRESENTATION_SUBMISSION_CLOSE_AT || o.PresentationUploadCloseAt || '10/11/2569 23:59';
-    settings.PRESENTATION_SUBMISSION_CLOSE_AT = finalDl;
-    conf.PresentationUploadCloseAt = parseBeDateTime(finalDl, 'PresentationUploadCloseAt');
+    ['INTERNAL_QUOTA','EXTERNAL_QUOTA','MAX_WORKS_PER_REGISTRATION','MIN_REVIEWERS_PER_WORK','MAX_REVIEWERS_PER_WORK','ORAL_TEMPLATE_URL','POSTER_TEMPLATE_URL'].forEach(k=>settings[k]=o[k]||'');
+    const rawDl = (o.PRESENTATION_SUBMISSION_CLOSE_AT || o.PresentationUploadCloseAt || '10/11/2569 23:59').trim();
+    const formattedDl = formatBeDateTime(rawDl) || '10/11/2569 23:59';
+    settings.PRESENTATION_SUBMISSION_CLOSE_AT = formattedDl;
+    conf.PresentationUploadCloseAt = parseBeDateTime(rawDl, 'PresentationUploadCloseAt');
     settings.INTERNAL_DAILY_QUOTA = o.INTERNAL_QUOTA || '400';
     settings.EXTERNAL_DAILY_QUOTA = o.EXTERNAL_QUOTA || '200';
     settings.EVENT_DATES_JSON=convertEventDatesJsonToCe(o.EVENT_DATES_JSON);
@@ -5316,27 +5427,20 @@ async function openUploadModal(wid, regId) {
         };
       }
     }).then(async (result) => {
-      if (result.isConfirmed && result.value && result.value.file) {
         const { file, category, replace } = result.value;
-        show('กำลังอัปโหลดไฟล์ไปยังระบบ Google Drive...');
+        show('กำลังเตรียมไฟล์สำหรับการอัปโหลด... (0%)');
         try {
-          const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const res = reader.result;
-              const b64 = typeof res === 'string' ? res.split(',')[1] : '';
-              resolve(b64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
+          const upObj = await uploadFileInChunks(file, (pct, cur, tot) => {
+            show(`กำลังอัปโหลดไฟล์... ${pct}% (ชิ้นที่ ${cur}/${tot})`);
           });
-
+          show('กำลังบันทึกไฟล์ไปยังระบบ Google Drive...');
           await rpc('adminUploadWorkFiles', TOKEN, CID, wid, regId || w.RegID || '', {
             fileCategory: category,
-            fileName: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            fileSize: file.size,
-            base64: base64,
+            fileName: upObj.name || file.name,
+            mimeType: upObj.mimeType || file.type || 'application/octet-stream',
+            fileSize: upObj.fileSize || file.size,
+            base64: upObj.base64 || '',
+            chunkUploadId: upObj.chunkUploadId || '',
             method: 'LOCAL',
             replace: replace
           });
@@ -6033,19 +6137,19 @@ async function uploadLocalFile(wid, regId){
   const file = document.getElementById('localFile').files[0];
   const type = document.getElementById('localType').value;
   if(!file) return Swal.fire('กรุณาเลือกไฟล์','','warning');
-  show('กำลังอัปโหลดไฟล์...');
+  show('กำลังเตรียมไฟล์สำหรับการอัปโหลด... (0%)');
   try {
-    const b64 = await new Promise((res,rej)=>{
-      const r = new FileReader();
-      r.onload = ()=>res(r.result.split(',')[1]);
-      r.onerror = rej;
-      r.readAsDataURL(file);
+    const upObj = await uploadFileInChunks(file, (pct, cur, tot) => {
+      show(`กำลังอัปโหลดไฟล์... ${pct}% (ชิ้นที่ ${cur}/${tot})`);
     });
+    show('กำลังบันทึกไฟล์ไปยังระบบ Google Drive...');
     await rpc('adminUploadWorkFiles', TOKEN, CID, wid, regId, {
       method: 'LOCAL',
-      fileName: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      base64: b64,
+      fileName: upObj.name || file.name,
+      mimeType: upObj.mimeType || file.type || 'application/octet-stream',
+      fileSize: upObj.fileSize || file.size,
+      base64: upObj.base64 || '',
+      chunkUploadId: upObj.chunkUploadId || '',
       fileCategory: type
     });
     hide();

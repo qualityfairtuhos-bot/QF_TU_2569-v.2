@@ -8,9 +8,75 @@ import { GAS_TIMEOUT_MS, MAX_REQUEST_BYTES, SESSION_COOKIE } from "@/lib/config"
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 const SETTINGS_FILE = path.join(process.cwd(), "persisted_settings.json");
 const WORK_LOCKS_FILE = path.join(process.cwd(), "persisted_work_locks.json");
+
+const chunkUploadMap = new Map<string, { chunks: Map<number, string>; total: number; timer: NodeJS.Timeout }>();
+
+function handleFileChunk(uploadId: string, chunkIndex: number, totalChunks: number, chunkData: string): boolean {
+  let entry = chunkUploadMap.get(uploadId);
+  if (!entry) {
+    const timer = setTimeout(() => {
+      chunkUploadMap.delete(uploadId);
+    }, 15 * 60 * 1000);
+    entry = { chunks: new Map<number, string>(), total: totalChunks, timer };
+    chunkUploadMap.set(uploadId, entry);
+  }
+  entry.chunks.set(chunkIndex, chunkData);
+  return entry.chunks.size === totalChunks;
+}
+
+function getReassembledChunk(uploadId: string): string | null {
+  const entry = chunkUploadMap.get(uploadId);
+  if (!entry) return null;
+  clearTimeout(entry.timer);
+  const parts: string[] = [];
+  for (let i = 0; i < entry.total; i++) {
+    const p = entry.chunks.get(i);
+    if (p === undefined) return null;
+    parts.push(p);
+  }
+  chunkUploadMap.delete(uploadId);
+  return parts.join("");
+}
+
+function resolveChunkedArgs(target: any): void {
+  if (!target || typeof target !== "object") return;
+  if (target.chunkUploadId) {
+    const full = getReassembledChunk(String(target.chunkUploadId));
+    if (full) {
+      target.base64 = full;
+      delete target.chunkUploadId;
+    }
+  }
+  for (const k of Object.keys(target)) {
+    if (target[k] && typeof target[k] === "object") {
+      resolveChunkedArgs(target[k]);
+    }
+  }
+}
+
+export function formatToThaiBeDateTime(val: any): string {
+  if (!val) return "10/11/2569 23:59";
+  const s = String(val).trim();
+  if (/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/.test(s)) {
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/)!;
+    return `${m[1].padStart(2, "0")}/${m[2].padStart(2, "0")}/${m[3]} ${(m[4] || "23").padStart(2, "0")}:${(m[5] || "59").padStart(2, "0")}`;
+  }
+  const mIso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?/);
+  if (mIso) {
+    let yr = Number(mIso[1]);
+    if (yr < 2400) yr += 543;
+    const mo = String(mIso[2]).padStart(2, "0");
+    const d = String(mIso[3]).padStart(2, "0");
+    const hr = String(mIso[4] || "23").padStart(2, "0");
+    const mi = String(mIso[5] || "59").padStart(2, "0");
+    return `${d}/${mo}/${yr} ${hr}:${mi}`;
+  }
+  return s;
+}
 
 function getPersistedSettings(): Record<string, any> {
   try {
@@ -347,6 +413,31 @@ export async function POST(req: NextRequest) {
     return errorResponse("จำนวนพารามิเตอร์ไม่ถูกต้อง", "VALIDATION_ERROR", 400, reqId);
   }
 
+  if (action === "uploadFileChunk") {
+    const chunkInfo = args[0] || {};
+    const uploadId = String(chunkInfo.uploadId || "");
+    const chunkIndex = Number(chunkInfo.chunkIndex ?? 0);
+    const totalChunks = Number(chunkInfo.totalChunks ?? 1);
+    const chunkData = String(chunkInfo.chunkData || "");
+
+    if (!uploadId || !chunkData) {
+      return errorResponse("ข้อมูล Chunk ไม่ถูกต้อง", "INVALID_CHUNK", 400, reqId);
+    }
+
+    const ready = handleFileChunk(uploadId, chunkIndex, totalChunks, chunkData);
+    return NextResponse.json({
+      success: true,
+      data: {
+        uploadId,
+        chunkIndex,
+        totalChunks,
+        ready,
+      },
+    });
+  }
+
+  resolveChunkedArgs(args);
+
   if (SESSION_ACTIONS.has(action)) {
     const cookieToken = req.cookies.get(SESSION_COOKIE)?.value;
     const clientToken = (typeof args[0] === "string" && args[0].trim() && args[0] !== "__COOKIE__") ? args[0].trim() : "";
@@ -551,6 +642,13 @@ export async function POST(req: NextRequest) {
           if (item) item.SettingValue = persisted[k];
           else result.data.settings.push({ SettingKey: k, SettingValue: persisted[k] });
         });
+        const presItem = result.data.settings.find((s: any) => s.SettingKey === "PRESENTATION_SUBMISSION_CLOSE_AT");
+        if (presItem) {
+          presItem.SettingValue = formatToThaiBeDateTime(presItem.SettingValue);
+        }
+        if (result.data.conference && result.data.conference.PresentationUploadCloseAt) {
+          result.data.conference.PresentationUploadCloseAt = formatToThaiBeDateTime(result.data.conference.PresentationUploadCloseAt);
+        }
       }
 
       if (action === "verifyWorkAccess" && result.data && typeof result.data === "object") {
@@ -671,10 +769,13 @@ export async function POST(req: NextRequest) {
 
     if (action === "getAdminSettings") {
       const persisted = getPersistedSettings();
-      const settingsMap = { ...(DEFAULT_BOOTSTRAP.settings || {}), ...persisted };
+      const settingsMap: Record<string, any> = { ...(DEFAULT_BOOTSTRAP.settings || {}), ...persisted };
+      if (settingsMap.PRESENTATION_SUBMISSION_CLOSE_AT) {
+        settingsMap.PRESENTATION_SUBMISSION_CLOSE_AT = formatToThaiBeDateTime(settingsMap.PRESENTATION_SUBMISSION_CLOSE_AT);
+      }
       const settingsList = Object.entries(settingsMap).map(([k, v]) => ({
         SettingKey: k,
-        SettingValue: v,
+        SettingValue: k === "PRESENTATION_SUBMISSION_CLOSE_AT" ? formatToThaiBeDateTime(v) : v,
       }));
       return NextResponse.json(
         {
