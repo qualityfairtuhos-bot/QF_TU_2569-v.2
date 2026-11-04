@@ -5427,6 +5427,7 @@ async function openUploadModal(wid, regId) {
         };
       }
     }).then(async (result) => {
+      if (result.isConfirmed && result.value && result.value.file) {
         const { file, category, replace } = result.value;
         show('กำลังเตรียมไฟล์สำหรับการอัปโหลด... (0%)');
         try {
