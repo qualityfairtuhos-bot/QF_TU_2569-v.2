@@ -3193,11 +3193,11 @@ function formatWorkCategory(v) {
   if (!v || v === '-') return '-';
   const s = String(v).trim();
   const up = s.toUpperCase();
-  if (up === 'CAT-SERVICE' || up === 'SERVICE' || up === 'CAT-3' || /service\s*excellence/i.test(s)) return 'Service Excellence';
-  if (up === 'CAT-CQI' || up === 'CQI' || up === 'CAT-4' || /cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
-  if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || up === 'CAT-PRIMARY_CARE' || up === 'CAT-5' || /primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
-  if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || up === 'CAT-1' || /วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
-  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || up === 'CAT-2' || /นวัตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-SERVICE' || up === 'SERVICE' || up === 'CAT-3' || /(?:^|[-_])0*3(?:\b|$)|service\s*excellence/i.test(s)) return 'Service Excellence';
+  if (up === 'CAT-CQI' || up === 'CQI' || up === 'CAT-4' || /(?:^|[-_])0*4(?:\b|$)|cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
+  if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || up === 'CAT-PRIMARY_CARE' || up === 'CAT-5' || /(?:^|[-_])0*5(?:\b|$)|primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
+  if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || up === 'CAT-1' || /(?:^|[-_])0*1(?:\b|$)|วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || up === 'CAT-2' || /(?:^|[-_])0*2(?:\b|$)|นว[ั]?ตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
   if (up === 'CAT-R2R' || up === 'R2R') return 'การพัฒนางานประจำสู่งานวิจัย (R2R)';
   if (up === 'CAT-POLICY' || up === 'POLICY') return 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร';
   if (up === 'CAT-STORYTELLING' || up === 'STORYTELLING') return 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์';
@@ -3370,6 +3370,8 @@ function renderWorksTable(){
     const cf = catVal.toLowerCase();
     filteredRows = filteredRows.filter(w => {
       const rawCat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '');
+      if (rawCat === catVal) return true;
+
       const rawAll = [
         rawCat,
         w.CategoryName,
@@ -3379,11 +3381,11 @@ function renderWorksTable(){
         w.WorkType
       ].filter(Boolean).join(' ').toLowerCase();
 
-      if (cf.includes('service')) return /service|cat-service|cat-3/i.test(rawAll);
-      if (cf.includes('cqi')) return /cqi|best\s*practice|cat-cqi|cat-4/i.test(rawAll);
-      if (cf.includes('primary') || cf.includes('community')) return /primary|community|cat-primary|cat-5/i.test(rawAll);
-      if (cf.includes('วิจัย') || cf.includes('research')) return /วิจัย|research|cat-research|cat-1/i.test(rawAll);
-      if (cf.includes('นวัตกรรม') || cf.includes('innovation')) return /นวัตกรรม|innovation|cat-innovation|cat-2/i.test(rawAll);
+      if (cf.includes('service')) return /service|cat-service|(?:^|[-_])0*3(?:\b|$)/i.test(rawAll);
+      if (cf.includes('cqi')) return /cqi|best\s*practice|cat-cqi|(?:^|[-_])0*4(?:\b|$)/i.test(rawAll);
+      if (cf.includes('primary') || cf.includes('community')) return /primary|community|cat-primary|(?:^|[-_])0*5(?:\b|$)/i.test(rawAll);
+      if (cf.includes('วิจัย') || cf.includes('research')) return /วิจัย|research|cat-research|(?:^|[-_])0*1(?:\b|$)/i.test(rawAll);
+      if (cf.includes('นวัตกรรม') || cf.includes('นวตกรรม') || cf.includes('innovation')) return /นว[ั]?ตกรรม|innovation|cat-innovation|(?:^|[-_])0*2(?:\b|$)/i.test(rawAll);
       if (cf.includes('r2r')) return /r2r/i.test(rawAll);
       if (cf.includes('นโยบาย') || cf.includes('policy')) return /policy|นโยบาย/i.test(rawAll);
       if (cf.includes('เรื่องเล่า') || cf.includes('story')) return /เรื่องเล่า|story/i.test(rawAll);
@@ -4931,7 +4933,7 @@ async function openUpdateWorkStatus(wid, currentStatus) {
       if (off.code === 'CQI' && (/cqi/i.test(cCode) || /cqi|best/i.test(cName))) return true;
       if (off.code === 'PRIMARY' && (/primary/i.test(cCode) || /primary|community/i.test(cName))) return true;
       if (off.code === 'RESEARCH' && (/research/i.test(cCode) || /วิจัย|research/i.test(cName))) return true;
-      if (off.code === 'INNOVATION' && (/innovation/i.test(cCode) || /นวัตกรรม|innovation/i.test(cName))) return true;
+      if (off.code === 'INNOVATION' && (/innovation/i.test(cCode) || /นว[ั]?ตกรรม|innovation/i.test(cName))) return true;
       return false;
     });
 
@@ -4998,7 +5000,7 @@ async function openUpdateWorkStatus(wid, currentStatus) {
                                  (c.CategoryCode === 'CQI' && /cqi|best/i.test(currentCatName)) ||
                                  (c.CategoryCode === 'PRIMARY' && /primary|community/i.test(currentCatName)) ||
                                  (c.CategoryCode === 'RESEARCH' && /วิจัย|research/i.test(currentCatName)) ||
-                                 (c.CategoryCode === 'INNOVATION' && /นวัตกรรม|innovation/i.test(currentCatName))
+                                 (c.CategoryCode === 'INNOVATION' && /นว[ั]?ตกรรม|innovation/i.test(currentCatName))
                                ));
             return `<option value="${esc(cid)}" ${isSelected ? 'selected' : ''}>${esc(cName)}</option>`;
           }).join('')}

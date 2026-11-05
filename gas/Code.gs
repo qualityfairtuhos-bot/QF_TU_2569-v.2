@@ -8639,7 +8639,7 @@ function resolveCategoryName_(cVal) {
   if (up === 'CAT-CQI' || up === 'CQI' || /cqi|best\s*practice/i.test(s)) return 'CQI/ Best Practice';
   if (up === 'CAT-PRIMARY' || up === 'PRIMARY' || /primary\s*care|community\s*network/i.test(s)) return 'Primary Care & Community Network Development';
   if (up === 'CAT-RESEARCH' || up === 'RESEARCH' || /วิจัย|research/i.test(s)) return 'ผลงานวิจัยด้านคุณภาพและความปลอดภัย';
-  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || /นวัตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
+  if (up === 'CAT-INNOVATION' || up === 'INNOVATION' || /(?:^|[-_])0*2(?:\b|$)|นว[ั]?ตกรรม|innovation/i.test(s)) return 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย';
   if (up === 'CAT-R2R' || up === 'R2R') return 'การพัฒนางานประจำสู่งานวิจัย (R2R)';
   if (up === 'CAT-POLICY' || up === 'POLICY') return 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร';
   if (up === 'CAT-STORYTELLING' || up === 'STORYTELLING') return 'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์';
