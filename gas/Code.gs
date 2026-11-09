@@ -214,6 +214,8 @@ function syncOfficialCriteria_(cid) {
  * Clean Core v1.0
  * Google Apps Script + Google Sheets + Google Drive
  */
+// เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
+const APP_VERSION = '2026-11-09.4';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -1694,7 +1696,7 @@ function logoutUser(token){return runSafely_('logoutUser',function(){const th=ha
 function changePassword(token,currentPassword,newPassword){return runSafely_('changePassword',function(){const c=requireSession_(token,null,null),u=c.user;if(hashPassword_(currentPassword,u.Salt)!==String(u.PasswordHash))throw new Error('รหัสผ่านเดิมไม่ถูกต้อง');if(String(newPassword).length<8)throw new Error('รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร');const salt=uuid_();updateRecord_('Users',u.__row,{Salt:salt,PasswordHash:hashPassword_(newPassword,salt),UpdatedAt:new Date()});return true;});}
 
 function logAudit_(conferenceId,user,role,action,targetType,targetId,details){try{appendRecord_('AuditLogs',{AuditLogID:nextId_('AUD'),ConferenceID:conferenceId,Timestamp:new Date(),UserID:user&&user.UserID||'',UserEmail:user&&user.Email||'',Role:role||'',Action:action,TargetType:targetType,TargetID:targetId,DetailsJson:safeJson_(details||{}),ClientInfo:''});}catch(e){} }
-function logSystem_(name,e){try{appendRecord_('SystemLogs',{SystemLogID:nextId_('SYS'),Timestamp:new Date(),Level:'ERROR',FunctionName:name,Message:e.message||String(e),StackTrace:e.stack||'',ConferenceID:'',UserEmail:'',ClientInfo:''});}catch(ignore){} }
+function logSystem_(name,e){try{appendRecord_('SystemLogs',{SystemLogID:nextId_('SYS'),Timestamp:new Date(),Level:'ERROR',FunctionName:name,Message:e.message||String(e),StackTrace:e.stack||'',ConferenceID:'',UserEmail:'',ClientInfo:'v'+APP_VERSION});}catch(ignore){} }
 function stripHtml_(html) {
   if (!html) return '';
   return String(html)
@@ -3692,6 +3694,16 @@ function requireRegistrationAccess_(conferenceId,regId,emailOrPhone,editCode){
       const xNum = xId.replace(/^REG-\d{4}-0*/, '');
       return xId === targetUpper || (targetNum && xNum === targetNum);
     });
+  }
+
+  if (!r && /^\d{1,6}$/.test(cleanRegId)) {
+    // 1.4 พิมพ์เฉพาะตัวเลขท้าย (เช่น 463, 0463, 000463) -> ใช้เมื่อมีทะเบียนเลขนั้นเพียงรายการเดียว
+    const num = Number(cleanRegId);
+    const matches = findMany_('Registrations', {ConferenceID: cid}).filter(function(x){
+      const m = clean_(x.RegID).match(/(\d+)$/);
+      return m && Number(m[1]) === num;
+    });
+    if (matches.length === 1) r = matches[0];
   }
 
   if (!r) {

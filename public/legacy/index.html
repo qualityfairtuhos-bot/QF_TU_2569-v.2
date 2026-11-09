@@ -324,7 +324,7 @@
     </form>
   </div></section>
 
-  <section class="page" id="page-status"><div class="card"><div class="section-title"><b>แก้ไขข้อมูลและตรวจสอบสถานะ</b><span class="en">Edit registration and check status</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="statusRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="statusKey"></div><div class="field"><label>รหัสแก้ไข (ถ้ามี)<span class="en">Edit code, optional</span></label><input id="statusCode"></div></div><button class="btn btn-primary" onclick="lookupStatus()">ค้นหา<span class="en">Search</span></button></div><div id="statusResult"></div></section>
+  <section class="page" id="page-status"><div class="card"><div class="section-title"><b>แก้ไขข้อมูลและตรวจสอบสถานะ</b><span class="en">Edit registration and check status</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="statusRegId"><small style="display:block;margin-top:4px;font-size:.78rem;color:#64748b;line-height:1.4">พิมพ์เฉพาะตัวเลขท้ายได้ เช่น 463 ระบบจะเติมเป็น REG-2026-000463 ให้เอง (หรือพิมพ์ให้ครบตามรูปแบบ REG-2026-000463)</small></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="statusKey"></div><div class="field"><label>รหัสแก้ไข (ถ้ามี)<span class="en">Edit code, optional</span></label><input id="statusCode"></div></div><button class="btn btn-primary" onclick="lookupStatus()">ค้นหา<span class="en">Search</span></button></div><div id="statusResult"></div></section>
 
   <section class="page" id="page-payment">
     <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg, #f0fdfa, #f8fafc);border:1px solid #99f6e4">
@@ -343,12 +343,12 @@
       </div>
       <div style="margin-top:10px;font-size:0.85rem;color:#0f766e"><i class="fa-solid fa-circle-info"></i> เมื่อโอนเงินเรียบร้อยแล้ว กรุณากรอกรหัสลงทะเบียนและอัปโหลดสลิปหลักฐานการชำระเงินด้านล่างนี้</div>
     </div>
-    <div class="card"><div class="section-title"><b>ส่งหลักฐานการชำระเงิน</b><span class="en">Upload payment evidence</span></div><div class="grid"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="payRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="payKey"></div><div class="field"><label>หลักฐานการชำระเงิน<span class="en">Payment slip</span></label><div id="paymentSlipPreview" style="margin-bottom:8px"></div><input type="file" id="payFile" accept="image/*,.pdf"></div></div><button class="btn btn-primary" onclick="sendPayment()">อัปโหลด<span class="en">Upload</span></button></div>
+    <div class="card"><div class="section-title"><b>ส่งหลักฐานการชำระเงิน</b><span class="en">Upload payment evidence</span></div><div class="grid"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="payRegId"><small style="display:block;margin-top:4px;font-size:.78rem;color:#64748b;line-height:1.4">พิมพ์เฉพาะตัวเลขท้ายได้ เช่น 463 ระบบจะเติมเป็น REG-2026-000463 ให้เอง (หรือพิมพ์ให้ครบตามรูปแบบ REG-2026-000463)</small></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="payKey"></div><div class="field"><label>หลักฐานการชำระเงิน<span class="en">Payment slip</span></label><div id="paymentSlipPreview" style="margin-bottom:8px"></div><input type="file" id="payFile" accept="image/*,.pdf"></div></div><button class="btn btn-primary" onclick="sendPayment()">อัปโหลด<span class="en">Upload</span></button></div>
   </section>
 
-  <section class="page" id="page-work"><div class="card"><div class="section-title"><b>ส่งผลงานเพื่อนำเสนอ</b><span class="en">Work submission</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="workRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="workKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="verifyWork()">ตรวจสอบสิทธิ์<span class="en">Verify eligibility</span></button></div></div></div><div id="workFormHost"></div></section>
+  <section class="page" id="page-work"><div class="card"><div class="section-title"><b>ส่งผลงานเพื่อนำเสนอ</b><span class="en">Work submission</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="workRegId"><small style="display:block;margin-top:4px;font-size:.78rem;color:#64748b;line-height:1.4">พิมพ์เฉพาะตัวเลขท้ายได้ เช่น 463 ระบบจะเติมเป็น REG-2026-000463 ให้เอง (หรือพิมพ์ให้ครบตามรูปแบบ REG-2026-000463)</small></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="workKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="verifyWork()">ตรวจสอบสิทธิ์<span class="en">Verify eligibility</span></button></div></div></div><div id="workFormHost"></div></section>
 
-  <section class="page" id="page-author-status"><div class="card"><div class="section-title"><b>สถานะผลงาน</b><span class="en">Work Status</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="authorWorkRegId"></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="authorWorkKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="lookupAuthorWorks()">ค้นหา<span class="en">Search</span></button></div></div></div><div id="authorWorkResult"></div></section>
+  <section class="page" id="page-author-status"><div class="card"><div class="section-title"><b>สถานะผลงาน</b><span class="en">Work Status</span></div><div class="grid3"><div class="field"><label>เลขลงทะเบียน<span class="en">Registration ID</span></label><input id="authorWorkRegId"><small style="display:block;margin-top:4px;font-size:.78rem;color:#64748b;line-height:1.4">พิมพ์เฉพาะตัวเลขท้ายได้ เช่น 463 ระบบจะเติมเป็น REG-2026-000463 ให้เอง (หรือพิมพ์ให้ครบตามรูปแบบ REG-2026-000463)</small></div><div class="field"><label>Email หรือโทรศัพท์<span class="en">Email or phone</span></label><input id="authorWorkKey"></div><div><button class="btn btn-primary" style="margin-top:29px" onclick="lookupAuthorWorks()">ค้นหา<span class="en">Search</span></button></div></div></div><div id="authorWorkResult"></div></section>
 
   <section class="page" id="page-schedule">
     <div class="card" style="border:1px solid #99f6e4; background:linear-gradient(135deg, #f0fdfa, #f8fafc); margin-bottom:16px;">
@@ -825,7 +825,7 @@ $('#regForm').addEventListener('submit',async e=>{
     }
   }
 });
-async function lookupStatus(){load('กำลังค้นหาข้อมูล');try{const r=await rpc('lookupRegistrationForEdit',CID,$('#statusRegId').value,$('#statusKey').value,$('#statusCode').value);let docs=[];try{docs=await rpc('getPublicFinanceDocuments',CID,$('#statusRegId').value,$('#statusKey').value)}catch(ignore){}done();renderStatus(r,docs)}catch(e){alertErr(e)}}
+async function lookupStatus(){load('กำลังค้นหาข้อมูล');try{const r=await rpc('lookupRegistrationForEdit',CID,$('#statusRegId').value,$('#statusKey').value,$('#statusCode').value);let docs=[];try{docs=await rpc('getPublicFinanceDocuments',CID,$('#statusRegId').value,$('#statusKey').value)}catch(ignore){}done();try{if(r&&r.RegID)$('#statusRegId').value=r.RegID}catch(ig){}renderStatus(r,docs)}catch(e){alertErr(e)}}
 function renderStatus(r,docs){
   const prefixes=settingOptions('PREFIX_OPTIONS_JSON',['นาย','นาง','นางสาว','นพ.','พญ.','ทพ.','ทพญ.','ภก.','ภญ.']),positions=settingOptions('POSITION_OPTIONS_JSON',[]),professions=settingOptions('PROFESSION_OPTIONS_JSON',['แพทย์','ทันตแพทย์','เภสัชกร','พยาบาล','นักวิชาการ']);
   const cg=settingOptions('ORGANIZATION_GROUP_OPTIONS_JSON',[]),co=settingOptions('ORGANIZATION_OPTIONS_JSON',[]);
@@ -963,7 +963,7 @@ async function verifyWork(){
     return;
   }
   load('กำลังตรวจสอบสิทธิ์');
-  try{const r=await rpc('verifyWorkAccess',CID,$('#workRegId').value,$('#workKey').value);done();renderWorkForm(r.registration)}catch(e){alertErr(e)}
+  try{const r=await rpc('verifyWorkAccess',CID,$('#workRegId').value,$('#workKey').value);done();try{if(r&&r.registration&&r.registration.RegID)$('#workRegId').value=r.registration.RegID}catch(ig){}renderWorkForm(r.registration)}catch(e){alertErr(e)}
 }
 function renderWorkForm(reg){
   const categoryOptions=BOOT.workCategories.map(x=>`<option value="${esc(x.CategoryID)}" data-code="${esc(x.CategoryCode||'')}">${esc(x.CategoryNameTH)}</option>`).join('');
@@ -992,6 +992,7 @@ async function lookupAuthorWorks(forceRefresh){
   try{
     const r=await rpc('verifyWorkAccess',CID,regId,key);
     AUTHOR_WORKS_CACHE[cacheKey] = r;
+    try{ if(r && r.registration && r.registration.RegID && $('#authorWorkRegId')) $('#authorWorkRegId').value = r.registration.RegID; }catch(ig){}
     try{
       sessionStorage.setItem('TUH_AUTHOR_SEARCH', JSON.stringify({regId, key}));
     }catch(e){}
