@@ -1343,7 +1343,8 @@ async function promptReplaceWorkFile(workId,category,title,regId){
       }
 
       load('กำลังบันทึกข้อมูลเข้าระบบ...');
-      await rpc('replaceWorkFile', CID, effectiveRegId, $('#authorWorkKey').value, effectiveWorkId, category, uploadPayload);
+      const saved = await rpc('replaceWorkFile', CID, effectiveRegId, $('#authorWorkKey').value, effectiveWorkId, category, uploadPayload);
+      if(!saved || !saved.fileId) throw new Error('ระบบไม่ได้บันทึกไฟล์ กรุณาลองอัปโหลดใหม่อีกครั้ง');
       done();
       await Swal.fire({
         icon: 'success',

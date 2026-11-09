@@ -4476,10 +4476,22 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
   return up;
 }
 function getAuthorPortal(conferenceId,regId,emailOrPhone){return runSafely_('getAuthorPortal',function(){const r=requireRegistrationAccess_(conferenceId||APP.DEFAULT_CONFERENCE_ID,regId,emailOrPhone,'');const works=findMany_('Works',{ConferenceID:r.ConferenceID,RegID:r.RegID}).map(function(w){return Object.assign({},w,{authors:findMany_('WorkAuthors',{ConferenceID:r.ConferenceID,WorkID:w.WorkID}),files:findMany_('WorkFiles',{ConferenceID:r.ConferenceID,WorkID:w.WorkID}).filter(function(f){return bool_(f.Active);})});});return {registration:publicRegistration_(r),works:serialize_(works)};});}
+// สถานะที่อนุญาตให้ส่งไฟล์นำเสนอ — ต้องตรงกับเงื่อนไข canPresent ในหน้า index.html
+function isPresentationUploadAllowed_(w){
+  const st=upper_(w.Status);
+  const fd=upper_(w.FinalDecision);
+  return ['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED','PUBLISHED'].indexOf(st)>=0
+    || st.indexOf('ACCEPT')>=0
+    || fd==='ACCEPTED' || fd==='PASS';
+}
 function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
   return runSafely_('replaceWorkFile',function(){
     const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID;
     const r=requireRegistrationAccess_(cid,regId,emailOrPhone,'');
+
+    // ต้องมีข้อมูลไฟล์จริง (ไฟล์ base64 หรือลิงก์ Drive) ไม่เช่นนั้นห้ามรายงานว่าสำเร็จ
+    const hasFilePayload=!!(file&&(file.base64||file.driveUrl||file.driveFileId||file.url));
+    if(!hasFilePayload)throw new Error('ระบบไม่ได้รับข้อมูลไฟล์ (อาจเกิดจากการอัปโหลดไฟล์ขนาดใหญ่ไม่สมบูรณ์) กรุณาลองอัปโหลดใหม่อีกครั้ง หรือใช้ลิงก์ Google Drive แทน');
 
     const cleanWorkId = clean_(workId);
     const cleanRegId = clean_(regId);
@@ -4531,8 +4543,8 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
 
     const st=upper_(w.Status);
     const canOriginal=['DRAFT','SUBMITTED','ACADEMIC_SCREENING','RETURNED_FOR_EDIT'].indexOf(st)>=0;
-    const canRevise=['REVISION_REQUIRED','REVISION_REQUESTED','REVISION_SUBMITTED'].indexOf(st)>=0;
-    const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED'].indexOf(st)>=0;
+    const canRevise=['REVISION_REQUIRED','REVISE_REQUIRED','REVISION_REQUESTED','REVISION_SUBMITTED'].indexOf(st)>=0;
+    const canPresent=isPresentationUploadAllowed_(w);
 
     if(['ORIGINAL','ETHICS','PRESENTER_BIO'].indexOf(category)>=0){
       if(!canOriginal)throw new Error('บทความถูกส่งให้คณะกรรมการประเมิน (Reviewer) แล้ว หากต้องการแก้ไขไฟล์ กรุณาติดต่อผู้ดูแลระบบ (Admin)');
@@ -4559,6 +4571,7 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
     if(!folder)throw new Error('ประเภทไฟล์ไม่ถูกต้อง');
     const prefix = category==='REVISION' ? ((w.WorkCode||effectiveWorkId)+'_REVISION') : (category==='FINAL_PRESENTATION' ? ((w.WorkCode||effectiveWorkId)+'_PRESENTATION') : ((w.WorkCode||effectiveWorkId)+'_'+category));
     const up=saveWorkFile_(cid,effectiveWorkId,effectiveRegId,category,file,folder,prefix);
+    if(!up||!up.fileId)throw new Error('บันทึกไฟล์ไม่สำเร็จ ระบบไม่ได้รับไฟล์ กรุณาลองอัปโหลดใหม่อีกครั้ง');
     if(category==='REVISION')updateRecord_('Works',w.__row,{Status:'REVISION_SUBMITTED',UpdatedAt:new Date()});
     if(category==='FINAL_PRESENTATION')updateRecord_('Works',w.__row,{PresentationUploadStatus:'SUBMITTED',Status:'PRESENTATION_FILE_SUBMITTED',UpdatedAt:new Date()});
     invalidateCache_(cid);
