@@ -3675,6 +3675,8 @@ function assertConferenceWindow_(conferenceId,openField,closeField,label){
   if(openTime && openTime > now) throw new Error(label+'ยังไม่เปิดรับ (กำหนดเปิด: ' + String(c[openField]) + ')');
   if(closeTime && closeTime < now) throw new Error(label+'ปิดรับแล้ว (กำหนดปิด: ' + String(c[closeField]) + ')');
 }
+// ทำให้รหัสเทียบกันได้แม้ผู้ใช้พิมพ์ขีด/ช่องว่าง/ตัวพิมพ์ต่างกัน เช่น REG2026000130, REG-2026-000-612
+function canonId_(v){ return clean_(v).toUpperCase().replace(/[^A-Z0-9]/g,''); }
 function requireRegistrationAccess_(conferenceId,regId,emailOrPhone,editCode){
   const cleanRegId = clean_(regId);
   const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
@@ -3691,13 +3693,29 @@ function requireRegistrationAccess_(conferenceId,regId,emailOrPhone,editCode){
       return xId === targetUpper || (targetNum && xNum === targetNum);
     });
   }
+
+  if (!r) {
+    // 1.5 เทียบแบบตัดขีด/ช่องว่างออก (เช่น REG2026000130, REG-2026-000-612)
+    const canonIn = canonId_(cleanRegId);
+    if (canonIn) {
+      r = findMany_('Registrations', {ConferenceID: cid}).find(function(x){
+        return canonId_(x.RegID) === canonIn;
+      });
+    }
+  }
   
   if (!r) {
     // 2. Check if cleanRegId is actually a WorkCode (e.g. TUH-69-...) or WorkID
     const worksAll = findMany_('Works', {ConferenceID: cid});
+    const canonWork = canonId_(cleanRegId);
+    // รองรับพิมพ์เฉพาะตัวเลขของ WorkCode เช่น 69-0001-0644 หรือ REG69-0001-0361 (ไม่มี TUH)
+    const workDigits = /^\d+$/.test(canonWork) ? canonWork : (/^REG\d+$/.test(canonWork) ? canonWork.slice(3) : '');
     const targetWork = worksAll.find(function(w){
+      const wc = canonId_(w.WorkCode), wid = canonId_(w.WorkID);
       return clean_(w.WorkCode).toUpperCase() === cleanRegId.toUpperCase() ||
-             clean_(w.WorkID).toUpperCase() === cleanRegId.toUpperCase();
+             clean_(w.WorkID).toUpperCase() === cleanRegId.toUpperCase() ||
+             (canonWork && (wc === canonWork || wid === canonWork)) ||
+             (workDigits && wc === 'TUH' + workDigits);
     });
     if (targetWork && targetWork.RegID) {
       r = findOne_('Registrations', {ConferenceID: cid, RegID: targetWork.RegID});
