@@ -4,14 +4,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { ALLOWED_ACTIONS, SESSION_ACTIONS, READ_ACTIONS } from "@/lib/actions";
 import { setSessionCookie, clearSessionCookie } from "@/lib/auth";
-import { GAS_TIMEOUT_MS, MAX_REQUEST_BYTES, SESSION_COOKIE } from "@/lib/config";
+import { GAS_TIMEOUT_MS, MAX_REQUEST_BYTES, ROUTE_BUDGET_MS, SESSION_COOKIE } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const SETTINGS_FILE = path.join(process.cwd(), "persisted_settings.json");
-const WORK_LOCKS_FILE = path.join(process.cwd(), "persisted_work_locks.json");
 
 const chunkUploadMap = new Map<string, { chunks: Map<number, string>; total: number; timer: NodeJS.Timeout }>();
 
@@ -89,27 +88,6 @@ function getPersistedSettings(): Record<string, any> {
   return {};
 }
 
-function getPersistedWorkLocks(): Record<string, { lockedRound1: boolean; timestamp: string }> {
-  try {
-    if (fs.existsSync(WORK_LOCKS_FILE)) {
-      return JSON.parse(fs.readFileSync(WORK_LOCKS_FILE, "utf-8"));
-    }
-  } catch (err) {
-    console.error("Failed to read persisted_work_locks.json", err);
-  }
-  return {};
-}
-
-function savePersistedWorkLock(workId: string, locked: boolean) {
-  try {
-    const current = getPersistedWorkLocks();
-    current[workId] = { lockedRound1: locked, timestamp: new Date().toISOString() };
-    fs.writeFileSync(WORK_LOCKS_FILE, JSON.stringify(current, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to write persisted_work_locks.json", err);
-  }
-}
-
 const rateLimits = new Map<string, { count: number; reset: number }>();
 const memoryCache = new Map<string, { data: any; expiresAt: number }>();
 const staleCache = new Map<string, any>();
@@ -123,20 +101,27 @@ const CACHE_TTLS: Record<string, number> = {
   getAdminSettings: 300_000,
   adminListRegistrations: 180_000,
   adminListPayments: 180_000,
-  adminListWorks: 180_000,
+  adminListWorks: 20_000,
   adminListReviewers: 300_000,
-  adminGetReviewerEvaluationReport: 180_000,
-  adminGetWorkScoreSummary: 180_000,
+  adminGetReviewerEvaluationReport: 20_000,
+  adminGetWorkScoreSummary: 15_000,
   adminListUsers: 300_000,
   adminListMealPasses: 180_000,
   adminListFinanceDocuments: 300_000,
   adminGetReviewConfig: 300_000,
-  reviewerBootstrap: 180_000,
-  reviewerGetAssignment: 180_000,
+  reviewerBootstrap: 15_000,
   verifyWorkAccess: 120_000,
   getEventScannerBootstrap: 180_000,
   listImportBatches: 300_000,
 };
+
+// ข้อมูลคะแนน/การประเมินห้ามแสดงข้อมูลเก่าแทนเมื่อ Apps Script ขัดข้อง (ต้องขึ้น error ให้ผู้ใช้รู้)
+const NO_STALE_FALLBACK = new Set([
+  "adminListWorks",
+  "adminGetReviewerEvaluationReport",
+  "adminGetWorkScoreSummary",
+  "reviewerBootstrap",
+]);
 
 const inFlight = new Map<string, Promise<any>>();
 
@@ -229,7 +214,7 @@ function setCache(action: string, args: any[], result: any) {
   if (!ttl || !result.success) return;
   const key = buildCacheKey(action, args);
   memoryCache.set(key, { data: result, expiresAt: Date.now() + ttl });
-  staleCache.set(key, result);
+  if (!NO_STALE_FALLBACK.has(action)) staleCache.set(key, result);
 }
 
 function getCached(action: string, args: any[]): any | null {
@@ -317,12 +302,16 @@ async function fetchGasWithRetry(payload: any, maxRetries: number) {
   }
 
   let lastError: any = null;
+  const startedAt = Date.now();
   for (const url of urls) {
     for (let attempt = 0; attempt < maxRetries; attempt += 1) {
       if (attempt > 0) {
         await new Promise((resolve) => setTimeout(resolve, attempt * 600));
       }
-      const timeoutMs = Math.max(GAS_TIMEOUT_MS, 90_000);
+      // ไม่ให้รวมเวลาเกินงบของฟังก์ชัน Vercel (ไม่เช่นนั้นถูกตัดกลางคันและหน้าเว็บได้ HTML แทน JSON)
+      const remainingMs = ROUTE_BUDGET_MS - (Date.now() - startedAt);
+      if (attempt > 0 && remainingMs < 5_000) break;
+      const timeoutMs = Math.max(3_000, Math.min(Math.max(GAS_TIMEOUT_MS, 90_000), remainingMs));
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -384,7 +373,7 @@ export async function POST(req: NextRequest) {
   const rl = rateLimits.get(ip);
   if (rl && rl.reset >= now) {
     rl.count += 1;
-    if (rl.count > 180) {
+    if (rl.count > 1500) {
       return errorResponse("ส่งคำขอบ่อยเกินไป กรุณารอสักครู่", "RATE_LIMITED", 429, reqId);
     }
   } else {
@@ -554,80 +543,43 @@ export async function POST(req: NextRequest) {
         invalidateCache("saveAdminSettings");
         memoryCache.clear();
         staleCache.clear();
+        let settingsRes: any = null;
+        let settingsErr: any = null;
         try {
-          if (getGasUrls().length > 0) {
-            const gasRes = await fetchGasWithRetry(payload, 1);
-            if (gasRes.success) return NextResponse.json(gasRes);
-          }
+          settingsRes = await fetchGasWithRetry(payload, 1);
         } catch (e) {
-          console.log("Upstream saveAdminSettings skipped or failed, saved locally:", e);
+          settingsErr = e;
         }
-        return NextResponse.json({
-          success: true,
-          data: { savedLocally: true, message: "บันทึกการตั้งค่าเรียบร้อยแล้ว" },
-        });
+        if (settingsRes && settingsRes.success) return NextResponse.json(settingsRes);
+        const gasConfigured = !!(process.env.GAS_WEB_APP_URL || process.env.GAS_EXEC_URL);
+        if (!gasConfigured) {
+          // เฉพาะตอนพัฒนาในเครื่องที่ยังไม่ได้ตั้งค่า Apps Script
+          return NextResponse.json({
+            success: true,
+            data: { savedLocally: true, message: "บันทึกการตั้งค่าในเครื่องเท่านั้น (ยังไม่ได้เชื่อมต่อ Apps Script)" },
+          });
+        }
+        // ห้ามตอบสำเร็จปลอม: ถ้า Apps Script ไม่ได้บันทึก ต้องบอกผู้ใช้ตามจริง
+        const settingsMsg = (settingsRes && settingsRes.message) || (settingsErr && settingsErr.message) || "ไม่สามารถบันทึกการตั้งค่าลงระบบได้";
+        return errorResponse("บันทึกการตั้งค่าไม่สำเร็จ: " + settingsMsg, "SETTINGS_SAVE_FAILED", 502, reqId);
       }
 
-      if (action === "adminAcceptWorkScores") {
-        const workId = String(args[2] || "").trim();
-        savePersistedWorkLock(workId, true);
+      if (action === "adminAcceptWorkScores" || action === "adminUnlockWorkScores") {
+        // ล็อก/ปลดล็อกคะแนนต้องสำเร็จที่ Apps Script (ชีต) เท่านั้น ห้ามตอบสำเร็จแทน
         invalidateCache("adminGetWorkScoreSummary");
         invalidateCache("adminListWorks");
         memoryCache.clear();
         staleCache.clear();
-        try {
-          if (getGasUrls().length > 0) {
-            const gasRes = await fetchGasWithRetry(payload, 1);
-            if (gasRes.success) return NextResponse.json(gasRes);
-          }
-        } catch (e) {
-          console.log("Upstream adminAcceptWorkScores error, using local fallback:", e);
-        }
-        return NextResponse.json({
-          success: true,
-          data: {
-            workId,
-            locked: true,
-            round: 1,
-            count: 3,
-            savedLocally: true,
-            message: "รับคะแนนและล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว",
-          },
-        });
-      }
-
-      if (action === "adminUnlockWorkScores") {
-        const workId = String(args[2] || "").trim();
-        savePersistedWorkLock(workId, false);
-        invalidateCache("adminGetWorkScoreSummary");
-        invalidateCache("adminListWorks");
-        memoryCache.clear();
-        staleCache.clear();
-        try {
-          if (getGasUrls().length > 0) {
-            const gasRes = await fetchGasWithRetry(payload, 1);
-            if (gasRes.success) return NextResponse.json(gasRes);
-          }
-        } catch (e) {
-          console.log("Upstream adminUnlockWorkScores error, using local fallback:", e);
-        }
-        return NextResponse.json({
-          success: true,
-          data: {
-            workId,
-            locked: false,
-            round: 1,
-            count: 3,
-            savedLocally: true,
-            message: "ปลดล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว",
-          },
-        });
       }
 
       result = await fetchGasWithRetry(payload, isRead ? 2 : 1);
     }
 
     if (result.success) {
+      if (action === "adminAcceptWorkScores" || action === "adminUnlockWorkScores") {
+        memoryCache.clear();
+        staleCache.clear();
+      }
       if (action === "getPublicBootstrap" && result.data && typeof result.data === "object") {
         const persisted = getPersistedSettings();
         if (result.data.settings && typeof result.data.settings === "object") {
@@ -660,26 +612,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (action === "adminGetWorkScoreSummary" && result.data && typeof result.data === "object") {
-        const locks = getPersistedWorkLocks();
-        const workId = String(args[2] || "").trim();
-        const lockInfo = locks[workId];
-        if (lockInfo !== undefined) {
-          const isLocked = lockInfo.lockedRound1;
-          result.data.isRound1Locked = isLocked;
-          if (Array.isArray(result.data.assignments)) {
-            result.data.assignments.forEach((a: any) => {
-              const isRound1 = (a.ReviewRoundID === 'RR-2026-000001') || (Number(a.RoundNo) === 1) || (!a.ReviewRoundID && !a.RoundNo) || !String(a.ReviewRoundID || '').includes('000002');
-              if (isRound1) {
-                a.Locked = isLocked;
-                a.ScoreAcceptedByAdmin = isLocked;
-                a.AdminLocked = isLocked;
-                if (isLocked) a.AllowEditAfterSubmit = false;
-              }
-            });
-          }
-        }
-      }
       setCache(action, args, result);
       invalidateCache(action);
     }

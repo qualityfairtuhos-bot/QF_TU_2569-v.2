@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-09.4';
+const APP_VERSION = '2026-11-09.5';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -4450,6 +4450,7 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
         const targetFolder = resolveUploadFolder_(folder);
         const sourceFile = DriveApp.getFileById(driveId);
         const newFile = sourceFile.makeCopy(filePrefix + '_' + Date.now() + '_' + safeName, targetFolder);
+        try { newFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (ignoreShare) {}
         up = {
           fileId: newFile.getId(),
           fileUrl: newFile.getUrl(),
@@ -4463,7 +4464,8 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
           fileUrl: (String(driveUrlOrId).startsWith('http') ? driveUrlOrId : ('https://drive.google.com/file/d/' + driveId + '/view')),
           fileName: safeName,
           mimeType: file.mimeType || 'application/vnd.google-apps.presentation',
-          fileSize: file.fileSize || 0
+          fileSize: file.fileSize || 0,
+          note: 'LINK_ONLY'
         };
       }
     } else if (String(driveUrlOrId).startsWith('http')) {
@@ -4472,7 +4474,8 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
         fileUrl: driveUrlOrId,
         fileName: safeName,
         mimeType: file.mimeType || 'application/vnd.google-apps.presentation',
-        fileSize: file.fileSize || 0
+        fileSize: file.fileSize || 0,
+        note: 'LINK_ONLY'
       };
     } else {
       throw new Error('ไม่พบ Google Drive File ID หรือ URL ที่ถูกต้อง');
@@ -4501,7 +4504,7 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
     UploadedAt:new Date(),
     Active:true,
     ReplacedFileID:old.length?old[old.length-1].WorkFileID:'',
-    Note:''
+    Note:up.note||''
   });
   return up;
 }
@@ -9514,4 +9517,60 @@ function testPublicApi() {
 function testAuthenticatedApi(token) {
   const context = requireSession_(token, null, APP.DEFAULT_CONFERENCE_ID);
   return {success:true,data:{userId:context.user.UserID,role:context.role}};
+}
+
+
+/** ===== เครื่องมือตรวจ/แก้สิทธิ์เปิดไฟล์ผลงาน (รันด้วยมือจากตัวแก้ไข Apps Script โดยเจ้าของโปรเจกต์) ===== **/
+// auditWorkFileAccess  : ตรวจอย่างเดียว ไม่แก้ไข สรุปผลลงชีต FileAccessAudit
+// fixWorkFileSharing   : ตั้งค่า "ทุกคนที่มีลิงก์ดูได้" ให้ไฟล์ที่บัญชีนี้เป็นเจ้าของและยังเปิดไม่ได้ (ไฟล์ของผู้อื่นแก้ให้ไม่ได้)
+function auditWorkFileAccess() { return auditWorkFiles_(false); }
+function fixWorkFileSharing() { return auditWorkFiles_(true); }
+function auditWorkFiles_(apply) {
+  const cid = APP.DEFAULT_CONFERENCE_ID;
+  const started = Date.now(), LIMIT_MS = 5 * 60 * 1000;
+  const wanted = ['ORIGINAL', 'REVISION', 'FINAL_PRESENTATION', 'BLIND', 'WORD'];
+  const files = findMany_('WorkFiles', { ConferenceID: cid }).filter(function(f) {
+    return bool_(f.Active) && wanted.indexOf(f.FileCategory) >= 0;
+  });
+  let me = '';
+  try { me = Session.getEffectiveUser().getEmail(); } catch (e) {}
+  const out = [['WorkFileID', 'WorkID', 'Category', 'FileName', 'Result', 'Detail', 'FileUrl']];
+  const count = { OK: 0, FIXED: 0, NEED_ATTENTION: 0, EXTERNAL: 0, UNREADABLE: 0, NOT_CHECKED: 0 };
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (Date.now() - started > LIMIT_MS) { count.NOT_CHECKED = files.length - i; break; }
+    const id = clean_(f.FileId);
+    const base = [f.WorkFileID, f.WorkID, f.FileCategory, clean_(f.FileName).slice(0, 80)];
+    if (!id || /^URL_/.test(id)) {
+      count.EXTERNAL++;
+      out.push(base.concat(['EXTERNAL', 'เป็นลิงก์ภายนอก ไม่ใช่ไฟล์ใน Drive: ต้องเปิดตรวจด้วยตนเอง', f.FileUrl]));
+      continue;
+    }
+    try {
+      const file = DriveApp.getFileById(id);
+      const access = String(file.getSharingAccess());
+      const open = access === 'ANYONE' || access === 'ANYONE_WITH_LINK';
+      if (open) { count.OK++; out.push(base.concat(['OK', 'แชร์: ' + access, f.FileUrl])); continue; }
+      let owner = '';
+      try { owner = file.getOwner() ? file.getOwner().getEmail() : ''; } catch (e) {}
+      if (apply && owner && owner === me) {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        count.FIXED++;
+        out.push(base.concat(['FIXED', 'ตั้งเป็น ANYONE_WITH_LINK (ดูได้) แล้ว (เดิม ' + access + ')', f.FileUrl]));
+      } else {
+        count.NEED_ATTENTION++;
+        out.push(base.concat(['NEED_ATTENTION', 'แชร์: ' + access + (owner && owner !== me ? ' / เจ้าของไฟล์คือผู้อื่น แก้ให้ไม่ได้' : ' / ยังไม่ได้แก้ (รัน fixWorkFileSharing)'), f.FileUrl]));
+      }
+    } catch (err) {
+      count.UNREADABLE++;
+      out.push(base.concat(['UNREADABLE', 'บัญชีนี้เปิดไฟล์ไม่ได้หรือไม่พบไฟล์: ' + (err && err.message ? err.message : err), f.FileUrl]));
+    }
+  }
+  const ss = getSpreadsheet_();
+  const sh = ss.getSheetByName('FileAccessAudit') || ss.insertSheet('FileAccessAudit');
+  sh.clearContents();
+  sh.getRange(1, 1, out.length, out[0].length).setValues(out);
+  const summary = { checked: files.length, mode: apply ? 'FIX' : 'AUDIT_ONLY', counts: count, sheet: 'FileAccessAudit' };
+  Logger.log(JSON.stringify(summary));
+  return summary;
 }
