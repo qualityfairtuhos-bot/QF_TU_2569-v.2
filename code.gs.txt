@@ -4218,8 +4218,27 @@ function verifyWorkAccess(conferenceId,regId,emailOrPhone){
       canSubmitNewWork = false;
     }
 
-    const works = findMany_('Works', {ConferenceID: cid, RegID: r.RegID});
-    const files = findMany_('WorkFiles', {ConferenceID: cid, RegID: r.RegID}).filter(function(f){ return bool_(f.Active); });
+    const allWorks = findMany_('Works', {ConferenceID: cid});
+    const targetReg = clean_(r.RegID).toUpperCase();
+    const inReg = cleanRegId.toUpperCase();
+    const targetNum = targetReg.replace(/^REG-\d{4}-0*/, '').replace(/^REG-0*/, '');
+    const works = allWorks.filter(function(w){
+      const wReg = clean_(w.RegID).toUpperCase();
+      if (wReg === targetReg || (inReg && wReg === inReg)) return true;
+      const wNum = wReg.replace(/^REG-\d{4}-0*/, '').replace(/^REG-0*/, '');
+      if (targetNum && wNum && wNum === targetNum) return true;
+      if (clean_(w.WorkCode).toUpperCase() === inReg || clean_(w.WorkID).toUpperCase() === inReg) return true;
+      return false;
+    });
+
+    const allFiles = findMany_('WorkFiles', {ConferenceID: cid}).filter(function(f){ return bool_(f.Active); });
+    const files = allFiles.filter(function(f){
+      const fReg = clean_(f.RegID).toUpperCase();
+      if (fReg === targetReg || (inReg && fReg === inReg)) return true;
+      const fNum = fReg.replace(/^REG-\d{4}-0*/, '').replace(/^REG-0*/, '');
+      if (targetNum && fNum && fNum === targetNum) return true;
+      return false;
+    });
 
     const allCriteria = findMany_('ScoringCriteria', {ConferenceID: cid}).filter(function(x){ return bool_(x.Active); });
     const critMap = {};
@@ -4233,7 +4252,10 @@ function verifyWorkAccess(conferenceId,regId,emailOrPhone){
 
     const outWorks = works.map(function(w){
       const cw = Object.assign({}, w);
-      cw.files = files.filter(function(f){ return f.WorkID === w.WorkID; });
+      cw.WorkID = cw.WorkID || cw.WorkCode || '';
+      cw.files = files.filter(function(f){
+        return (cw.WorkID && f.WorkID === cw.WorkID) || (cw.WorkCode && (f.WorkID === cw.WorkCode || f.WorkID === cw.WorkID));
+      });
 
       // Fetch completed or submitted reviews for this work
       const assignments = findMany_('ReviewAssignments', {ConferenceID: cid, WorkID: w.WorkID}).filter(function(a){
@@ -4392,27 +4414,38 @@ function saveWorkFile_(cid,workId,regId,category,file,folder,prefix){
   const driveUrlOrId = file.driveUrl || file.driveFileId || file.url || '';
   if (driveUrlOrId) {
     const driveId = extractDriveId_(driveUrlOrId);
-    if (!driveId) throw new Error('ไม่พบ Google Drive File ID หรือ URL ที่ถูกต้อง');
-    const targetFolder = resolveUploadFolder_(folder);
     const safeName = clean_(file.name || (category + '_presentation')).replace(/[\\/:*?"<>|]/g, '_');
-    try {
-      const sourceFile = DriveApp.getFileById(driveId);
-      const newFile = sourceFile.makeCopy(filePrefix + '_' + Date.now() + '_' + safeName, targetFolder);
+    if (driveId) {
+      try {
+        const targetFolder = resolveUploadFolder_(folder);
+        const sourceFile = DriveApp.getFileById(driveId);
+        const newFile = sourceFile.makeCopy(filePrefix + '_' + Date.now() + '_' + safeName, targetFolder);
+        up = {
+          fileId: newFile.getId(),
+          fileUrl: newFile.getUrl(),
+          fileName: newFile.getName(),
+          mimeType: newFile.getMimeType(),
+          fileSize: newFile.getSize()
+        };
+      } catch(errDrive) {
+        up = {
+          fileId: driveId,
+          fileUrl: (String(driveUrlOrId).startsWith('http') ? driveUrlOrId : ('https://drive.google.com/file/d/' + driveId + '/view')),
+          fileName: safeName,
+          mimeType: file.mimeType || 'application/vnd.google-apps.presentation',
+          fileSize: file.fileSize || 0
+        };
+      }
+    } else if (String(driveUrlOrId).startsWith('http')) {
       up = {
-        fileId: newFile.getId(),
-        fileUrl: newFile.getUrl(),
-        fileName: newFile.getName(),
-        mimeType: newFile.getMimeType(),
-        fileSize: newFile.getSize()
-      };
-    } catch(errDrive) {
-      up = {
-        fileId: driveId,
-        fileUrl: 'https://drive.google.com/file/d/' + driveId + '/view',
+        fileId: 'URL_' + Date.now(),
+        fileUrl: driveUrlOrId,
         fileName: safeName,
         mimeType: file.mimeType || 'application/vnd.google-apps.presentation',
         fileSize: file.fileSize || 0
       };
+    } else {
+      throw new Error('ไม่พบ Google Drive File ID หรือ URL ที่ถูกต้อง');
     }
   } else if (file.base64) {
     up = uploadBase64File_(file, folder, filePrefix);
@@ -4447,13 +4480,60 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
   return runSafely_('replaceWorkFile',function(){
     const cid=conferenceId||APP.DEFAULT_CONFERENCE_ID;
     const r=requireRegistrationAccess_(cid,regId,emailOrPhone,'');
-    const w=findOne_('Works',{ConferenceID:cid,WorkID:workId,RegID:regId});
+
+    const cleanWorkId = clean_(workId);
+    const cleanRegId = clean_(regId);
+    const rRegId = clean_(r.RegID);
+    const allWorks = findMany_('Works', {ConferenceID: cid});
+
+    let w = allWorks.find(function(item) {
+      const itemWorkId = clean_(item.WorkID).toUpperCase();
+      const itemWorkCode = clean_(item.WorkCode).toUpperCase();
+      const matchId = cleanWorkId && (
+        itemWorkId === cleanWorkId.toUpperCase() ||
+        itemWorkCode === cleanWorkId.toUpperCase()
+      );
+      if (!matchId) return false;
+
+      const itemReg = clean_(item.RegID).toUpperCase();
+      const userReg = rRegId.toUpperCase();
+      const inReg = cleanRegId.toUpperCase();
+
+      if (!itemReg) return true;
+      if (itemReg === userReg || itemReg === inReg) return true;
+
+      const itemNum = itemReg.replace(/^REG-\d{4}-0*/, '').replace(/^REG-0*/, '');
+      const userNum = userReg.replace(/^REG-\d{4}-0*/, '').replace(/^REG-0*/, '');
+      if (itemNum && userNum && itemNum === userNum) return true;
+
+      return false;
+    });
+
+    if (!w) {
+      const regWorks = allWorks.filter(function(item) {
+        const itemReg = clean_(item.RegID).toUpperCase();
+        return itemReg === rRegId.toUpperCase() || (cleanRegId && itemReg === cleanRegId.toUpperCase());
+      });
+      if (regWorks.length === 1) {
+        w = regWorks[0];
+      } else if (regWorks.length > 1 && cleanWorkId) {
+        w = regWorks.find(function(item) {
+          return clean_(item.WorkID).toUpperCase() === cleanWorkId.toUpperCase() ||
+                 clean_(item.WorkCode).toUpperCase() === cleanWorkId.toUpperCase();
+        });
+      }
+    }
+
     if(!w)throw new Error('ไม่พบผลงาน');
+
+    const effectiveWorkId = w.WorkID || w.WorkCode || workId;
+    const effectiveRegId = w.RegID || r.RegID || regId;
+
     const st=upper_(w.Status);
     const canOriginal=['DRAFT','SUBMITTED','ACADEMIC_SCREENING','RETURNED_FOR_EDIT'].indexOf(st)>=0;
     const canRevise=['REVISION_REQUIRED','REVISION_REQUESTED','REVISION_SUBMITTED'].indexOf(st)>=0;
     const canPresent=['ACCEPTED','ACCEPTED_ORAL','ACCEPTED_POSTER','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED'].indexOf(st)>=0;
-    
+
     if(['ORIGINAL','ETHICS','PRESENTER_BIO'].indexOf(category)>=0){
       if(!canOriginal)throw new Error('บทความถูกส่งให้คณะกรรมการประเมิน (Reviewer) แล้ว หากต้องการแก้ไขไฟล์ กรุณาติดต่อผู้ดูแลระบบ (Admin)');
     }
@@ -4477,12 +4557,14 @@ function replaceWorkFile(conferenceId,regId,emailOrPhone,workId,category,file){
     };
     const folder=folderMap[category];
     if(!folder)throw new Error('ประเภทไฟล์ไม่ถูกต้อง');
-    const prefix = category==='REVISION' ? ((w.WorkCode||workId)+'_REVISION') : (category==='FINAL_PRESENTATION' ? ((w.WorkCode||workId)+'_PRESENTATION') : ((w.WorkCode||workId)+'_'+category));
-    const up=saveWorkFile_(cid,workId,regId,category,file,folder,prefix);
+    const prefix = category==='REVISION' ? ((w.WorkCode||effectiveWorkId)+'_REVISION') : (category==='FINAL_PRESENTATION' ? ((w.WorkCode||effectiveWorkId)+'_PRESENTATION') : ((w.WorkCode||effectiveWorkId)+'_'+category));
+    const up=saveWorkFile_(cid,effectiveWorkId,effectiveRegId,category,file,folder,prefix);
     if(category==='REVISION')updateRecord_('Works',w.__row,{Status:'REVISION_SUBMITTED',UpdatedAt:new Date()});
     if(category==='FINAL_PRESENTATION')updateRecord_('Works',w.__row,{PresentationUploadStatus:'SUBMITTED',Status:'PRESENTATION_FILE_SUBMITTED',UpdatedAt:new Date()});
     invalidateCache_(cid);
-    try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + regId); } catch(e) {}
+    try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + effectiveRegId); } catch(e) {}
+    try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + r.RegID); } catch(e) {}
+    try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + cleanRegId); } catch(e) {}
     try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
     return up;
   });

@@ -1045,6 +1045,7 @@ function formatPresentationDeadlineDisplay(raw){
 }
 
 function renderAuthorWorks(works,reg,templates){
+  window._CURRENT_AUTHOR_REG = reg;
   works=works||[];
   if(!works.length){
     $('#authorWorkResult').innerHTML='<div class="card"><div class="notice">ยังไม่พบข้อมูลผลงานของคุณ<br>หากท่านเพิ่งส่งผลงาน หรือต้องการส่งผลงานใหม่ กรุณาตรวจสอบเลขลงทะเบียนและเบอร์โทรศัพท์/อีเมล</div></div>';
@@ -1221,12 +1222,15 @@ function renderAuthorWorks(works,reg,templates){
       }
     }
 
+    const targetWorkId = esc(w.WorkID || w.WorkCode || '');
+    const targetRegId = esc(w.RegID || reg?.RegID || '');
+
     let actions='';
     if(canOriginal) {
-      actions+=`<button class="btn btn-soft" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 14px;" onclick="promptReplaceWorkFile('${w.WorkID}','ORIGINAL','อัปโหลดไฟล์ผลงานเดิม (แทนที่ของเดิม)')"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์ผลงานเดิม</button>`;
+      actions+=`<button class="btn btn-soft" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 14px;" onclick="promptReplaceWorkFile('${targetWorkId}','ORIGINAL','อัปโหลดไฟล์ผลงานเดิม (แทนที่ของเดิม)','${targetRegId}')"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์ผลงานเดิม</button>`;
     }
     if(canRevise) {
-      actions+=`<button class="btn btn-gold" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#d97706;color:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="promptReplaceWorkFile('${w.WorkID}','REVISION','ส่งไฟล์บทคัดย่อ / ผลงานฉบับแก้ไข (Revision)')"><i class="fa-solid fa-file-pen"></i> อัปโหลดไฟล์แก้ไข (Revision)</button>`;
+      actions+=`<button class="btn btn-gold" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#d97706;color:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="promptReplaceWorkFile('${targetWorkId}','REVISION','ส่งไฟล์บทคัดย่อ / ผลงานฉบับแก้ไข (Revision)','${targetRegId}')"><i class="fa-solid fa-file-pen"></i> อัปโหลดไฟล์แก้ไข (Revision)</button>`;
     }
     if(canPresent) {
       // แสดงปุ่มดาวน์โหลด Template ตามประเภทที่ได้รับการคัดเลือก
@@ -1241,7 +1245,7 @@ function renderAuthorWorks(works,reg,templates){
         if(oralTpl) actions+=`<a href="${esc(oralTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#f59e0b;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-weight:700;"><i class="fa-solid fa-file-powerpoint"></i> ดาวน์โหลด Template Oral</a>`;
         if(posterTpl) actions+=`<a href="${esc(posterTpl)}" target="_blank" class="btn" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:#0284c7;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-weight:700;"><i class="fa-solid fa-file-image"></i> ดาวน์โหลด Template Poster</a>`;
       }
-      actions+=`<button class="btn btn-blue" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:var(--blue);color:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="promptReplaceWorkFile('${w.WorkID}','FINAL_PRESENTATION','อัปโหลดไฟล์นำเสนอ (Presentation)')"><i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์นำเสนอ (Presentation)</button>`;
+      actions+=`<button class="btn btn-blue" style="margin-right:8px;margin-bottom:8px;font-size:0.85rem;padding:8px 16px;background:var(--blue);color:#fff;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="promptReplaceWorkFile('${targetWorkId}','FINAL_PRESENTATION','อัปโหลดไฟล์นำเสนอ (Presentation)','${targetRegId}')"><i class="fa-solid fa-cloud-arrow-up"></i> อัปโหลดไฟล์นำเสนอ (Presentation)</button>`;
     }
 
     return `
@@ -1271,10 +1275,12 @@ function renderAuthorWorks(works,reg,templates){
   $('#authorWorkResult').innerHTML=html;
 }
 
-async function promptReplaceWorkFile(workId,category,title){
+async function promptReplaceWorkFile(workId,category,title,regId){
   const isPres = (category === 'FINAL_PRESENTATION');
   const isRev = (category === 'REVISION');
   const acceptTypes = isPres ? '.pdf,.ppt,.pptx,.zip' : (isRev ? '.pdf,.doc,.docx' : '.pdf,.doc,.docx,.ppt,.pptx');
+  const effectiveRegId = (regId || window._CURRENT_AUTHOR_REG?.RegID || ($('#authorWorkRegId')?.value || '')).trim();
+  const effectiveWorkId = (workId || '').trim();
 
   const modalHtml = `
     <div style="text-align:left; font-size:0.9rem;">
@@ -1337,7 +1343,7 @@ async function promptReplaceWorkFile(workId,category,title){
       }
 
       load('กำลังบันทึกข้อมูลเข้าระบบ...');
-      await rpc('replaceWorkFile', CID, $('#authorWorkRegId').value, $('#authorWorkKey').value, workId, category, uploadPayload);
+      await rpc('replaceWorkFile', CID, effectiveRegId, $('#authorWorkKey').value, effectiveWorkId, category, uploadPayload);
       done();
       await Swal.fire({
         icon: 'success',
