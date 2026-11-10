@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-09.5';
+const APP_VERSION = '2026-11-10.1';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -1199,7 +1199,11 @@ function normalizeEventDatesJson_(value){
   if(new Set(result).size!==result.length)throw new Error('พบวันจัดงานซ้ำกัน');
   return JSON.stringify(result);
 }
-function withLock_(fn){ const l=LockService.getScriptLock(); l.waitLock(30000); try{return fn();}finally{l.releaseLock();} }
+function withLock_(fn){
+  const l=LockService.getScriptLock();
+  try{ l.waitLock(30000); }catch(e){ throw new Error('ระบบกำลังมีผู้ใช้งานจำนวนมาก กรุณาลองอีกครั้งในอีกสักครู่'); }
+  try{return fn();}finally{l.releaseLock();}
+}
 function getSheet_(name){ const sh=getSpreadsheet_().getSheetByName(name); if(!sh) throw new Error('ไม่พบแผ่นงาน '+name); return sh; }
 const MASTER_TABLES_ = ['Conferences', 'Settings', 'RegistrationTypes', 'WorkCategories', 'PresentationTypes', 'OrganizationUnits', 'ScoringCriteria', 'ReviewRounds'];
 
@@ -1305,23 +1309,7 @@ function getRecords_(name){
 
   const sh=getSheet_(name), hm=headerMap_(name), last=sh.getLastRow(); if(last<2)return globalThis.__TUH_RECORDS[name]=[];
   const values=sh.getRange(2,1,last-1,hm.headers.length).getValues();
-  const records = values.map(function(r,idx){ 
-    const o={__row:idx+2}; 
-    hm.headers.forEach(function(h,i){
-      var val = r[i];
-      if (h === 'ReceiptTaxID') {
-        val = normalizeTaxId_(val);
-      } else if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0 && val !== null && val !== undefined && val !== '') {
-        val = String(val).trim();
-      }
-      o[h]=val;
-      const cleanH = String(h||'').replace(/[\s\r\n]+/g, '');
-      if (cleanH && o[cleanH] === undefined) o[cleanH] = val;
-      const lowH = String(cleanH).toLowerCase();
-      if (lowH && o[lowH] === undefined) o[lowH] = val;
-    }); 
-    return o; 
-  });
+  const records = values.map(function(r,idx){ return buildRecord_(hm, r, idx+2); });
   globalThis.__TUH_RECORDS[name] = records;
 
   if (isCachable) {
@@ -1330,6 +1318,63 @@ function getRecords_(name){
     } catch(e) {}
   }
   return records;
+}
+// ---------- อ่านเฉพาะแถวที่ต้องใช้ (เร็วกว่าอ่านทั้งตาราง) ----------
+// สร้าง record จากค่าหนึ่งแถว ให้หน้าตาเหมือนที่ getRecords_ สร้าง (ใช้ร่วมกัน)
+function buildRecord_(hm, r, rowNumber) {
+  const o = {__row: rowNumber};
+  hm.headers.forEach(function(h, i) {
+    var val = r[i];
+    if (h === 'ReceiptTaxID') {
+      val = normalizeTaxId_(val);
+    } else if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0 && val !== null && val !== undefined && val !== '') {
+      val = String(val).trim();
+    }
+    o[h] = val;
+    const cleanH = String(h||'').replace(/[\s\r\n]+/g, '');
+    if (cleanH && o[cleanH] === undefined) o[cleanH] = val;
+    const lowH = String(cleanH).toLowerCase();
+    if (lowH && o[lowH] === undefined) o[lowH] = val;
+  });
+  return o;
+}
+// ค้นแถวด้วย TextFinder ในคอลัมน์คีย์ แล้วอ่านเฉพาะแถวที่พบ; คืน null ถ้าทำไม่ได้ (ให้ผู้เรียกถอยไปใช้วิธีอ่านทั้งตาราง)
+function findRowsFast_(name, keyColumn, keyValue) {
+  try {
+    const key = clean_(keyValue);
+    if (!key) return null;
+    const sh = getSheet_(name), hm = headerMap_(name), idx = hm.map[keyColumn];
+    if (idx === undefined) return null;
+    const last = sh.getLastRow();
+    if (last < 2) return [];
+    const found = sh.getRange(2, idx + 1, last - 1, 1).createTextFinder(key).matchEntireCell(true).matchCase(false).findAll();
+    const out = [];
+    found.forEach(function(cell) {
+      const row = cell.getRow();
+      const vals = sh.getRange(row, 1, 1, hm.headers.length).getValues()[0];
+      const rec = buildRecord_(hm, vals, row);
+      if (clean_(rec[keyColumn]).toUpperCase() === key.toUpperCase()) out.push(rec);
+    });
+    return out;
+  } catch (e) {
+    return null;
+  }
+}
+// เหมือน findMany_ แต่ลองค้นเร็วก่อน ถ้าไม่พบหรือทำไม่ได้จะถอยไปอ่านทั้งตาราง (ผลลัพธ์ต้องครบเหมือนเดิมเสมอ)
+function findManyFast_(name, keyColumn, criteria) {
+  const fast = findRowsFast_(name, keyColumn, criteria[keyColumn]);
+  if (fast && fast.length) {
+    return fast.filter(function(r) {
+      return Object.keys(criteria).every(function(k) {
+        return clean_(r[k] === undefined || r[k] === null ? '' : r[k]) === clean_(criteria[k]);
+      });
+    });
+  }
+  return findMany_(name, criteria);
+}
+function findOneFast_(name, keyColumn, criteria) {
+  const rows = findManyFast_(name, keyColumn, criteria);
+  return rows.length ? rows[0] : null;
 }
 function clearTableCache_(name){
   try {
@@ -1718,6 +1763,16 @@ function stripHtml_(html) {
     .trim();
 }
 
+// อีเมลที่ต้องส่งให้ได้เสมอ (ไม่ถูกข้ามเมื่อโควต้าเหลือน้อย)
+const EMAIL_HIGH_PRIORITY_ = ['ASSIGNMENT', 'REVIEWER', 'ACCOUNT'];
+// โหมดอีเมลอัตโนมัติ: ESSENTIAL (ค่าเริ่มต้น) = ไม่ส่งอีเมลยืนยันลงทะเบียน/แจ้งสถานะทั่วไป/คูปองอัตโนมัติ; ตั้ง EMAIL_AUTO_MODE=ALL ในชีต Settings เพื่อส่งครบ
+function emailAutoModeAll_(conferenceId) {
+  return upper_(getSetting_(conferenceId || APP.DEFAULT_CONFERENCE_ID, 'EMAIL_AUTO_MODE', 'ESSENTIAL')) === 'ALL';
+}
+function emailQuotaReserve_(conferenceId) {
+  const n = Number(getSetting_(conferenceId || APP.DEFAULT_CONFERENCE_ID, 'EMAIL_QUOTA_RESERVE', '40'));
+  return isNaN(n) || n < 0 ? 40 : n;
+}
 function sendEmailLogged_(conferenceId,to,subject,html,relatedType,relatedId,user,attachments){
   const cleanTo = String(to || '').trim();
   if (!cleanTo) {
@@ -1734,6 +1789,31 @@ function sendEmailLogged_(conferenceId,to,subject,html,relatedType,relatedId,use
       ErrorMessage: 'ไม่มีอีเมลผู้รับ'
     });
     return { success: false, error: 'ไม่มีอีเมลผู้รับ' };
+  }
+
+  // สำรองโควต้าอีเมลรายวันให้อีเมลสำคัญ (กรรมการ/บัญชีผู้ใช้) อีเมลอื่นจะถูกข้ามเมื่อโควต้าเหลือน้อย
+  if (EMAIL_HIGH_PRIORITY_.indexOf(String(relatedType || '')) < 0) {
+    let remainingQuota = -1;
+    try { remainingQuota = MailApp.getRemainingDailyQuota(); } catch (eq) {}
+    const reserve = emailQuotaReserve_(conferenceId);
+    if (remainingQuota >= 0 && remainingQuota <= reserve) {
+      const skipMsg = 'ข้ามการส่งเพื่อสำรองโควต้าอีเมลสำหรับอีเมลสำคัญ (โควต้าคงเหลือ ' + remainingQuota + ')';
+      try {
+        appendRecord_('EmailLogs', {
+          EmailLogID: nextId_('MAIL'),
+          ConferenceID: conferenceId,
+          SentAt: new Date(),
+          SentBy: (user && user.Email) || 'SYSTEM',
+          To: cleanTo,
+          Subject: subject,
+          RelatedType: relatedType || '',
+          RelatedID: relatedId || '',
+          Status: 'SKIPPED',
+          ErrorMessage: skipMsg
+        });
+      } catch (ignoreLog) {}
+      return { success: false, skipped: true, error: skipMsg };
+    }
   }
 
   const plainBody = stripHtml_(html) || subject || 'TUH Quality Fair Notification';
@@ -3991,7 +4071,7 @@ function saveRegistrationEdit(conferenceId,regId,emailOrPhone,editCode,payload){
 }
 function getRegistrationStatus(conferenceId,regId,emailOrPhone){return runSafely_('getRegistrationStatus',function(){return publicRegistration_(requireRegistrationAccess_(conferenceId||APP.DEFAULT_CONFERENCE_ID,regId,emailOrPhone,''));});}
 function publicRegistration_(r){const out={};['RegID','ParticipantType','Prefix','FirstName','LastName','FullName','Position','OrganizationGroup','OrganizationUnit','Institution','Profession','LicenseNo','CID','Phone','LineID','Email','FoodType','FoodAllergyDetail','AttendanceDay1','AttendanceDay2','AttendanceDay3','WantsSubmitWork','ReceiptRequirement','ReceiptName','ReceiptTaxID','ReceiptAddress','ReceiptPostalCode','ReceiptPhone','NeedInvoice','InvoiceStatus','InvoiceNote','DataCompletenessStatus','RegistrationStatus','PaymentStatus','MealPassStatus','CreatedAt','UpdatedAt'].forEach(function(k){out[k]=r[k];});return serialize_(out);}
-function sendRegistrationEmail_(reg){try{const r=reg.record||reg;sendEmailLogged_(r.ConferenceID,r.Email,'ยืนยันการลงทะเบียน '+reg.RegID,'<div style="font-family:Prompt,sans-serif"><h2>ลงทะเบียนสำเร็จ</h2><p>เลขลงทะเบียน <b>'+reg.RegID+'</b></p><p>กรุณาเก็บเลขลงทะเบียนเพื่อแก้ไขข้อมูลและตรวจสอบสถานะ</p></div>','REGISTRATION',reg.RegID,null);}catch(ignore){} }
+function sendRegistrationEmail_(reg){try{const r=reg.record||reg;if(!emailAutoModeAll_(r.ConferenceID))return;sendEmailLogged_(r.ConferenceID,r.Email,'ยืนยันการลงทะเบียน '+reg.RegID,'<div style="font-family:Prompt,sans-serif"><h2>ลงทะเบียนสำเร็จ</h2><p>เลขลงทะเบียน <b>'+reg.RegID+'</b></p><p>กรุณาเก็บเลขลงทะเบียนเพื่อแก้ไขข้อมูลและตรวจสอบสถานะ</p></div>','REGISTRATION',reg.RegID,null);}catch(ignore){} }
 
 
 /** ===== 04_PaymentWork.gs ===== **/
@@ -4759,6 +4839,24 @@ function adminListReviewers(token,conferenceId){
 }
 function adminAssignReviewers(token,conferenceId,workId,reviewRoundId,reviewerIds){
   return runSafely_('adminAssignReviewers',function(){const ctx=requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId),w=findOne_('Works',{ConferenceID:conferenceId,WorkID:workId}),round=findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:reviewRoundId});if(!w||!round)throw new Error('ไม่พบผลงานหรือรอบประเมิน');if(['CLOSED','LOCKED','CANCELLED'].indexOf(upper_(round.Status))>=0)throw new Error('รอบประเมินปิดแล้ว');let created=0,skipped=[];(reviewerIds||[]).forEach(function(rid){const rev=findOne_('Reviewers',{ReviewerID:rid}),pool=findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});if(!rev||!pool||upper_(pool.Status)!=='ACTIVE'){skipped.push({ReviewerID:rid,reason:'Reviewer inactive'});return;}if(findOne_('ReviewAssignments',{ConferenceID:conferenceId,ReviewRoundID:reviewRoundId,WorkID:workId,ReviewerID:rid})){skipped.push({ReviewerID:rid,reason:'Already assigned'});return;}if(num_(pool.CurrentAssignedCount)>=num_(pool.MaxWorkload,10)){skipped.push({ReviewerID:rid,reason:'Workload full'});return;}const aid=nextId_('ASN');appendRecord_('ReviewAssignments',{AssignmentID:aid,ConferenceID:conferenceId,ReviewRoundID:reviewRoundId,WorkID:workId,WorkCode:w.WorkCode,ReviewerID:rid,ReviewerName:rev.FullName,ReviewerEmail:rev.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',Locked:false,UpdatedAt:new Date()});updateRecord_('ReviewerPool',pool.__row,{CurrentAssignedCount:num_(pool.CurrentAssignedCount)+1});sendReviewAssignmentEmail_(conferenceId,w,rev,aid);created++;});if(created)updateRecord_('Works',w.__row,{Status:'UNDER_REVIEW',UpdatedAt:new Date()});return {created:created,skipped:skipped};});
+}
+// รวมอีเมลมอบหมายงานเป็นฉบับเดียวต่อกรรมการ (ลดการใช้โควต้าอีเมล)
+function queueAssignmentEmail_(queue, rev, w, assignmentId) {
+  if (!rev || !rev.Email) return;
+  const k = normalizeEmail_(rev.Email);
+  if (!queue[k]) queue[k] = { rev: rev, items: [] };
+  queue[k].items.push({ code: (w && w.WorkCode) || '', title: (w && (w.TitleTH || w.TitleEN)) || '', aid: assignmentId, work: w });
+}
+function flushAssignmentEmails_(cid, queue) {
+  const portal = buildWebAppRouteUrl_('reviewer', cid);
+  Object.keys(queue).forEach(function(k) {
+    const e = queue[k], items = e.items;
+    if (!items.length) return;
+    if (items.length === 1) { sendReviewAssignmentEmail_(cid, items[0].work || { WorkCode: items[0].code }, e.rev, items[0].aid); return; }
+    const list = items.map(function(it) { return '<li>' + it.code + '</li>'; }).join('');
+    const html = '<p>เรียน ' + (e.rev.FullName || '') + '</p><p>ท่านได้รับมอบหมายให้ประเมินผลงานจำนวน <b>' + items.length + '</b> เรื่อง</p><ul>' + list + '</ul><p><a href="' + portal + '">เข้าสู่ระบบ Reviewer</a></p>';
+    sendEmailLogged_(cid, e.rev.Email, 'แจ้งมอบหมายประเมินผลงาน ' + items.length + ' เรื่อง', html, 'ASSIGNMENT', items[0].aid + ' (+' + (items.length - 1) + ')', null);
+  });
 }
 function sendReviewAssignmentEmail_(cid,w,rev,assignmentId){const portal=buildWebAppRouteUrl_('reviewer',cid);sendEmailLogged_(cid,rev.Email,'แจ้งมอบหมายประเมินผลงาน '+w.WorkCode,'<p>เรียน '+rev.FullName+'</p><p>ท่านได้รับมอบหมายให้ประเมินผลงาน <b>'+w.WorkCode+'</b></p><p><a href="'+portal+'">เข้าสู่ระบบ Reviewer</a></p>','ASSIGNMENT',assignmentId,null);}
 function isRound2_(x) {
@@ -5585,15 +5683,18 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     const criteriaMap={};
     filteredCriteria.forEach(function(c){criteriaMap[c.CriteriaID]=c;});
 
+    // ช่วงเขียนคะแนนทำทีละคน (lock สั้นๆ) กันแถวชนกัน/รหัสซ้ำ/บันทึกซ้ำตอนกรรมการหลายคนหรือกดซ้ำพร้อมกัน
+    let savedScoresList = [], total = 0, status = '', completedAt = '', isLocked = false;
+    withLock_(function(){
     // Fetch existing scores once to avoid repeated sheet reads
-    const existingScores = findMany_('ReviewScores', {ConferenceID: cid, AssignmentID: assignmentId});
+    const existingScores = findManyFast_('ReviewScores', 'AssignmentID', {ConferenceID: cid, AssignmentID: assignmentId});
     const existingMap = {};
     existingScores.forEach(function(es){ existingMap[es.CriteriaID] = es; });
 
     const updates = [];
     const inserts = [];
-    const savedScoresList = [];
-    let total = 0;
+    savedScoresList = [];
+    total = 0;
     scores.forEach(function(s){
       if(s.Score === '' || s.Score === null || s.Score === undefined) return;
       var c = criteriaMap[s.CriteriaID];
@@ -5655,10 +5756,10 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
 
     var isSubmit = bool_(submit) || bool_(payload && payload.submit) || bool_(payload && payload.isSubmit);
     if (!isSubmit && payload && payload.isDraft === false) isSubmit = true;
-    const status = isSubmit ? 'COMPLETE' : 'DRAFT_SAVED';
+    status = isSubmit ? 'COMPLETE' : 'DRAFT_SAVED';
     // Reviewer submit never locks out reviewer themselves; only Admin accepts/locks!
-    const isLocked = false;
-    const completedAt = isSubmit ? new Date() : (a.CompletedAt || '');
+    isLocked = false;
+    completedAt = isSubmit ? new Date() : (a.CompletedAt || '');
 
     updateRecord_('ReviewAssignments', a.__row, {
       Status: status,
@@ -5697,6 +5798,7 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
         UpdatedAt: new Date()
       });
     }
+    });
 
     const userEmail = normalizeEmail_(ctx.user.Email);
     const revEmail = normalizeEmail_(a.ReviewerEmail || '');
@@ -6036,13 +6138,16 @@ function maybeAutoIssueMealPass_(conferenceId,regId,trigger){
   const r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)return {sent:false,reason:'ไม่พบผู้ลงทะเบียน'};
   const type=registrationTypeMap_(conferenceId)[r.ParticipantType]||{},eligibility=mealPassEligibility_(r,type);if(!eligibility.ok)return {sent:false,reason:eligibility.reason};
   ensureMealEntitlements_(conferenceId,regId);
+  if(!emailAutoModeAll_(conferenceId))return {sent:false,emailSkipped:true,reason:'ไม่ส่งคูปองทางอีเมลอัตโนมัติ (ผู้ลงทะเบียนดูคูปอง QR ได้ที่เมนูคูปองอาหาร)'};
   const auto=bool_(getSetting_(conferenceId,bool_(type.PaymentRequired)?'MEAL_PASS_AUTO_SEND_EXTERNAL':'MEAL_PASS_AUTO_SEND_INTERNAL','TRUE'));
   if(!auto)return {sent:false,reason:'ปิดการส่งอัตโนมัติ'};
   const dispatch=mealPassDispatchInfo_(conferenceId,regId);if(dispatch.count>0)return {sent:false,alreadySent:true,dispatchCount:dispatch.count,reason:'ส่งแล้ว'};
   return sendMealPassEmail_(conferenceId,regId,null,trigger||'AUTO');
 }
 function sendRegistrationStatusEmail_(conferenceId,r,status,note,user){
-  if(!r.Email)return false;const url=buildWebAppRouteUrl_('public',conferenceId);
+  if(!r.Email)return false;
+  // ส่งเฉพาะกรณีต้องให้ผู้ลงทะเบียนแก้ไขข้อมูล; การแจ้งสถานะทั่วไปดูได้ที่หน้าเว็บ (เปิดส่งครบด้วย EMAIL_AUTO_MODE=ALL)
+  if(status!=='REGISTRATION_RETURNED'&&!emailAutoModeAll_(conferenceId))return false;const url=buildWebAppRouteUrl_('public',conferenceId);
   let subject='อัปเดตสถานะการลงทะเบียน '+r.RegID,html='<p>สถานะการลงทะเบียนของท่านได้รับการอัปเดตเป็น <b>'+htmlEscape_(status)+'</b></p>';
   if(status==='REGISTRATION_RETURNED'){subject='กรุณาแก้ไขข้อมูลลงทะเบียน '+r.RegID;html='<p>เจ้าหน้าที่ส่งคืนข้อมูลลงทะเบียนเพื่อให้ท่านแก้ไข</p><p><b>เหตุผล:</b> '+htmlEscape_(note)+'</p><p><a href="'+url+'">เปิดระบบเพื่อแก้ไขข้อมูล</a></p>';}
   if(status==='REGISTRATION_VERIFIED'||status==='COMPLETED'){subject='ตรวจสอบข้อมูลลงทะเบียนเรียบร้อย '+r.RegID;html='<p>เจ้าหน้าที่ตรวจสอบข้อมูลลงทะเบียนของท่านเรียบร้อยแล้ว</p>';}
@@ -6410,18 +6515,18 @@ function scannerRegistrationApproved_(registration){
 }
 function scannerCheckInRecord_(conferenceId,regId,eventDate,sessionCode){
   const date=scannerDateKey_(eventDate),code=upper_(sessionCode);
-  return findMany_('AttendanceCheckIns',{ConferenceID:conferenceId,RegID:regId}).find(function(x){
+  return findManyFast_('AttendanceCheckIns','RegID',{ConferenceID:conferenceId,RegID:regId}).find(function(x){
     return scannerDateKey_(x.EventDate)===date&&upper_(x.CheckInSession||x.Note)===code&&upper_(x.Status)!=='CANCELLED';
   })||null;
 }
 function scannerMealEntitlement_(conferenceId,regId,eventDate,mealCode){
   const date=scannerDateKey_(eventDate),code=upper_(mealCode);
-  const rows=findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:regId}).filter(function(x){return scannerDateKey_(x.EventDate)===date&&upper_(x.MealCode)===code;});
+  const rows=findManyFast_('MealEntitlements','RegID',{ConferenceID:conferenceId,RegID:regId}).filter(function(x){return scannerDateKey_(x.EventDate)===date&&upper_(x.MealCode)===code;});
   return rows.slice().reverse().find(function(x){return upper_(x.Status)!=='CANCELLED';})||rows[rows.length-1]||null;
 }
 function scannerInspectInternal_(ctx,conferenceId,identifier,eventDate,serviceCode){
   const def=scannerServiceDef_(conferenceId,serviceCode),date=scannerDateKey_(eventDate);if(!date)throw new Error('กรุณาเลือกวันที่จัดงาน');
-  const regId=scannerResolveRegId_(identifier,conferenceId),r=findOne_('Registrations',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน '+regId);
+  const regId=scannerResolveRegId_(identifier,conferenceId),r=findOneFast_('Registrations','RegID',{ConferenceID:conferenceId,RegID:regId});if(!r)throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน '+regId);
   const type=scannerRegistrationType_(conferenceId,r),day=scannerSelectedDay_(conferenceId,r,date);
   const checks={
     dataComplete:upper_(r.DataCompletenessStatus)==='COMPLETE',
@@ -6642,6 +6747,7 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     if(!isOriginal && (!reviewerIds||!reviewerIds.length))throw new Error('No reviewers provided');
     let created=0,skipped=0;
     const revCountAdd = {};
+    const assignEmailQueue = {};
     workIds.forEach(function(wid){
       const w = findOne_('Works',{ConferenceID:conferenceId,WorkID:wid});
       let targetRids = reviewerIds;
@@ -6665,7 +6771,7 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
         created++;
         assignedForThisWork++;
         revCountAdd[rid] = (revCountAdd[rid] || 0) + 1;
-        try { sendReviewAssignmentEmail_(conferenceId, w, rvw, aid); } catch(e){}
+        queueAssignmentEmail_(assignEmailQueue, rvw, w, aid);
       });
       if (assignedForThisWork > 0 && w && ['WAITING_REVIEWER_ASSIGN','ACADEMIC_SCREENING','DRAFT','SUBMITTED'].indexOf(upper_(w.Status)) >= 0) {
         try {
@@ -6693,6 +6799,7 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     clearTableCache_('Works');
     clearTableCache_('ReviewerPool');
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e){}
+    try { flushAssignmentEmails_(conferenceId, assignEmailQueue); } catch(e){}
 
     return {created:created,skipped:skipped};
   });
@@ -9446,7 +9553,9 @@ function doPost(e) {
     if (!fn) throw apiError_('ACTION_NOT_ALLOWED','ไม่อนุญาตให้เรียกคำสั่งนี้');
     apiAuthorize_(action, body.args);
     if (API_WRITE_ACTIONS[action]) claimKey = apiClaimRequest_(requestId);
+    const perfStart = Date.now();
     const legacyResult = fn.apply(null, body.args);
+    apiPerfLog_(action, Date.now() - perfStart, !!(legacyResult && legacyResult.success === true));
     if (!legacyResult || legacyResult.success !== true) {
       const message = legacyResult && legacyResult.message ? legacyResult.message : 'ไม่สามารถดำเนินการได้';
       throw apiError_(legacyResult && legacyResult.errorCode || 'ACTION_FAILED', message);
@@ -9573,4 +9682,51 @@ function auditWorkFiles_(apply) {
   const summary = { checked: files.length, mode: apply ? 'FIX' : 'AUDIT_ONLY', counts: count, sheet: 'FileAccessAudit' };
   Logger.log(JSON.stringify(summary));
   return summary;
+}
+
+/** ===== เครื่องมือวัดผลสำหรับซ้อมก่อนวันงาน ===== **/
+// เปิดบันทึกเวลาต่อคำสั่ง: ตั้ง Script Property ชื่อ TUH_PERF_LOG = 1 (Project Settings > Script properties) ผลลงชีต PerfLog; ปิดโดยลบ/ตั้งเป็น 0
+function apiPerfLog_(action, ms, ok) {
+  try {
+    if (PropertiesService.getScriptProperties().getProperty('TUH_PERF_LOG') !== '1') return;
+    const ss = getSpreadsheet_();
+    const sh = ss.getSheetByName('PerfLog') || ss.insertSheet('PerfLog');
+    if (sh.getLastRow() === 0) sh.appendRow(['Timestamp', 'Action', 'DurationMs', 'Ok', 'Version']);
+    sh.appendRow([new Date(), action, ms, ok, APP_VERSION]);
+  } catch (e) {}
+}
+// ตรวจว่าตารางไหนบันทึกลงแคชได้ และอ่านจากชีตใช้เวลาเท่าไร (รันเองในตัวแก้ไข ผลลงชีต CacheDiagnostics)
+function diagnoseCache() {
+  const names = ['Registrations', 'MealEntitlements', 'AttendanceCheckIns', 'Works', 'WorkFiles', 'ReviewScores', 'ReviewAssignments', 'Settings', 'Sessions', 'Users'];
+  const rows = [['Table', 'Rows', 'SheetReadMs', 'JsonChars', 'JsonBytes', 'Chunks@30000', 'PutFirst85000chars', 'PutFirst30000chars', 'CachedNow']];
+  const cache = CacheService.getScriptCache();
+  names.forEach(function(n) {
+    try {
+      const t0 = Date.now();
+      const sh = getSheet_(n), hm = headerMap_(n), last = sh.getLastRow();
+      let recs = [];
+      if (last >= 2) {
+        const vals = sh.getRange(2, 1, last - 1, hm.headers.length).getValues();
+        recs = vals.map(function(r, i) { return buildRecord_(hm, r, i + 2); });
+      }
+      const ms = Date.now() - t0;
+      const str = JSON.stringify(recs);
+      const bytes = Utilities.newBlob(str).getBytes().length;
+      const tryPut = function(size) {
+        try { cache.put('DIAG_TEST', str.substr(0, size), 30); const ok = cache.get('DIAG_TEST') !== null; cache.remove('DIAG_TEST'); return ok ? 'OK' : 'FAIL'; }
+        catch (e) { return 'FAIL: ' + (e && e.message ? e.message : e); }
+      };
+      let cachedNow = 'no';
+      try { cachedNow = cacheGetLarge_('TBL_' + n) ? 'yes' : 'no'; } catch (e) {}
+      rows.push([n, recs.length, ms, str.length, bytes, Math.ceil(str.length / 30000), tryPut(85000), tryPut(30000), cachedNow]);
+    } catch (e) {
+      rows.push([n, 'ERR', '', '', '', '', '', String(e && e.message ? e.message : e), '']);
+    }
+  });
+  const ss = getSpreadsheet_();
+  const sh = ss.getSheetByName('CacheDiagnostics') || ss.insertSheet('CacheDiagnostics');
+  sh.clearContents();
+  sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+  Logger.log(JSON.stringify(rows));
+  return rows;
 }
