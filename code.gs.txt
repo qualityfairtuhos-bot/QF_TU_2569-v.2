@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.4';
+const APP_VERSION = '2026-11-10.5';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -5913,7 +5913,7 @@ function getMealPass(conferenceId,regId,emailOrPhone){
     const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
     const cleanId = clean_(regId);
     if(!cleanId) throw new Error('กรุณาระบุเลขลงทะเบียน');
-    let r = findOne_('Registrations', {ConferenceID: cid, RegID: cleanId});
+    let r = findRegistrationLoose_(cid, cleanId);
     if(!r) throw new Error('ไม่พบข้อมูลผู้ลงทะเบียน ' + cleanId);
     const key = clean_(emailOrPhone);
     if(!key) throw new Error('กรุณาระบุ Email หรือเบอร์โทรศัพท์ที่ใช้ลงทะเบียน');
@@ -9358,6 +9358,7 @@ function adminDeleteFinanceDocument(token, conferenceId, documentId) {
 /** ===== Combined from gas/ApiActions.gs ===== **/
 /** Actions discovered from the production frontends. Do not expose arbitrary globals. */
 const API_ACTIONS = Object.freeze({
+  uploadFileChunk: apiUploadFileChunk_,
   adminAddReviewer: adminAddReviewer,
   adminAddUser: adminAddUser,
   adminAssignReviewersBulk: adminAssignReviewersBulk,
@@ -9468,7 +9469,7 @@ const API_PERMISSION_MAP = Object.freeze({
   PUBLIC: Object.freeze([
     'getPublicBootstrap','submitRegistration','lookupRegistrationForEdit',
     'saveRegistrationEdit','uploadPaymentSlip','verifyWorkAccess','submitWork',
-    'replaceWorkFile','emailMyMealPass','getMealPass','loginUser',
+    'replaceWorkFile','uploadFileChunk','emailMyMealPass','getMealPass','loginUser',
     'requestPasswordReset','registerNewUser','getPublicFinanceDocuments'
   ]),
   REVIEWER: Object.freeze(['reviewerBootstrap','reviewerGetAssignment','reviewerSaveReview']),
@@ -9608,6 +9609,8 @@ function doPost(e) {
     const fn = API_ACTIONS[action];
     if (!fn) throw apiError_('ACTION_NOT_ALLOWED','ไม่อนุญาตให้เรียกคำสั่งนี้');
     apiAuthorize_(action, body.args);
+    // ไฟล์ที่ส่งแบบแบ่งท่อน: ประกอบกลับจากท่อนที่เก็บไว้ใน Drive (ใช้ร่วมกันได้ทุกคำขอ ไม่พึ่ง memory ของ Vercel)
+    if (action !== 'uploadFileChunk') resolveChunkedArgs_(body.args);
     if (API_WRITE_ACTIONS[action]) claimKey = apiClaimRequest_(requestId);
     const perfStart = Date.now();
     const legacyResult = fn.apply(null, body.args);
@@ -9906,4 +9909,86 @@ function cleanupExpiredSessions_(apply) {
   const summary = { mode: apply ? 'DELETE' : 'REPORT_ONLY', totalRows: vals.length, removable: rows.length, deleted: deleted, keptActive: keepActive, keptRecentlyExpired: keepRecent, keptUnknownDate: unknown, stoppedEarly: stopped };
   Logger.log(JSON.stringify(summary));
   return summary;
+}
+
+/** ===== ไฟล์ขนาดใหญ่แบบแบ่งท่อน: เก็บท่อนชั่วคราวใน Drive แล้วประกอบตอนบันทึก ===== **/
+const CHUNK_FOLDER_KEY_ = '01_Import_Temp';
+const CHUNK_MAX_PIECE_ = 2000000;   // ตัวอักษร base64 ต่อท่อน
+const CHUNK_MAX_COUNT_ = 30;        // ~ 25MB ไฟล์จริง
+function chunkFileName_(uploadId, idx) { return 'CHUNK_' + uploadId + '_' + idx + '.txt'; }
+function validUploadId_(id) { return /^up_\d{10,15}_[a-z0-9]{3,12}$/.test(String(id || '')); }
+function apiUploadFileChunk_(info) {
+  return runSafely_('uploadFileChunk', function() {
+    info = info || {};
+    const uploadId = String(info.uploadId || ''), idx = Number(info.chunkIndex), total = Number(info.totalChunks), data = String(info.chunkData || '');
+    if (!validUploadId_(uploadId)) throw new Error('รหัสการอัปโหลดไม่ถูกต้อง');
+    if (!isFinite(total) || total < 1 || total > CHUNK_MAX_COUNT_ || total !== Math.floor(total)) throw new Error('จำนวนท่อนไฟล์ไม่ถูกต้อง');
+    if (!isFinite(idx) || idx < 0 || idx >= total || idx !== Math.floor(idx)) throw new Error('ลำดับท่อนไฟล์ไม่ถูกต้อง');
+    if (!data || data.length > CHUNK_MAX_PIECE_ || !/^[A-Za-z0-9+\/=\s]*$/.test(data)) throw new Error('ข้อมูลท่อนไฟล์ไม่ถูกต้อง');
+    const folder = resolveUploadFolder_(CHUNK_FOLDER_KEY_);
+    const name = chunkFileName_(uploadId, idx);
+    const old = folder.getFilesByName(name);
+    while (old.hasNext()) { try { old.next().setTrashed(true); } catch (e) {} }   // ส่งซ้ำ: แทนที่ท่อนเดิม
+    folder.createFile(name, data, MimeType.PLAIN_TEXT);
+    return { uploadId: uploadId, chunkIndex: idx, totalChunks: total, stored: 'drive' };
+  });
+}
+function assembleChunkedUpload_(uploadId, total) {
+  if (!validUploadId_(uploadId)) throw new Error('รหัสการอัปโหลดไม่ถูกต้อง');
+  total = Number(total);
+  if (!isFinite(total) || total < 1 || total > CHUNK_MAX_COUNT_ || total !== Math.floor(total)) throw new Error('จำนวนท่อนไฟล์ไม่ถูกต้อง กรุณาอัปโหลดใหม่อีกครั้ง');
+  const folder = resolveUploadFolder_(CHUNK_FOLDER_KEY_);
+  const parts = [], files = [];
+  for (let i = 0; i < total; i++) {
+    const it = folder.getFilesByName(chunkFileName_(uploadId, i));
+    let f = null;
+    while (it.hasNext()) f = it.next();
+    if (!f) throw new Error('ไฟล์ที่อัปโหลดมาไม่ครบ (ขาดท่อนที่ ' + (i + 1) + ' จาก ' + total + ') กรุณาอัปโหลดใหม่อีกครั้ง');
+    parts.push(f.getBlob().getDataAsString());
+    files.push(f);
+  }
+  files.forEach(function(f) { try { f.setTrashed(true); } catch (e) {} });   // เก็บกวาดท่อนชั่วคราว
+  return parts.join('');
+}
+function resolveChunkedArgs_(node) {
+  if (!node || typeof node !== 'object') return;
+  if (!Array.isArray(node) && node.chunkUploadId && !node.base64) {
+    node.base64 = assembleChunkedUpload_(node.chunkUploadId, node.totalChunks);
+    delete node.chunkUploadId;
+  }
+  Object.keys(node).forEach(function(k) {
+    const v = node[k];
+    if (v && typeof v === 'object') resolveChunkedArgs_(v);
+  });
+}
+// ลบท่อนชั่วคราวที่ค้างเกิน 24 ชั่วโมง (เช่น ผู้ใช้ปิดหน้าจอกลางคัน) รันด้วยมือได้
+function cleanupChunkFiles() {
+  const folder = resolveUploadFolder_(CHUNK_FOLDER_KEY_);
+  const cutoff = Date.now() - 24 * 3600000, started = Date.now();
+  let trashed = 0, scanned = 0;
+  const it = folder.getFiles();
+  while (it.hasNext()) {
+    if (Date.now() - started > 5 * 60 * 1000) break;
+    const f = it.next(); scanned++;
+    if (f.getName().indexOf('CHUNK_') === 0 && f.getDateCreated().getTime() < cutoff) { f.setTrashed(true); trashed++; }
+  }
+  const summary = { scanned: scanned, trashed: trashed };
+  Logger.log(JSON.stringify(summary));
+  return summary;
+}
+
+// ค้นผู้ลงทะเบียนจากรหัสที่พิมพ์ไม่ตรงเป๊ะ: เต็ม, เลขท้ายล้วน (เมื่อมีเลขนั้นรายการเดียว), หรือรูปแบบที่ตัดขีด/ตัวพิมพ์ต่างกัน
+function findRegistrationLoose_(cid, input) {
+  const raw = clean_(input);
+  if (!raw) return null;
+  const exact = findOneFast_('Registrations', 'RegID', {ConferenceID: cid, RegID: raw});
+  if (exact) return exact;
+  const regs = findMany_('Registrations', {ConferenceID: cid});
+  if (/^\d{1,6}$/.test(raw)) {
+    const n = Number(raw);
+    const m = regs.filter(function(x) { const mm = clean_(x.RegID).match(/(\d+)$/); return mm && Number(mm[1]) === n; });
+    return m.length === 1 ? m[0] : null;
+  }
+  const canon = canonId_(raw);
+  return canon ? (regs.find(function(x) { return canonId_(x.RegID) === canon; }) || null) : null;
 }

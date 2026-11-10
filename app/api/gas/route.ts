@@ -413,6 +413,31 @@ export async function POST(req: NextRequest) {
       return errorResponse("ข้อมูล Chunk ไม่ถูกต้อง", "INVALID_CHUNK", 400, reqId);
     }
 
+    // เก็บท่อนไฟล์ไว้ที่ Apps Script (Drive) ทันที เพื่อให้ทุกคำขอ/ทุก instance ใช้ร่วมกันได้ ไม่หายเมื่อคำขอถัดไปไปตก instance อื่น
+    // ถ้า Apps Script รุ่นเก่ายังไม่รู้จักคำสั่งนี้ จะถอยไปเก็บใน memory แบบเดิม (ใช้ได้เฉพาะเมื่อทุกท่อนตก instance เดียวกัน)
+    const gasChunkPayload = {
+      action,
+      args: [{ uploadId, chunkIndex, totalChunks, chunkData }],
+      requestId: typeof body.requestId === "string" ? body.requestId : reqId,
+      timestamp: Date.now(),
+      secret: process.env.GAS_API_SECRET || process.env.GAS_WEBHOOK_TOKEN || process.env.BYPASS_SHARED_SECRET || "",
+    };
+    let chunkRes: any = null;
+    let chunkErr: any = null;
+    try {
+      chunkRes = await fetchGasWithRetry(gasChunkPayload, 1);
+    } catch (e) {
+      chunkErr = e;
+    }
+    if (chunkRes && chunkRes.success) {
+      return NextResponse.json({ success: true, data: { uploadId, chunkIndex, totalChunks, stored: "gas" } });
+    }
+    const notSupported = !!(chunkRes && chunkRes.errorCode === "ACTION_NOT_ALLOWED");
+    if (!notSupported) {
+      const msg = (chunkRes && chunkRes.message) || (chunkErr && chunkErr.message) || "บันทึกท่อนไฟล์ไม่สำเร็จ";
+      return errorResponse("ส่งไฟล์ไม่สำเร็จ: " + msg, "CHUNK_STORE_FAILED", 502, reqId);
+    }
+
     const ready = handleFileChunk(uploadId, chunkIndex, totalChunks, chunkData);
     return NextResponse.json({
       success: true,
@@ -421,6 +446,7 @@ export async function POST(req: NextRequest) {
         chunkIndex,
         totalChunks,
         ready,
+        stored: "memory",
       },
     });
   }
