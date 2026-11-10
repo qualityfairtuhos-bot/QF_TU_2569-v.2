@@ -434,7 +434,11 @@ export async function POST(req: NextRequest) {
     }
     const notSupported = !!(chunkRes && chunkRes.errorCode === "ACTION_NOT_ALLOWED");
     if (!notSupported) {
-      const msg = (chunkRes && chunkRes.message) || (chunkErr && chunkErr.message) || "บันทึกท่อนไฟล์ไม่สำเร็จ";
+      if (chunkRes) {
+        // Apps Script ตอบปฏิเสธเอง (เช่น ไฟล์ใหญ่เกิน/ข้อมูลไม่ถูกต้อง): ส่งข้อความเดิมกลับ ไม่ให้เบราว์เซอร์ลองซ้ำ
+        return errorResponse(String(chunkRes.message || "ไม่สามารถรับไฟล์ได้"), "CHUNK_REJECTED", 400, reqId);
+      }
+      const msg = (chunkErr && chunkErr.message) || "บันทึกท่อนไฟล์ไม่สำเร็จ";
       return errorResponse("ส่งไฟล์ไม่สำเร็จ: " + msg, "CHUNK_STORE_FAILED", 502, reqId);
     }
 
