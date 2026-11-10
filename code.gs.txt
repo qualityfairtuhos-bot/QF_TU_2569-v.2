@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.3';
+const APP_VERSION = '2026-11-10.4';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -1199,10 +1199,13 @@ function normalizeEventDatesJson_(value){
   if(new Set(result).size!==result.length)throw new Error('พบวันจัดงานซ้ำกัน');
   return JSON.stringify(result);
 }
+// lock แบบซ้อนได้: ถ้าฟังก์ชันนี้ถูกเรียกขณะถือ lock อยู่แล้ว (เช่น ในช่วงสแกน/นำเข้าข้อมูล) จะทำงานต่อโดยไม่รอ lock ซ้ำ (กันค้าง)
 function withLock_(fn){
+  if((globalThis.__TUH_LOCK_DEPTH||0)>0)return fn();
   const l=LockService.getScriptLock();
   try{ l.waitLock(30000); }catch(e){ throw new Error('ระบบกำลังมีผู้ใช้งานจำนวนมาก กรุณาลองอีกครั้งในอีกสักครู่'); }
-  try{return fn();}finally{l.releaseLock();}
+  globalThis.__TUH_LOCK_DEPTH=1;
+  try{return fn();}finally{globalThis.__TUH_LOCK_DEPTH=0;l.releaseLock();}
 }
 function getSheet_(name){ const sh=getSpreadsheet_().getSheetByName(name); if(!sh) throw new Error('ไม่พบแผ่นงาน '+name); return sh; }
 const MASTER_TABLES_ = ['Conferences', 'Settings', 'RegistrationTypes', 'WorkCategories', 'PresentationTypes', 'OrganizationUnits', 'ScoringCriteria', 'ReviewRounds'];
@@ -5865,29 +5868,43 @@ function ensureMealEntitlements_(conferenceId,regId){
   if(!meals.length)throw new Error('ผู้ดูแลระบบยังไม่ได้กำหนดรายการอาหาร');
   if(!selected.some(Boolean))throw new Error('ผู้ลงทะเบียนยังไม่ได้เลือกวันเข้าร่วมงาน');
   const activeDates={};dates.forEach(function(d,i){if(selected[i])activeDates[scannerDateKey_(d)]=true;});
-  const existing=findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:regId});
-  existing.forEach(function(e){
-    const shouldBeActive=!!activeDates[scannerDateKey_(e.EventDate)];
-    if(!shouldBeActive&&upper_(e.Status)!=='REDEEMED'&&upper_(e.Status)!=='CANCELLED')updateRecord_('MealEntitlements',e.__row,{Eligible:false,Status:'CANCELLED'});
-    if(shouldBeActive&&upper_(e.Status)==='CANCELLED')updateRecord_('MealEntitlements',e.__row,{Eligible:true,Status:'AVAILABLE'});
-  });
-  const toInsert=[];
-  dates.forEach(function(date,i){
-    if(!selected[i])return;
-    meals.forEach(function(m){
-      const old=existing.find(function(x){return scannerDateKey_(x.EventDate)===scannerDateKey_(date)&&upper_(x.MealCode)===upper_(m.code);});
-      if(!old){
-        const token=signMealToken_(conferenceId,regId,date,m.code);
-        toInsert.push({EntitlementID:nextId_('MEAL'),ConferenceID:conferenceId,RegID:regId,EventDate:date,MealCode:m.code,MealNameTH:m.th,Eligible:true,TokenHash:hashText_(token),Status:'AVAILABLE',CreatedAt:new Date()});
-      }
+  // วางแผนว่าต้องแก้/เพิ่มอะไรบ้าง (อ่านเฉพาะแถวของคนนี้)
+  const planFn=function(){
+    const existing=findManyFast_('MealEntitlements','RegID',{ConferenceID:conferenceId,RegID:regId});
+    const updates=[],missing=[];
+    existing.forEach(function(e){
+      const shouldBeActive=!!activeDates[scannerDateKey_(e.EventDate)],st=upper_(e.Status);
+      if(!shouldBeActive&&st!=='REDEEMED'&&st!=='CANCELLED')updates.push({row:e.__row,patch:{Eligible:false,Status:'CANCELLED'}});
+      if(shouldBeActive&&st==='CANCELLED')updates.push({row:e.__row,patch:{Eligible:true,Status:'AVAILABLE'}});
     });
-  });
-  if(toInsert.length>0){
-    appendRecords_('MealEntitlements',toInsert);
+    dates.forEach(function(date,i){
+      if(!selected[i])return;
+      meals.forEach(function(m){
+        const old=existing.find(function(x){return scannerDateKey_(x.EventDate)===scannerDateKey_(date)&&upper_(x.MealCode)===upper_(m.code);});
+        if(!old)missing.push({date:date,meal:m});
+      });
+    });
+    return {existing:existing,updates:updates,missing:missing};
+  };
+  let plan=planFn(),created=0,changed=false;
+  if(plan.updates.length||plan.missing.length){
+    // เขียนภายใต้ lock และตรวจซ้ำก่อนเขียน กันสร้างสิทธิ์ซ้ำเมื่อมีหลายคำขอพร้อมกัน (เปิดคูปองซ้ำ/ลองใหม่อัตโนมัติ)
+    created=withLock_(function(){
+      const p=planFn();
+      p.updates.forEach(function(u){updateRecord_('MealEntitlements',u.row,u.patch);});
+      const rows=p.missing.map(function(x){
+        const token=signMealToken_(conferenceId,regId,x.date,x.meal.code);
+        return {EntitlementID:nextId_('MEAL'),ConferenceID:conferenceId,RegID:regId,EventDate:x.date,MealCode:x.meal.code,MealNameTH:x.meal.th,Eligible:true,TokenHash:hashText_(token),Status:'AVAILABLE',CreatedAt:new Date()};
+      });
+      if(rows.length>0)appendRecords_('MealEntitlements',rows);
+      changed=p.updates.length>0||rows.length>0;
+      return rows.length;
+    });
   }
-  const current=findMany_('MealEntitlements',{ConferenceID:conferenceId,RegID:regId}),total=current.filter(function(e){return upper_(e.Status)!=='CANCELLED';}).length;
-  updateRecord_('Registrations',r.__row,{MealPassStatus:upper_(r.MealPassStatus)==='SENT'?'SENT':'READY',UpdatedAt:new Date()});
-  return {created:toInsert.length,total:total,cancelled:current.filter(function(e){return upper_(e.Status)==='CANCELLED';}).length};
+  const current=changed?findManyFast_('MealEntitlements','RegID',{ConferenceID:conferenceId,RegID:regId}):plan.existing,total=current.filter(function(e){return upper_(e.Status)!=='CANCELLED';}).length;
+  const desiredPassStatus=upper_(r.MealPassStatus)==='SENT'?'SENT':'READY';
+  if(upper_(r.MealPassStatus)!==desiredPassStatus)updateRecord_('Registrations',r.__row,{MealPassStatus:desiredPassStatus,UpdatedAt:new Date()});
+  return {created:created,total:total,cancelled:current.filter(function(e){return upper_(e.Status)==='CANCELLED';}).length};
 }
 function signMealToken_(cid,regId,date,meal){const payload=[cid,regId,date,meal].join('|'),sig=Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload,getAuthSecret_())).replace(/=+$/,'');return Utilities.base64EncodeWebSafe(payload).replace(/=+$/,'')+'.'+sig;}
 function parseMealToken_(token){const p=String(token).split('.');if(p.length!==2)throw new Error('QR ไม่ถูกต้อง');const payload=Utilities.newBlob(Utilities.base64DecodeWebSafe(p[0])).getDataAsString(),sig=Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload,getAuthSecret_())).replace(/=+$/,'');if(sig!==p[1])throw new Error('QR ไม่ถูกต้อง');const a=payload.split('|');return {conferenceId:a[0],regId:a[1],date:a[2],meal:a[3]};}
