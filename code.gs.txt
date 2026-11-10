@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.2';
+const APP_VERSION = '2026-11-10.3';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -9841,6 +9841,52 @@ function cleanupDuplicateMealEntitlements_(apply) {
   out.clearContents();
   out.getRange(1, 1, report.length, report[0].length).setValues(report);
   const summary = { mode: apply ? 'DELETE' : 'REPORT_ONLY', duplicateGroups: report.length - 1, extraRows: toDelete.length, deleted: deleted, stoppedEarly: stopped, sheet: 'MealDedupReport' };
+  Logger.log(JSON.stringify(summary));
+  return summary;
+}
+
+/** ===== ล้างเซสชันเก่าที่หมดอายุ (รันด้วยมือ ควรทำช่วงที่มีผู้ใช้น้อย) ===== **/
+// ลบเฉพาะแถวที่ "ใช้เข้าสู่ระบบไม่ได้อีกแล้ว" และเก่ากว่า 24 ชั่วโมง: (หมดอายุแล้ว) หรือ (ออกจากระบบแล้ว/สถานะไม่ใช่ ACTIVE)
+// ไม่ลบเซสชันที่ยังใช้งานได้ และไม่ลบเซสชันที่เพิ่งหมดอายุภายใน 24 ชั่วโมง; ข้อมูลอื่นไม่ถูกแตะ (เวลาเข้าสู่ระบบล่าสุดเก็บที่ Users.LastLogin)
+// cleanupExpiredSessions = ตรวจอย่างเดียว; cleanupExpiredSessionsApply = ลบจริง
+function cleanupExpiredSessions() { return cleanupExpiredSessions_(false); }
+function cleanupExpiredSessionsApply() { return cleanupExpiredSessions_(true); }
+function cleanupExpiredSessions_(apply) {
+  const started = Date.now(), LIMIT_MS = 5 * 60 * 1000;
+  const cutoff = Date.now() - 24 * 3600000;
+  const sh = getSheet_('Sessions'), hm = headerMap_('Sessions');
+  const last = sh.getLastRow();
+  if (last < 2) return { total: 0, removable: 0 };
+  const vals = sh.getRange(2, 1, last - 1, hm.headers.length).getValues();
+  const rows = [];
+  let keepActive = 0, keepRecent = 0, unknown = 0;
+  vals.forEach(function(r, i) {
+    const rec = buildRecord_(hm, r, i + 2);
+    const exp = new Date(rec.ExpiresAt).getTime(), seen = new Date(rec.LastSeenAt).getTime();
+    if (isNaN(exp)) { unknown++; return; }
+    const isActive = upper_(rec.Status) === 'ACTIVE';
+    if (isActive && exp >= Date.now()) { keepActive++; return; }
+    const lastTouch = Math.max(exp, isNaN(seen) ? 0 : seen);
+    if (isActive ? exp < cutoff : lastTouch < cutoff) rows.push(rec.__row); else keepRecent++;
+  });
+  let deleted = 0, stopped = false;
+  if (apply && rows.length) {
+    rows.sort(function(a, b) { return b - a; });
+    // รวมแถวติดกันเป็นช่วงเดียว ลบจากล่างขึ้นบน
+    let i = 0;
+    while (i < rows.length) {
+      if (Date.now() - started > LIMIT_MS) { stopped = true; break; }
+      let startRow = rows[i], count = 1;
+      while (i + count < rows.length && rows[i + count] === startRow - count) count++;
+      const firstRow = startRow - count + 1;
+      sh.deleteRows(firstRow, count);
+      deleted += count;
+      i += count;
+    }
+    clearTableCache_('Sessions');
+    try { clearRequestCache_(); } catch (e) {}
+  }
+  const summary = { mode: apply ? 'DELETE' : 'REPORT_ONLY', totalRows: vals.length, removable: rows.length, deleted: deleted, keptActive: keepActive, keptRecentlyExpired: keepRecent, keptUnknownDate: unknown, stoppedEarly: stopped };
   Logger.log(JSON.stringify(summary));
   return summary;
 }
