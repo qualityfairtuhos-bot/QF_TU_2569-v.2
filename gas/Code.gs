@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.1';
+const APP_VERSION = '2026-11-10.2';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -1319,6 +1319,28 @@ function getRecords_(name){
   }
   return records;
 }
+// ---------- วันที่แบบไม่มีเวลา (เช่น EventDate): ป้องกันวันที่เลื่อนไป 1 วัน ----------
+// ชีตเก็บวันที่เป็นชนิดวันที่; Apps Script ส่งกลับเป็น Date ที่ขึ้นกับเขตเวลา การแปลงด้วยเขตเวลาอื่นทำให้ได้วันก่อนหน้า
+// จึงหาเขตเวลาที่ทำให้ Date นี้เป็นเที่ยงคืนพอดี แล้วใช้วันที่ในเขตเวลานั้น
+const DATE_ONLY_FIELDS_ = ['EventDate'];
+function dateKeyFromDate_(d) {
+  if (!d || isNaN(d.getTime())) return '';
+  globalThis.__TUH_TZS = globalThis.__TUH_TZS || (function() {
+    const list = [APP.TIMEZONE];
+    try { const t = getSpreadsheet_().getSpreadsheetTimeZone(); if (t && list.indexOf(t) < 0) list.push(t); } catch (e) {}
+    try { const t = Session.getScriptTimeZone(); if (t && list.indexOf(t) < 0) list.push(t); } catch (e) {}
+    if (list.indexOf('UTC') < 0) list.push('UTC');
+    return list;
+  })();
+  const tzs = globalThis.__TUH_TZS;
+  for (let i = 0; i < tzs.length; i++) {
+    try {
+      if (Utilities.formatDate(d, tzs[i], 'HH:mm:ss') === '00:00:00') return Utilities.formatDate(d, tzs[i], 'yyyy-MM-dd');
+    } catch (e) {}
+  }
+  return Utilities.formatDate(d, APP.TIMEZONE, 'yyyy-MM-dd');
+}
+
 // ---------- อ่านเฉพาะแถวที่ต้องใช้ (เร็วกว่าอ่านทั้งตาราง) ----------
 // สร้าง record จากค่าหนึ่งแถว ให้หน้าตาเหมือนที่ getRecords_ สร้าง (ใช้ร่วมกัน)
 function buildRecord_(hm, r, rowNumber) {
@@ -1329,6 +1351,8 @@ function buildRecord_(hm, r, rowNumber) {
       val = normalizeTaxId_(val);
     } else if (PLAIN_TEXT_FIELDS.indexOf(h) >= 0 && val !== null && val !== undefined && val !== '') {
       val = String(val).trim();
+    } else if (DATE_ONLY_FIELDS_.indexOf(h) >= 0 && Object.prototype.toString.call(val) === '[object Date]') {
+      val = dateKeyFromDate_(val);
     }
     o[h] = val;
     const cleanH = String(h||'').replace(/[\s\r\n]+/g, '');
@@ -5888,9 +5912,24 @@ function getMealPass(conferenceId,regId,emailOrPhone){
       throw new Error('ยังไม่สามารถออกคูปองอาหารได้ (' + elig.reason + ')');
     }
     ensureMealEntitlements_(cid, r.RegID);
-    const ents = findMany_('MealEntitlements', {ConferenceID: r.ConferenceID, RegID: r.RegID});
+    const ents = dedupeMealEntitlements_(findMany_('MealEntitlements', {ConferenceID: r.ConferenceID, RegID: r.RegID}));
     return {registration: publicRegistration_(r), PassToken: signMealPassToken_(r.ConferenceID, r.RegID), entitlements: serialize_(ents)};
   });
+}
+// สิทธิ์อาหารซ้ำ (วันที่+มื้อเดียวกัน): เลือกแถวเดียว ลำดับความสำคัญ รับแล้ว > ใช้ได้ > ยกเลิก; เท่ากันใช้แถวหลังสุด (ตรงกับที่ตัวสแกนเลือก)
+function mealEntitlementPriority_(e) {
+  const st = upper_(e.Status);
+  return st === 'REDEEMED' ? 3 : (st === 'CANCELLED' ? 1 : 2);
+}
+function dedupeMealEntitlements_(list) {
+  const best = {}, order = [];
+  (list || []).forEach(function(e) {
+    const k = scannerDateKey_(e.EventDate) + '|' + (upper_(e.MealCode) || upper_(e.MealNameTH));
+    const cur = best[k];
+    if (!cur) { best[k] = e; order.push(k); return; }
+    if (mealEntitlementPriority_(e) >= mealEntitlementPriority_(cur)) best[k] = e;
+  });
+  return order.map(function(k) { return best[k]; });
 }
 function scanMealToken(token,scannerToken,conferenceId,scannerPoint,eventDate,mealCode){
   return runSafely_('scanMealToken',function(){
@@ -6456,7 +6495,7 @@ function ensureSheetColumns_(sheetName, columns){
 }
 function scannerDateKey_(value){
   if(!value)return '';
-  if(Object.prototype.toString.call(value)==='[object Date]'&&!isNaN(value.getTime()))return Utilities.formatDate(value,APP.TIMEZONE,'yyyy-MM-dd');
+  if(Object.prototype.toString.call(value)==='[object Date]'&&!isNaN(value.getTime()))return dateKeyFromDate_(value);
   const s=clean_(value),m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];
   const d=new Date(value);return isNaN(d.getTime())?s:Utilities.formatDate(d,APP.TIMEZONE,'yyyy-MM-dd');
 }
@@ -9729,4 +9768,79 @@ function diagnoseCache() {
   sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
   Logger.log(JSON.stringify(rows));
   return rows;
+}
+
+/** ===== เครื่องมือแก้ข้อมูลวันที่/สิทธิ์อาหารซ้ำ (รันด้วยมือในตัวแก้ไข Apps Script) ===== **/
+// diagnoseDates: แสดงว่า Apps Script อ่านวันที่ EventDate จากชีตเป็นอะไรในแต่ละเขตเวลา (ผลลงชีต DateDiagnostics)
+function diagnoseDates() {
+  const sh = getSheet_('MealEntitlements'), hm = headerMap_('MealEntitlements'), idx = hm.map['EventDate'];
+  const last = sh.getLastRow();
+  const n = Math.min(5, Math.max(0, last - 1));
+  const rows = [['Row', 'RawType', 'ISO_UTC', 'InBangkok', 'InSpreadsheetTZ', 'InScriptTZ', 'DateKeyUsedNow', 'OldMethod(Bangkok)']];
+  let ssTz = '', scTz = '';
+  try { ssTz = getSpreadsheet_().getSpreadsheetTimeZone(); } catch (e) {}
+  try { scTz = Session.getScriptTimeZone(); } catch (e) {}
+  if (n > 0) {
+    const vals = sh.getRange(last - n + 1, idx + 1, n, 1).getValues();
+    vals.forEach(function(v, i) {
+      const x = v[0], isDate = Object.prototype.toString.call(x) === '[object Date]';
+      rows.push([last - n + 1 + i, isDate ? 'Date' : typeof x, isDate ? x.toISOString() : String(x),
+        isDate ? Utilities.formatDate(x, APP.TIMEZONE, "yyyy-MM-dd HH:mm") : '',
+        isDate && ssTz ? Utilities.formatDate(x, ssTz, "yyyy-MM-dd HH:mm") : '',
+        isDate && scTz ? Utilities.formatDate(x, scTz, "yyyy-MM-dd HH:mm") : '',
+        isDate ? dateKeyFromDate_(x) : String(x),
+        isDate ? Utilities.formatDate(x, APP.TIMEZONE, 'yyyy-MM-dd') : String(x)]);
+    });
+  }
+  rows.push(['TZ', 'spreadsheet=' + ssTz, 'script=' + scTz, 'APP=' + APP.TIMEZONE, '', '', '', '']);
+  const ss = getSpreadsheet_();
+  const out = ss.getSheetByName('DateDiagnostics') || ss.insertSheet('DateDiagnostics');
+  out.clearContents();
+  out.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+  Logger.log(JSON.stringify(rows));
+  return rows;
+}
+// ตรวจ/ลบแถวสิทธิ์อาหารที่ซ้ำ (วันที่+มื้อเดียวกันของคนเดียวกัน) ค่าเริ่มต้นตรวจอย่างเดียว; cleanupDuplicateMealEntitlementsApply ลบจริง
+function cleanupDuplicateMealEntitlements() { return cleanupDuplicateMealEntitlements_(false); }
+function cleanupDuplicateMealEntitlementsApply() { return cleanupDuplicateMealEntitlements_(true); }
+function cleanupDuplicateMealEntitlements_(apply) {
+  const started = Date.now(), LIMIT_MS = 5 * 60 * 1000;
+  const sh = getSheet_('MealEntitlements'), hm = headerMap_('MealEntitlements');
+  const last = sh.getLastRow();
+  if (last < 2) return { groups: 0, extra: 0 };
+  const vals = sh.getRange(2, 1, last - 1, hm.headers.length).getValues();
+  const groups = {};
+  vals.forEach(function(r, i) {
+    const rec = buildRecord_(hm, r, i + 2);
+    const k = clean_(rec.ConferenceID) + '|' + upper_(rec.RegID) + '|' + scannerDateKey_(rec.EventDate) + '|' + (upper_(rec.MealCode) || upper_(rec.MealNameTH));
+    (groups[k] = groups[k] || []).push(rec);
+  });
+  const report = [['Group', 'KeepRow', 'DeleteRows', 'KeepStatus']];
+  const toDelete = [];
+  Object.keys(groups).forEach(function(k) {
+    const g = groups[k];
+    if (g.length < 2) return;
+    let keep = g[0];
+    g.forEach(function(e) { if (mealEntitlementPriority_(e) >= mealEntitlementPriority_(keep)) keep = e; });
+    const del = g.filter(function(e) { return e !== keep; }).map(function(e) { return e.__row; });
+    del.forEach(function(rw) { toDelete.push(rw); });
+    report.push([k, keep.__row, del.join(','), keep.Status]);
+  });
+  let deleted = 0, stopped = false;
+  if (apply) {
+    toDelete.sort(function(a, b) { return b - a; });
+    for (let i = 0; i < toDelete.length; i++) {
+      if (Date.now() - started > LIMIT_MS) { stopped = true; break; }
+      sh.deleteRow(toDelete[i]);
+      deleted++;
+    }
+    clearTableCache_('MealEntitlements');
+  }
+  const ss = getSpreadsheet_();
+  const out = ss.getSheetByName('MealDedupReport') || ss.insertSheet('MealDedupReport');
+  out.clearContents();
+  out.getRange(1, 1, report.length, report[0].length).setValues(report);
+  const summary = { mode: apply ? 'DELETE' : 'REPORT_ONLY', duplicateGroups: report.length - 1, extraRows: toDelete.length, deleted: deleted, stoppedEarly: stopped, sheet: 'MealDedupReport' };
+  Logger.log(JSON.stringify(summary));
+  return summary;
 }
