@@ -793,7 +793,7 @@ $('#regForm').addEventListener('submit',async e=>{
   try{
     const r=await rpc('submitRegistration',CID,formObj(e.target));
     done();
-    await Swal.fire({icon:'success',title:'ลงทะเบียนสำเร็จ',html:`เลขลงทะเบียน <b>${esc(r.RegID)}</b><br>รหัสแก้ไข <b>${esc(r.EditCode)}</b>${r.warnings?.length?'<br><small>'+r.warnings.map(esc).join('<br>')+'</small>':''}`,confirmButtonColor:'#006D70'});
+    await Swal.fire({icon:'success',title:'ลงทะเบียนสำเร็จ',html:`เลขลงทะเบียน <b>${esc(r.RegID)}</b><br>รหัสแก้ไข <b>${esc(r.EditCode)}</b><br><small>กรุณาจดหรือแคปหน้าจอนี้ไว้ ใช้ตรวจสอบสถานะและแสดงคูปองอาหาร QR ที่เมนู "คูปองอาหาร" (ระบบอาจไม่ส่งอีเมลยืนยัน)</small>${r.warnings?.length?'<br><small>'+r.warnings.map(esc).join('<br>')+'</small>':''}`,confirmButtonColor:'#006D70'});
     e.target.reset();
     renderAttendanceDates();
     resetConsentState();
