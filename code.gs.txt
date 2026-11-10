@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.5';
+const APP_VERSION = '2026-11-10.6';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -1326,6 +1326,12 @@ function getRecords_(name){
 // ชีตเก็บวันที่เป็นชนิดวันที่; Apps Script ส่งกลับเป็น Date ที่ขึ้นกับเขตเวลา การแปลงด้วยเขตเวลาอื่นทำให้ได้วันก่อนหน้า
 // จึงหาเขตเวลาที่ทำให้ Date นี้เป็นเที่ยงคืนพอดี แล้วใช้วันที่ในเขตเวลานั้น
 const DATE_ONLY_FIELDS_ = ['EventDate'];
+// ค่าตั้งค่า (Settings.SettingValue) ที่ชีตแปลงเป็น "วันที่-เวลา" -> ข้อความ dd/MM/ปี พ.ศ. HH:mm ตามเวลาไทย (กันเวลาเลื่อน -7 ชั่วโมงตอนส่งเป็น UTC)
+function settingDateToText_(d) {
+  const y = Number(Utilities.formatDate(d, APP.TIMEZONE, 'yyyy'));
+  const be = y < 2400 ? y + 543 : y;
+  return Utilities.formatDate(d, APP.TIMEZONE, 'dd/MM/') + be + ' ' + Utilities.formatDate(d, APP.TIMEZONE, 'HH:mm');
+}
 function dateKeyFromDate_(d) {
   if (!d || isNaN(d.getTime())) return '';
   globalThis.__TUH_TZS = globalThis.__TUH_TZS || (function() {
@@ -1356,6 +1362,8 @@ function buildRecord_(hm, r, rowNumber) {
       val = String(val).trim();
     } else if (DATE_ONLY_FIELDS_.indexOf(h) >= 0 && Object.prototype.toString.call(val) === '[object Date]') {
       val = dateKeyFromDate_(val);
+    } else if (h === 'SettingValue' && Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
+      val = settingDateToText_(val);
     }
     o[h] = val;
     const cleanH = String(h||'').replace(/[\s\r\n]+/g, '');
@@ -1600,7 +1608,15 @@ function nextId_(prefix){
 }
 function upsertSetting_(conferenceId,key,value,type,group,th,en){
   const old=findOne_('Settings',{ConferenceID:conferenceId,SettingKey:key}), patch={SettingValue:String(value),ValueType:type||'TEXT',GroupName:group||'GENERAL',DescriptionTH:th||'',DescriptionEN:en||'',IsEditable:true,UpdatedAt:new Date(),UpdatedBy:'SYSTEM'};
-  if(old) updateRecord_('Settings',old.__row,patch); else appendRecord_('Settings',Object.assign({SettingID:nextId_('SET'),ConferenceID:conferenceId,SettingKey:key},patch));
+  let row;
+  if(old){ updateRecord_('Settings',old.__row,patch); row=old.__row; } else row=appendRecord_('Settings',Object.assign({SettingID:nextId_('SET'),ConferenceID:conferenceId,SettingKey:key},patch));
+  // ค่าที่หน้าตาเป็นวันที่-เวลา (เช่น 11/11/2569 23:59) ชีตมักแปลงเป็นชนิดวันที่และอ่านกลับเพี้ยน: ตั้งรูปแบบเป็นข้อความแล้วเขียนซ้ำเป็นข้อความ
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}(\s+\d{1,2}:\d{2})?$/.test(String(value).trim())){
+    try{
+      const sh=getSheet_('Settings'),hm=headerMap_('Settings');
+      if(hm.map['SettingValue']!==undefined&&row){ sh.getRange(row,hm.map['SettingValue']+1).setNumberFormat('@').setValue(String(value).trim()); clearTableCache_('Settings'); }
+    }catch(e){}
+  }
 }
 function getSetting_(conferenceId,key,def){ const r=findOne_('Settings',{ConferenceID:conferenceId,SettingKey:key}); return r?String(r.SettingValue):def; }
 function settingsMap_(conferenceId){ const out={}; findMany_('Settings',{ConferenceID:conferenceId}).forEach(function(r){out[r.SettingKey]=r.SettingValue;}); return out; }
