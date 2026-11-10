@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.6';
+const APP_VERSION = '2026-11-10.7';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -9938,7 +9938,8 @@ function apiUploadFileChunk_(info) {
     info = info || {};
     const uploadId = String(info.uploadId || ''), idx = Number(info.chunkIndex), total = Number(info.totalChunks), data = String(info.chunkData || '');
     if (!validUploadId_(uploadId)) throw new Error('รหัสการอัปโหลดไม่ถูกต้อง');
-    if (!isFinite(total) || total < 1 || total > CHUNK_MAX_COUNT_ || total !== Math.floor(total)) throw new Error('จำนวนท่อนไฟล์ไม่ถูกต้อง');
+    if (isFinite(total) && total > CHUNK_MAX_COUNT_) throw new Error('ไฟล์มีขนาดใหญ่เกินกำหนด (ไม่เกิน 25 MB) กรุณาลดขนาดไฟล์ หรือใช้ช่อง "ลิงก์ Google Drive" แทนการอัปโหลดไฟล์');
+    if (!isFinite(total) || total < 1 || total !== Math.floor(total)) throw new Error('จำนวนท่อนไฟล์ไม่ถูกต้อง');
     if (!isFinite(idx) || idx < 0 || idx >= total || idx !== Math.floor(idx)) throw new Error('ลำดับท่อนไฟล์ไม่ถูกต้อง');
     if (!data || data.length > CHUNK_MAX_PIECE_ || !/^[A-Za-z0-9+\/=\s]*$/.test(data)) throw new Error('ข้อมูลท่อนไฟล์ไม่ถูกต้อง');
     const folder = resolveUploadFolder_(CHUNK_FOLDER_KEY_);

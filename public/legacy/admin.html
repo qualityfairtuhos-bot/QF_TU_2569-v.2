@@ -442,6 +442,10 @@ function err(e){hide();Swal.fire({icon:'error',title:'ไม่สามาร�
 function toast(title,icon='success'){Swal.fire({toast:true,position:'top-end',icon,title,showConfirmButton:false,timer:2200})}
 function fileObj(el){return new Promise((res,rej)=>{const f=el.files[0];if(!f)return res(null);const r=new FileReader();r.onload=()=>res({name:f.name,mimeType:f.type,base64:String(r.result).split(',')[1]});r.onerror=rej;r.readAsDataURL(f)})}
 async function uploadFileInChunks(file, onProgress){
+  const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+  if(file && file.size > MAX_UPLOAD_BYTES){
+    throw new Error('ไฟล์มีขนาด ' + (file.size / 1048576).toFixed(1) + ' MB เกินกำหนด 25 MB กรุณาลดขนาดไฟล์ หรือใช้ช่อง "ลิงก์ Google Drive" แทนการอัปโหลดไฟล์');
+  }
   const b64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -477,8 +481,10 @@ async function uploadFileInChunks(file, onProgress){
         let json = null;
         try{ json = await res.json(); }catch(e){}
         if(json && json.success) return;
-        lastErr = new Error((json && json.message) || ('ส่งข้อมูลส่วนที่ ' + (i + 1) + ' ไม่สำเร็จ'));
-      }catch(e){ lastErr = e; }
+        const msg = (json && json.message) || ('ส่งข้อมูลส่วนที่ ' + (i + 1) + ' ไม่สำเร็จ');
+        if(res.status >= 400 && res.status < 500){ const fe = new Error(msg); fe.fatal = true; throw fe; }
+        lastErr = new Error(msg);
+      }catch(e){ if(e && e.fatal) throw e; lastErr = e; }
     }
     throw lastErr || new Error('ส่งข้อมูลส่วนที่ ' + (i + 1) + ' ไม่สำเร็จ');
   };
