@@ -3632,6 +3632,9 @@ async function openAssignFinalRoundModal() {
     const rounds = config.rounds || [];
     const r2 = rounds.find(r => Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน')) || rounds[1] || rounds[0];
     const r2Id = r2 ? r2.ReviewRoundID : 'RR-2026-000002';
+    if (r2 && !isRoundOpen(r2)) {
+      return Swal.fire({ icon: 'info', title: 'รอบตัดสินปิดอยู่', text: 'เปิดรอบตัดสินก่อน ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน แล้วจึงมอบหมายกรรมการ', confirmButtonColor: '#006D70' });
+    }
 
     // Filter works that are accepted / qualified for presentation
     const qualifiedWorks = allWorks.filter(w => {
@@ -3741,6 +3744,40 @@ async function openAssignFinalRoundModal() {
 }
 
 
+function isRoundOpen(r) {
+  return !['CLOSED', 'LOCKED', 'CANCELLED'].includes(String((r && r.Status) || '').toUpperCase());
+}
+
+async function toggleReviewRoundStatus(roundId) {
+  const rounds = (CURRENT_REVIEW_CONFIG && CURRENT_REVIEW_CONFIG.rounds) || [];
+  const r = rounds.find(x => x.ReviewRoundID === roundId);
+  if (!r) return;
+  const open = isRoundOpen(r);
+  const name = esc(r.RoundNameTH || r.ReviewRoundID);
+  const ok = await Swal.fire({
+    icon: 'warning',
+    title: open ? `ปิด${name}?` : `เปิด${name}?`,
+    html: open
+      ? 'เมื่อปิดรอบ:<br>• รอบนี้จะไม่แสดงในตัวเลือกตอนมอบหมายกรรมการ<br>• กรรมการจะ<b>บันทึกหรือแก้คะแนนรอบนี้ไม่ได้</b><br>• คะแนนที่บันทึกไว้แล้วยังอยู่ครบ และกดเปิดรอบกลับได้ทุกเมื่อ'
+      : 'เมื่อเปิดรอบ: มอบหมายกรรมการในรอบนี้ได้ และกรรมการที่ได้รับมอบหมายบันทึกคะแนนได้',
+    showCancelButton: true,
+    confirmButtonText: open ? 'ปิดรอบ' : 'เปิดรอบ',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: open ? '#b91c1c' : '#15803d'
+  });
+  if (!ok.isConfirmed) return;
+  show(open ? 'กำลังปิดรอบ...' : 'กำลังเปิดรอบ...');
+  try {
+    await rpc('adminSaveReviewRoundStatus', TOKEN, CID, roundId, open ? 'CLOSED' : 'OPEN');
+    hide();
+    await loadReviewConfig(true);
+    Swal.fire({ icon: 'success', title: open ? 'ปิดรอบแล้ว' : 'เปิดรอบแล้ว', timer: 1500, showConfirmButton: false });
+  } catch (e) {
+    hide();
+    err(e);
+  }
+}
+
 function assignEmailNote(res) {
   if (res && res.emailSent === false) return '<div style="margin-top:10px; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; color:#9a3412; font-size:0.85rem;">ยังไม่ได้ส่งอีเมลแจ้งกรรมการ<br>เมื่อมอบหมายครบแล้ว กดปุ่ม <b>"ส่งอีเมลแจ้งกรรมการรอบตัดสิน"</b></div>';
   return '<div style="margin-top:8px; color:#166534; font-size:0.85rem;">ส่งอีเมลแจ้งกรรมการแล้ว</div>';
@@ -3844,7 +3881,9 @@ async function openAssignByCategoryModal(){
     }).join('') : '<option value="">ไม่มีผลงานในระบบ</option>';
     if (!defaultCat && activeCatList.length > 0) defaultCat = activeCatList[0];
 
-    const roundsHtml = (d.rounds || []).map(rd => `<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH || rd.RoundNameEN || rd.ReviewRoundID)}</option>`).join('');
+    const openRoundsList = (d.rounds || []).filter(isRoundOpen);
+    if (!openRoundsList.length) return Swal.fire({ icon: 'info', title: 'ไม่มีรอบที่เปิดอยู่', text: 'ทุกรอบปิดแล้ว เปิดรอบได้ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน', confirmButtonColor: '#006D70' });
+    const roundsHtml = openRoundsList.map(rd => `<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH || rd.RoundNameEN || rd.ReviewRoundID)}</option>`).join('');
 
     const modalHtml = `
       <div style="text-align:left; font-size:0.88rem;">
@@ -4152,6 +4191,8 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
     hide();
 
     const rounds = d.rounds || [];
+    const openRounds = rounds.filter(isRoundOpen);
+    if (!openRounds.length) return Swal.fire({ icon: 'info', title: 'ไม่มีรอบที่เปิดอยู่', text: 'ทุกรอบปิดแล้ว เปิดรอบได้ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน', confirmButtonColor: '#006D70' });
     let initialRoundId = (rounds[0] && rounds[0].ReviewRoundID) || '';
     if (targetRoundNoOrId === 2 || String(targetRoundNoOrId) === '2' || /(?:^|[-_])2$|[-_]0*2$/i.test(String(targetRoundNoOrId).trim())) {
       const r2 = rounds.find(r => Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน'));
@@ -4161,6 +4202,8 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
       const matched = rounds.find(r => r.ReviewRoundID === targetRoundNoOrId || Number(r.RoundNo) === Number(targetRoundNoOrId));
       if (matched) initialRoundId = matched.ReviewRoundID;
     }
+
+    if (!openRounds.some(r => r.ReviewRoundID === initialRoundId)) initialRoundId = openRounds[0].ReviewRoundID;
 
     const allAssignments = (summary && summary.assignments) || [];
     const workObj = (summary && summary.work) || (window.WORK_ROWS || []).find(w => w.WorkID === wid) || {};
@@ -4225,7 +4268,7 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
         <div style="margin-bottom:12px;">
           <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">รอบการประเมินที่ต้องการมอบหมาย:</label>
           <select id="assignRoundSelect" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid #006D70; font-size:0.88rem; font-weight:600; background:#fff;">
-            ${rounds.map(rd => `<option value="${esc(rd.ReviewRoundID)}" ${rd.ReviewRoundID === initialRoundId ? 'selected' : ''}>${esc(rd.RoundNameTH || rd.RoundNameEN)} (${esc(rd.ReviewRoundID)})</option>`).join('')}
+            ${openRounds.map(rd => `<option value="${esc(rd.ReviewRoundID)}" ${rd.ReviewRoundID === initialRoundId ? 'selected' : ''}>${esc(rd.RoundNameTH || rd.RoundNameEN)} (${esc(rd.ReviewRoundID)})</option>`).join('')}
           </select>
         </div>
 
@@ -5880,7 +5923,7 @@ function renderReviewConfigView(){
             style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; border:1.5px solid ${border}; background:${bg}; color:${color}; font-weight:${isSel ? "700" : "600"}; font-size:0.9rem; cursor:pointer; box-shadow:${isSel ? "0 2px 6px rgba(0,0,0,0.06)" : "none"};">
             <i class="fa-solid ${icon}"></i>
             <span>รอบที่ ${r.RoundNo}: ${esc(r.RoundNameTH)}</span>
-            <span class="badge" style="background:${isSel ? "#fff" : "#e2e8f0"}; color:${color}; font-size:0.75rem; padding:2px 8px; border-radius:999px;">${esc(r.Status || "OPEN")}</span>
+            <span class="badge" style="background:${isRoundOpen(r) ? "#dcfce7" : "#fee2e2"}; color:${isRoundOpen(r) ? "#166534" : "#b91c1c"}; font-size:0.75rem; padding:2px 8px; border-radius:999px;">${isRoundOpen(r) ? "เปิด" : "ปิด"}</span>
           </button>
         `;
       }).join("")}
@@ -5901,6 +5944,9 @@ function renderReviewConfigView(){
         </div>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${activeRound.ReviewRoundID ? (isRoundOpen(activeRound)
+          ? `<button type="button" class="btn btn-sm" onclick="toggleReviewRoundStatus('${esc(activeRound.ReviewRoundID)}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:0.84rem; padding:8px 14px; background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5;"><i class="fa-solid fa-lock"></i> ปิดรอบนี้</button>`
+          : `<button type="button" class="btn btn-sm" onclick="toggleReviewRoundStatus('${esc(activeRound.ReviewRoundID)}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:0.84rem; padding:8px 14px; background:#f0fdf4; color:#15803d; border:1px solid #86efac;"><i class="fa-solid fa-lock-open"></i> เปิดรอบนี้</button>`) : ''}
         <button type="button" class="btn btn-sm btn-primary" onclick="openCriterionModal(null, '${esc(SELECTED_REVIEW_ROUND_ID)}')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:0.84rem; padding:8px 14px;">
           <i class="fa-solid fa-plus"></i> เพิ่มข้อเกณฑ์ในรอบนี้
         </button>

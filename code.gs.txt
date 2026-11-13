@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-13.2';
+const APP_VERSION = '2026-11-13.3';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -6817,6 +6817,7 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
   return runSafely_('adminAssignReviewersBulk',function(){
     const ctx = requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
     const sendEmail = assignmentSendEmailOption_(options);
+    requireOpenReviewRound_(conferenceId, roundId);
     ensureAssignmentNotifiedColumn_();
     if(!workIds||!workIds.length){
       workIds = findMany_('Works',{ConferenceID:conferenceId}).filter(w=>w.Status!=='REJECTED'&&w.Status!=='RECEIVED').map(w=>w.WorkID);
@@ -6886,11 +6887,10 @@ function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, revie
   return runSafely_('adminSyncWorkRoundReviewers', function() {
     var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
     var sendEmail = assignmentSendEmailOption_(options);
-    ensureAssignmentNotifiedColumn_();
     var w = findOne_('Works', { ConferenceID: conferenceId, WorkID: workId });
     if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
-    var round = findOne_('ReviewRounds', { ConferenceID: conferenceId, ReviewRoundID: roundId });
-    if (!round) throw new Error('ไม่พบรอบการประเมิน');
+    requireOpenReviewRound_(conferenceId, roundId);
+    ensureAssignmentNotifiedColumn_();
 
     var currentAssignments = findMany_('ReviewAssignments', {
       ConferenceID: conferenceId,
@@ -6985,6 +6985,31 @@ function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, revie
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e) {}
 
     return { success: true, added: added, removed: removed, emailSent: sendEmail };
+  });
+}
+// ---- เปิด/ปิดรอบการประเมิน (แอดมินตั้งเอง): รอบที่ปิดจะมอบหมายกรรมการเพิ่มไม่ได้ และกรรมการบันทึกคะแนนรอบนั้นไม่ได้ ----
+function isReviewRoundClosed_(round) {
+  return ['CLOSED', 'LOCKED', 'CANCELLED'].indexOf(upper_(round && round.Status)) >= 0;
+}
+function requireOpenReviewRound_(conferenceId, roundId) {
+  const round = findOne_('ReviewRounds', { ConferenceID: conferenceId, ReviewRoundID: roundId });
+  if (!round) throw new Error('ไม่พบรอบการประเมิน');
+  if (isReviewRoundClosed_(round)) throw new Error('รอบ "' + (round.RoundNameTH || roundId) + '" ปิดแล้ว ไม่สามารถมอบหมายกรรมการได้ (เปิดรอบได้ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน)');
+  return round;
+}
+function adminSaveReviewRoundStatus(token, conferenceId, roundId, status) {
+  return runSafely_('adminSaveReviewRoundStatus', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    const st = upper_(status);
+    if (['OPEN', 'CLOSED'].indexOf(st) < 0) throw new Error('สถานะรอบต้องเป็น OPEN หรือ CLOSED');
+    const round = findOne_('ReviewRounds', { ConferenceID: conferenceId, ReviewRoundID: roundId });
+    if (!round) throw new Error('ไม่พบรอบการประเมิน');
+    const before = upper_(round.Status);
+    if (before !== st) updateRecord_('ReviewRounds', round.__row, { Status: st });
+    clearTableCache_('ReviewRounds');
+    try { CacheService.getScriptCache().remove('ADM_RCFG_' + conferenceId); } catch (e) {}
+    logAudit_(conferenceId, ctx.user, ctx.role, 'SET_REVIEW_ROUND_STATUS', 'ReviewRounds', roundId, { from: before, to: st });
+    return { roundId: roundId, status: st, previous: before };
   });
 }
 // ---- แจ้งกรรมการทีหลัง: มอบหมายแบบยังไม่ส่งอีเมล แล้วกดส่งรวดเดียว ----
@@ -9454,6 +9479,7 @@ const API_ACTIONS = Object.freeze({
   adminAssignReviewersBulk: adminAssignReviewersBulk,
   adminSyncWorkRoundReviewers: adminSyncWorkRoundReviewers,
   adminNotifyRoundReviewers: adminNotifyRoundReviewers,
+  adminSaveReviewRoundStatus: adminSaveReviewRoundStatus,
   adminBootstrap: adminBootstrap,
   adminDashboard: adminDashboard,
   adminGetRegistration: adminGetRegistration,
@@ -9537,7 +9563,7 @@ const API_ACTIONS = Object.freeze({
 });
 
 const API_WRITE_ACTIONS = Object.freeze({
-  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminSyncWorkRoundReviewers:1, adminNotifyRoundReviewers:1,
+  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminSyncWorkRoundReviewers:1, adminNotifyRoundReviewers:1, adminSaveReviewRoundStatus:1,
   adminResendReviewerCreds:1, adminSaveRegistration:1, adminRepairAttendanceDays:1, adminSendDirectEmail:1,
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
