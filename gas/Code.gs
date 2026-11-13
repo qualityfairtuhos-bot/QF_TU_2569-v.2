@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-10.7';
+const APP_VERSION = '2026-11-13.1';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -5706,7 +5706,11 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
     // Admin acceptance / locking logic:
     // Reviewers can edit their scores until Admin accepts the scores or finalizes the work!
     const workStatus = upper_(work ? work.Status : '');
-    const isWorkAcceptedOrFinalizedByAdmin = ['ACCEPTED_ORAL','ACCEPTED_POSTER','REVISION_REQUIRED','REJECTED','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED','PUBLISHED','WITHDRAWN'].indexOf(workStatus) >= 0;
+    // The work-status lock is for Round 1 (screening) only. Works that reach the Final
+    // round already carry statuses such as PRESENTATION_FILE_SUBMITTED, so applying it
+    // there would block every Final-round score. Explicit admin locks still apply.
+    const isFinalRound = !!(round && Number(round.RoundNo) === 2);
+    const isWorkAcceptedOrFinalizedByAdmin = !isFinalRound && ['ACCEPTED_ORAL','ACCEPTED_POSTER','REVISION_REQUIRED','REJECTED','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED','PRESENTATION_FILE_APPROVED','SCHEDULED','PUBLISHED','WITHDRAWN'].indexOf(workStatus) >= 0;
     const isAdminExplicitlyLocked = bool_(a.ScoreAcceptedByAdmin) || bool_(a.AdminLocked) || (bool_(a.Locked) && isWorkAcceptedOrFinalizedByAdmin);
 
     if(isWorkAcceptedOrFinalizedByAdmin || isAdminExplicitlyLocked){
@@ -8588,9 +8592,12 @@ function adminGetWorkScoreSummary(token, conferenceId, workId, roundOption) {
       var rAssignments = allAssignments.filter(function(a){
         return String(a.ReviewRoundID || '').trim() === String(targetRound.ReviewRoundID).trim();
       });
-      if (rAssignments.length > 0) {
-        assignments = rAssignments;
-      }
+      // Strict: a chosen round shows only that round's assignments (even when none),
+      // so the Final round sheet is blank until its own reviewers are assigned.
+      assignments = rAssignments.filter(function(a){ return upper_(a.Status) !== 'CANCELLED'; });
+    } else if (roundOption) {
+      // A round was asked for but does not exist: never fall back to another round's data.
+      assignments = [];
     } else {
       // Auto-detect round: prefer round with completed scores, or Round 1
       var scoredA = allAssignments.filter(function(a){ 
