@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-13.1';
+const APP_VERSION = '2026-11-13.2';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -310,7 +310,7 @@ const DB_SCHEMA = Object.freeze({
   Reviewers: ['ReviewerID','Prefix','FirstName','LastName','FullName','Position','Institution','Department','Province','HealthRegion','Phone','Email','ExpertiseCategories','ExpertiseTypes','MaxWorkload','Status','NotificationPreference','LineToken','TelegramID','Note','CreatedAt','UpdatedAt'],
   ReviewerPool: ['PoolID','ConferenceID','ReviewerID','ExpertiseCategories','ExpertiseTypes','MaxWorkload','CurrentAssignedCount','ConflictOrganizations','Status','AssignedAt','AssignedBy'],
   ReviewerConflicts: ['ConflictID','ConferenceID','ReviewerID','WorkID','Organization','ConflictType','Note','Status','CreatedAt'],
-  ReviewAssignments: ['AssignmentID','ConferenceID','ReviewRoundID','WorkID','WorkCode','ReviewerID','ReviewerName','ReviewerEmail','AssignedAt','AssignedBy','Status','OpenedAt','CompletedAt','TotalScore','Decision','RecommendationToAuthor','InternalComment','DeclineReason','AnnotatedFileId','AnnotatedFileUrl','Locked','UpdatedAt'],
+  ReviewAssignments: ['AssignmentID','ConferenceID','ReviewRoundID','WorkID','WorkCode','ReviewerID','ReviewerName','ReviewerEmail','AssignedAt','AssignedBy','Status','OpenedAt','CompletedAt','TotalScore','Decision','RecommendationToAuthor','InternalComment','DeclineReason','AnnotatedFileId','AnnotatedFileUrl','Locked','NotifiedAt','UpdatedAt'],
   ScoringCriteria: ['CriteriaID','ConferenceID','ReviewRoundID','CategoryID','PresentationTypeID','ItemNo','CriteriaNameTH','CriteriaNameEN','DescriptionTH','MaxScore','WeightPercent','RequiredComment','Active','SortOrder'],
   ReviewScores: ['ScoreID','ConferenceID','AssignmentID','ReviewRoundID','WorkID','ReviewerID','CriteriaID','Score','WeightedScore','Comment','CreatedAt','UpdatedAt'],
   ReviewSummary: ['SummaryID','ConferenceID','AssignmentID','ReviewRoundID','WorkID','ReviewerID','TotalScore','Decision','RecommendationToAuthor','InternalComment','CreatedAt','UpdatedAt'],
@@ -6813,9 +6813,11 @@ function upgradeTuhEventScannerV18(){
     return {version:'1.8.0-EVENT-SCANNER',conferenceId:cid,columnsAdded:added,eventDates:jsonParse_(getSetting_(cid,'EVENT_DATES_JSON','[]'),[]),services:scannerServiceDefinitions_(cid)};
   });
 }
-function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds){
+function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds,options){
   return runSafely_('adminAssignReviewersBulk',function(){
     const ctx = requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
+    const sendEmail = assignmentSendEmailOption_(options);
+    ensureAssignmentNotifiedColumn_();
     if(!workIds||!workIds.length){
       workIds = findMany_('Works',{ConferenceID:conferenceId}).filter(w=>w.Status!=='REJECTED'&&w.Status!=='RECEIVED').map(w=>w.WorkID);
     }
@@ -6843,11 +6845,11 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
         const pool = findOne_('ReviewerPool',{ConferenceID:conferenceId,ReviewerID:rid});
         if(pool && String(pool.Status).toUpperCase() === 'INACTIVE') { skipped++; return; }
         const aid = nextId_('ASN');
-        appendRecord_('ReviewAssignments',{AssignmentID:aid,ConferenceID:conferenceId,ReviewRoundID:roundId,WorkID:wid,WorkCode:w?w.WorkCode:wid,ReviewerID:rid,ReviewerName:rvw.FullName||(rvw.FirstName+' '+rvw.LastName),ReviewerEmail:rvw.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',CreatedAt:new Date(),UpdatedAt:new Date()});
+        appendRecord_('ReviewAssignments',{AssignmentID:aid,ConferenceID:conferenceId,ReviewRoundID:roundId,WorkID:wid,WorkCode:w?w.WorkCode:wid,ReviewerID:rid,ReviewerName:rvw.FullName||(rvw.FirstName+' '+rvw.LastName),ReviewerEmail:rvw.Email,AssignedAt:new Date(),AssignedBy:ctx.user.Email,Status:'ASSIGNED',NotifiedAt:sendEmail?new Date():'',CreatedAt:new Date(),UpdatedAt:new Date()});
         created++;
         assignedForThisWork++;
         revCountAdd[rid] = (revCountAdd[rid] || 0) + 1;
-        queueAssignmentEmail_(assignEmailQueue, rvw, w, aid);
+        if (sendEmail) queueAssignmentEmail_(assignEmailQueue, rvw, w, aid);
       });
       if (assignedForThisWork > 0 && w && ['WAITING_REVIEWER_ASSIGN','ACADEMIC_SCREENING','DRAFT','SUBMITTED'].indexOf(upper_(w.Status)) >= 0) {
         try {
@@ -6875,14 +6877,16 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     clearTableCache_('Works');
     clearTableCache_('ReviewerPool');
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e){}
-    try { flushAssignmentEmails_(conferenceId, assignEmailQueue); } catch(e){}
+    if (sendEmail) { try { flushAssignmentEmails_(conferenceId, assignEmailQueue); } catch(e){} }
 
-    return {created:created,skipped:skipped};
+    return {created:created,skipped:skipped,emailSent:sendEmail};
   });
 }
-function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, reviewerIds) {
+function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, reviewerIds, options) {
   return runSafely_('adminSyncWorkRoundReviewers', function() {
     var ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    var sendEmail = assignmentSendEmailOption_(options);
+    ensureAssignmentNotifiedColumn_();
     var w = findOne_('Works', { ConferenceID: conferenceId, WorkID: workId });
     if (!w) throw new Error('ไม่พบข้อมูลผลงาน');
     var round = findOne_('ReviewRounds', { ConferenceID: conferenceId, ReviewRoundID: roundId });
@@ -6953,6 +6957,7 @@ function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, revie
         AssignedAt: new Date(),
         AssignedBy: ctx.user.Email,
         Status: 'ASSIGNED',
+        NotifiedAt: sendEmail ? new Date() : '',
         CreatedAt: new Date(),
         UpdatedAt: new Date()
       });
@@ -6965,7 +6970,7 @@ function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, revie
           });
         } catch(e) {}
       }
-      try { sendReviewAssignmentEmail_(conferenceId, w, rvw, aid); } catch(e) {}
+      if (sendEmail) { try { sendReviewAssignmentEmail_(conferenceId, w, rvw, aid); } catch(e) {} }
     });
 
     if (added > 0 && ['WAITING_REVIEWER_ASSIGN','ACADEMIC_SCREENING','DRAFT','SUBMITTED'].indexOf(upper_(w.Status)) >= 0) {
@@ -6979,7 +6984,69 @@ function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, revie
     clearTableCache_('ReviewerPool');
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e) {}
 
-    return { success: true, added: added, removed: removed };
+    return { success: true, added: added, removed: removed, emailSent: sendEmail };
+  });
+}
+// ---- แจ้งกรรมการทีหลัง: มอบหมายแบบยังไม่ส่งอีเมล แล้วกดส่งรวดเดียว ----
+// options.sendEmail === false เท่านั้นที่ไม่ส่ง (ผู้เรียกแบบเดิมที่ไม่ส่ง options ยังส่งอีเมลเหมือนเดิม)
+function assignmentSendEmailOption_(options) {
+  return !(options && (options.sendEmail === false || String(options.sendEmail).toLowerCase() === 'false'));
+}
+// คอลัมน์ NotifiedAt ใน ReviewAssignments: เวลาที่ส่งอีเมลแจ้งกรรมการแล้ว (ว่าง = ยังไม่แจ้ง)
+function ensureAssignmentNotifiedColumn_() {
+  const hm = headerMap_('ReviewAssignments');
+  if (hm.map['NotifiedAt'] !== undefined) return;
+  withLock_(function() {
+    const sh = getSheet_('ReviewAssignments');
+    const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0];
+    if (head.indexOf('NotifiedAt') < 0) sh.getRange(1, sh.getLastColumn() + 1).setValue('NotifiedAt');
+    if (globalThis.__TUH_HEADERS) delete globalThis.__TUH_HEADERS['ReviewAssignments'];
+    clearTableCache_('ReviewAssignments');
+  });
+}
+// กรรมการที่ยังไม่ได้รับอีเมลแจ้งในรอบนี้: สถานะ ASSIGNED และ NotifiedAt ว่าง
+function pendingAssignmentNotices_(conferenceId, roundId) {
+  return findMany_('ReviewAssignments', { ConferenceID: conferenceId, ReviewRoundID: roundId }).filter(function(a) {
+    return upper_(a.Status) === 'ASSIGNED' && !clean_(a.NotifiedAt);
+  });
+}
+// sendNow=false: แค่นับจำนวนให้ดูก่อน / sendNow=true: ส่งอีเมล 1 ฉบับต่อกรรมการ 1 ท่าน (รวมทุกเรื่อง) แล้วบันทึก NotifiedAt
+function adminNotifyRoundReviewers(token, conferenceId, roundId, sendNow) {
+  return runSafely_('adminNotifyRoundReviewers', function() {
+    const ctx = requireSession_(token, ['SUPERADMIN', 'CONFERENCE_ADMIN', 'ACADEMIC_STAFF'], conferenceId);
+    const round = findOne_('ReviewRounds', { ConferenceID: conferenceId, ReviewRoundID: roundId });
+    if (!round) throw new Error('ไม่พบรอบการประเมิน');
+    ensureAssignmentNotifiedColumn_();
+    const pending = pendingAssignmentNotices_(conferenceId, roundId);
+    const reviewerKeys = {};
+    pending.forEach(function(a) { reviewerKeys[normalizeEmail_(a.ReviewerEmail) || a.ReviewerID] = true; });
+    const summary = { roundId: roundId, roundName: round.RoundNameTH || round.RoundNameEN || roundId, assignments: pending.length, reviewers: Object.keys(reviewerKeys).length };
+    if (!sendNow || !pending.length) { summary.sent = false; return summary; }
+
+    const queue = {};
+    const revCache = {}, workCache = {};
+    let noEmail = 0;
+    pending.forEach(function(a) {
+      const rid = String(a.ReviewerID || '');
+      const rvw = revCache[rid] || (revCache[rid] = findOne_('Reviewers', { ReviewerID: rid }) || { FullName: a.ReviewerName, Email: a.ReviewerEmail });
+      if (!rvw.Email) rvw.Email = a.ReviewerEmail;
+      if (!rvw.Email) { noEmail++; return; }
+      const w = workCache[a.WorkID] || (workCache[a.WorkID] = findOne_('Works', { ConferenceID: conferenceId, WorkID: a.WorkID }) || { WorkCode: a.WorkCode || a.WorkID });
+      queueAssignmentEmail_(queue, rvw, w, a.AssignmentID);
+    });
+    flushAssignmentEmails_(conferenceId, queue);
+
+    const now = new Date();
+    const updates = pending.filter(function(a) { return a.ReviewerEmail || (revCache[String(a.ReviewerID || '')] || {}).Email; })
+      .map(function(a) { return { rowNumber: a.__row, patch: { NotifiedAt: now, UpdatedAt: now } }; });
+    if (updates.length) batchUpdateRecords_('ReviewAssignments', updates);
+    clearTableCache_('ReviewAssignments');
+    logAudit_(conferenceId, ctx.user, ctx.role, 'NOTIFY_ROUND_REVIEWERS', 'ReviewRounds', roundId, { reviewers: Object.keys(queue).length, assignments: updates.length, noEmail: noEmail });
+    summary.sent = true;
+    summary.emailsSent = Object.keys(queue).length;
+    summary.assignmentsNotified = updates.length;
+    summary.noEmail = noEmail;
+    return summary;
   });
 }
 function adminGetReviewer(token,conferenceId,reviewerId){
@@ -9386,6 +9453,7 @@ const API_ACTIONS = Object.freeze({
   adminAddUser: adminAddUser,
   adminAssignReviewersBulk: adminAssignReviewersBulk,
   adminSyncWorkRoundReviewers: adminSyncWorkRoundReviewers,
+  adminNotifyRoundReviewers: adminNotifyRoundReviewers,
   adminBootstrap: adminBootstrap,
   adminDashboard: adminDashboard,
   adminGetRegistration: adminGetRegistration,
@@ -9469,7 +9537,7 @@ const API_ACTIONS = Object.freeze({
 });
 
 const API_WRITE_ACTIONS = Object.freeze({
-  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminSyncWorkRoundReviewers:1,
+  adminAddReviewer:1, adminAddUser:1, adminAssignReviewersBulk:1, adminSyncWorkRoundReviewers:1, adminNotifyRoundReviewers:1,
   adminResendReviewerCreds:1, adminSaveRegistration:1, adminRepairAttendanceDays:1, adminSendDirectEmail:1,
   adminSendMealPasses:1, adminUpdateRegistrationStatus:1, adminUpdateReviewer:1,
   adminUpdateUserStatus:1, adminUpdateWorkStatus:1, adminUploadWorkFiles:1,
