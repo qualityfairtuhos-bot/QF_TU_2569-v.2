@@ -273,6 +273,7 @@
             </button>
             <button class="btn btn-blue" onclick="openAssignByCategoryModal()"><i class="fa-solid fa-users-gear"></i> Assign ตามสาขา</button>
             <button class="btn" onclick="openAssignFinalRoundModal()" style="background:#b45309; color:#fff; border-color:#92400e; font-weight:600;"><i class="fa-solid fa-trophy"></i> Assign กรรมการรอบตัดสิน</button>
+            <button class="btn" onclick="notifyFinalRoundReviewers()" style="background:#fff7ed; color:#9a3412; border:1px solid #fdba74; font-weight:600;"><i class="fa-solid fa-envelope"></i> ส่งอีเมลแจ้งกรรมการรอบตัดสิน</button>
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
         </div>
@@ -3693,6 +3694,7 @@ async function openAssignFinalRoundModal() {
         <div id="finalWorksListContainer" style="max-height:260px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; background:#fff; margin-bottom:12px;">
           ${worksListHtml}
         </div>
+        <label style="display:flex; align-items:flex-start; gap:8px; margin:10px 0 0; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; font-size:0.82rem; color:#7c2d12; cursor:pointer; text-align:left;"><input type="checkbox" id="finalSendEmail" style="margin-top:2px; width:16px; height:16px;"><span><b>ส่งอีเมลแจ้งกรรมการทันที</b><br><span style="color:#9a3412;">ถ้าไม่ติ๊ก: บันทึกการมอบหมายอย่างเดียว แล้วกดปุ่ม "ส่งอีเมลแจ้งกรรมการรอบตัดสิน" ภายหลังเพื่อแจ้งทีเดียว</span></span></label>
 
         <div style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
           <div style="font-weight:600; color:#0f172a; margin-bottom:4px;">รอบการประเมินเป้าหมาย:</div>
@@ -3717,18 +3719,18 @@ async function openAssignFinalRoundModal() {
           Swal.showValidationMessage('กรุณาเลือกผลงานอย่างน้อย 1 เรื่อง');
           return false;
         }
-        return { workIds: selectedWids, roundId: r2Id };
+        return { workIds: selectedWids, roundId: r2Id, sendEmail: !!document.getElementById('finalSendEmail')?.checked };
       }
     });
 
     if (result.isConfirmed) {
       show('กำลังมอบหมายกรรมการชุดเดิมเข้ารอบตัดสิน...');
-      const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, result.value.workIds, result.value.roundId, ['__ORIGINAL__']);
+      const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, result.value.workIds, result.value.roundId, ['__ORIGINAL__'], { sendEmail: result.value.sendEmail });
       hide();
       Swal.fire({
         icon: 'success',
         title: 'มอบหมายกรรมการรอบตัดสินสำเร็จ!',
-        html: `สร้างการมอบหมายใหม่ <b>${res.created}</b> รายการ<br><small style="color:#64748b;">(ข้ามรายการที่เคยได้รับมอบหมายแล้ว ${res.skipped} รายการ)</small>`,
+        html: `สร้างการมอบหมายใหม่ <b>${res.created}</b> รายการ<br><small style="color:#64748b;">(ข้ามรายการที่เคยได้รับมอบหมายแล้ว ${res.skipped} รายการ)</small>${assignEmailNote(res)}`,
         confirmButtonColor: '#006D70'
       });
       loadWorks();
@@ -3738,6 +3740,48 @@ async function openAssignFinalRoundModal() {
   }
 }
 
+
+function assignEmailNote(res) {
+  if (res && res.emailSent === false) return '<div style="margin-top:10px; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; color:#9a3412; font-size:0.85rem;">ยังไม่ได้ส่งอีเมลแจ้งกรรมการ<br>เมื่อมอบหมายครบแล้ว กดปุ่ม <b>"ส่งอีเมลแจ้งกรรมการรอบตัดสิน"</b></div>';
+  return '<div style="margin-top:8px; color:#166534; font-size:0.85rem;">ส่งอีเมลแจ้งกรรมการแล้ว</div>';
+}
+
+async function notifyFinalRoundReviewers() {
+  show('กำลังตรวจรายการที่ยังไม่ได้แจ้ง...');
+  try {
+    const config = await rpc('adminGetReviewConfig', TOKEN, CID);
+    const rounds = config.rounds || [];
+    const r2 = rounds.find(r => Number(r.RoundNo) === 2) || rounds.find(r => String(r.RoundNameTH || '').includes('ตัดสิน'));
+    if (!r2) { hide(); return Swal.fire({ icon: 'warning', title: 'ไม่พบรอบตัดสิน' }); }
+    const preview = await rpc('adminNotifyRoundReviewers', TOKEN, CID, r2.ReviewRoundID, false);
+    hide();
+    if (!preview.assignments) {
+      return Swal.fire({ icon: 'info', title: 'ไม่มีรายการที่ต้องแจ้ง', text: 'กรรมการรอบตัดสินทุกท่านได้รับอีเมลแจ้งแล้ว หรือยังไม่มีการมอบหมาย', confirmButtonColor: '#006D70' });
+    }
+    const ok = await Swal.fire({
+      icon: 'question',
+      title: 'ส่งอีเมลแจ้งกรรมการรอบตัดสิน?',
+      html: `รอบ: <b>${esc(preview.roundName)}</b><br>กรรมการที่ยังไม่ได้รับแจ้ง <b>${preview.reviewers}</b> ท่าน (รวม <b>${preview.assignments}</b> ผลงาน)<br><small style="color:#64748b;">ส่ง 1 ฉบับต่อกรรมการ 1 ท่าน ระบุรหัสผลงานทั้งหมดในอีเมล และจะไม่ส่งซ้ำให้ท่านที่แจ้งไปแล้ว</small>`,
+      showCancelButton: true,
+      confirmButtonText: 'ส่งอีเมลตอนนี้',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#b45309'
+    });
+    if (!ok.isConfirmed) return;
+    show('กำลังส่งอีเมลแจ้งกรรมการ...');
+    const res = await rpc('adminNotifyRoundReviewers', TOKEN, CID, r2.ReviewRoundID, true);
+    hide();
+    Swal.fire({
+      icon: 'success',
+      title: 'ส่งอีเมลแจ้งกรรมการแล้ว',
+      html: `ส่งอีเมล <b>${res.emailsSent || 0}</b> ฉบับ (ครอบคลุม ${res.assignmentsNotified || 0} ผลงาน)${res.noEmail ? `<br><span style="color:#b91c1c;">ไม่มีอีเมลกรรมการ ${res.noEmail} รายการ กรุณาตรวจข้อมูลกรรมการ</span>` : ''}<br><small style="color:#64748b;">ดูผลการส่งรายฉบับได้ในชีต EmailLogs</small>`,
+      confirmButtonColor: '#006D70'
+    });
+  } catch (e) {
+    hide();
+    err(e);
+  }
+}
 
 async function openAssignByCategoryModal(){
   const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
@@ -3887,6 +3931,7 @@ async function openAssignByCategoryModal(){
         <div id="batchSummaryNotice" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 12px; font-size:0.82rem; color:#1e40af; text-align:left;">
           💡 กรุณาเลือกผลงานและ Reviewer เพื่อดำเนินการ Assign
         </div>
+        <label style="display:flex; align-items:flex-start; gap:8px; margin:10px 0 0; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; font-size:0.82rem; color:#7c2d12; cursor:pointer; text-align:left;"><input type="checkbox" id="batchSendEmail" style="margin-top:2px; width:16px; height:16px;"><span><b>ส่งอีเมลแจ้งกรรมการทันที</b><br><span style="color:#9a3412;">ถ้าไม่ติ๊ก: บันทึกการมอบหมายอย่างเดียว แล้วกดปุ่ม "ส่งอีเมลแจ้งกรรมการรอบตัดสิน" ภายหลังเพื่อแจ้งทีเดียว</span></span></label>
       </div>
     `;
 
@@ -4067,20 +4112,20 @@ async function openAssignByCategoryModal(){
           return false;
         }
 
-        return { workIds: checkedWorks, reviewerIds: checkedRevs, roundId };
+        return { workIds: checkedWorks, reviewerIds: checkedRevs, roundId, sendEmail: !!document.getElementById('batchSendEmail')?.checked };
       }
     });
 
     if (result.isConfirmed && result.value) {
-      const { workIds, reviewerIds, roundId } = result.value;
+      const { workIds, reviewerIds, roundId, sendEmail } = result.value;
       show(`กำลังมอบหมาย Reviewer (${reviewerIds.length} ท่าน) ให้กับผลงาน (${workIds.length} เรื่อง)...`);
       try {
-        const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, workIds, roundId, reviewerIds);
+        const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, workIds, roundId, reviewerIds, { sendEmail });
         hide();
         await Swal.fire({
           icon: 'success',
           title: 'มอบหมายงานสำเร็จ',
-          html: `สร้าง Assignment <b>${res.created}</b> รายการ${res.skipped > 0 ? `<br><span class="muted" style="font-size:0.85rem">ข้าม ${res.skipped} รายการ (เนื่องจากมีอยู่แล้วหรือสถานะไม่พร้อม)</span>` : ''}`,
+          html: `สร้าง Assignment <b>${res.created}</b> รายการ${res.skipped > 0 ? `<br><span class="muted" style="font-size:0.85rem">ข้าม ${res.skipped} รายการ (เนื่องจากมีอยู่แล้วหรือสถานะไม่พร้อม)</span>` : ''}${assignEmailNote(res)}`,
           confirmButtonColor: '#006D70'
         });
         loadWorks(true);
@@ -4184,6 +4229,8 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
           </select>
         </div>
 
+        <div style="margin-bottom:12px;"><label style="display:flex; align-items:flex-start; gap:8px; margin:10px 0 0; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; font-size:0.82rem; color:#7c2d12; cursor:pointer; text-align:left;"><input type="checkbox" id="assignSendEmail" style="margin-top:2px; width:16px; height:16px;"><span><b>ส่งอีเมลแจ้งกรรมการทันที</b><br><span style="color:#9a3412;">ถ้าไม่ติ๊ก: บันทึกการมอบหมายอย่างเดียว แล้วกดปุ่ม "ส่งอีเมลแจ้งกรรมการรอบตัดสิน" ภายหลังเพื่อแจ้งทีเดียว</span></span></label></div>
+
         <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <label style="font-weight:700; color:#0C385B; font-size:0.88rem;">
             เลือก Reviewer:
@@ -4255,20 +4302,20 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
           Swal.showValidationMessage('กรุณาเลือกรอบการประเมิน');
           return false;
         }
-        return { roundId, reviewerIds: checkedIds };
+        return { roundId, reviewerIds: checkedIds, sendEmail: !!document.getElementById('assignSendEmail')?.checked };
       }
     });
 
     if (result.isConfirmed && result.value) {
-      const { roundId, reviewerIds } = result.value;
+      const { roundId, reviewerIds, sendEmail } = result.value;
       show('กำลังบันทึกการมอบหมาย...');
       try {
-        const res = await rpc('adminSyncWorkRoundReviewers', TOKEN, CID, wid, roundId, reviewerIds);
+        const res = await rpc('adminSyncWorkRoundReviewers', TOKEN, CID, wid, roundId, reviewerIds, { sendEmail });
         hide();
         await Swal.fire({
           icon: 'success',
           title: 'บันทึกสำเร็จ',
-          html: `เพิ่มการมอบหมาย <b>${res.added || 0}</b> ท่าน${res.removed ? `, ยกเลิก <b>${res.removed}</b> ท่าน` : ''}`,
+          html: `เพิ่มการมอบหมาย <b>${res.added || 0}</b> ท่าน${res.removed ? `, ยกเลิก <b>${res.removed}</b> ท่าน` : ''}${(res.added || 0) > 0 ? assignEmailNote(res) : ''}`,
           confirmButtonColor: '#006D70'
         });
         loadWorks(true);
