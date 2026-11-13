@@ -5961,7 +5961,8 @@ function renderReviewConfigView(){
     if(c.Active === false || c.Active === 'false' || c.Active === 'FALSE' || c.Active === 0 || c.Active === '0') return false;
     const cRound = String(c.ReviewRoundID || "").trim();
     if(isRound2){
-      return cRound === activeRound.ReviewRoundID || cRound === "RR-2026-000002" || cRound.includes("2");
+      // เดิมใช้ cRound.includes("2") ซึ่งตรงกับทุกรหัส (RR-2026-...) ทำให้เกณฑ์รอบ 1 ปนเข้ามา
+      return cRound === activeRound.ReviewRoundID;
     } else {
       return cRound === activeRound.ReviewRoundID || cRound === "RR-2026-000001" || !cRound || cRound === "ALL";
     }
@@ -5989,7 +5990,9 @@ function renderReviewConfigView(){
     return true;
   }).sort((a,b) => (Number(a.ItemNo)||0) - (Number(b.ItemNo)||0));
 
-  const otherCrit = critList.filter(c => !researchCrit.includes(c) && !cqiCrit.includes(c)).sort((a,b) => (Number(a.ItemNo)||0) - (Number(b.ItemNo)||0));
+  // "เกณฑ์อื่นๆ" = เฉพาะข้อที่ไม่อยู่ในกลุ่มวิจัย/นวัตกรรม หรือ CQI/Service/Primary เลย
+  // (ข้อที่ซ้ำกันตามรหัสประเภทย่อย เช่น SERVICE/CQI/PRIMARY เป็นชุดเดียวกัน แสดงครั้งเดียวในกลุ่มของมัน)
+  const otherCrit = critList.filter(c => !criteriaGroupOfClient(c.CategoryID)).sort((a,b) => (Number(a.ItemNo)||0) - (Number(b.ItemNo)||0));
 
   const renderCritGroup = (title, icon, badgeColor, items, catId) => {
     const sum = items.reduce((acc, x) => acc + (Number(x.MaxScore) || 0), 0);
@@ -6055,11 +6058,20 @@ function renderReviewConfigView(){
   container.innerHTML = tabsHtml + roundInfoBanner + critHtml;
 }
 
+function criteriaGroupOfClient(cat){
+  const c = String(cat || "").toUpperCase();
+  if (c === "RESEARCH_INNOVATION" || c.includes("RESEARCH") || c.includes("INNOVATION")) return "RESEARCH_INNOVATION";
+  if (c === "SERVICE_CQI_PRIMARY" || c.includes("CQI") || c.includes("SERVICE") || c.includes("PRIMARY")) return "SERVICE_CQI_PRIMARY";
+  return "";
+}
+
 async function openCriterionModal(crit = null, defaultRoundId = "", defaultCatId = ""){
   const isEdit = !!(crit && crit.CriteriaID);
   const rounds = (CURRENT_REVIEW_CONFIG && CURRENT_REVIEW_CONFIG.rounds) || [];
   const targetRoundId = crit ? (crit.ReviewRoundID || defaultRoundId) : (defaultRoundId || SELECTED_REVIEW_ROUND_ID);
-  const targetCatId = crit ? (crit.CategoryID || defaultCatId) : (defaultCatId || "SERVICE_CQI_PRIMARY");
+  const rawCatId = crit ? (crit.CategoryID || defaultCatId) : (defaultCatId || "SERVICE_CQI_PRIMARY");
+  // ข้อของรอบตัดสินเก็บเป็นรหัสย่อย (เช่น SERVICE) ให้เลือกกลุ่มของมันในรายการ ไม่ให้ตกไปที่ตัวเลือกแรก
+  const targetCatId = criteriaGroupOfClient(rawCatId) || rawCatId;
 
   const roundOptions = rounds.map(r => `
     <option value="${esc(r.ReviewRoundID)}" ${r.ReviewRoundID === targetRoundId ? "selected" : ""}>
@@ -6091,6 +6103,9 @@ async function openCriterionModal(crit = null, defaultRoundId = "", defaultCatId
         <select id="modalCritCat" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.88rem;">
           ${catOptions}
         </select>
+      </div>
+      <div style="margin-bottom:12px; padding:8px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:0.8rem; color:#1e3a8a;">
+        การบันทึกจะมีผลกับทุกประเภทในกลุ่มเดียวกันพร้อมกัน (CQI / Service Excellence / Primary Care หรือ วิจัย / นวัตกรรม)
       </div>
       <div style="display:flex; gap:10px; margin-bottom:12px;">
         <div style="width:110px;">

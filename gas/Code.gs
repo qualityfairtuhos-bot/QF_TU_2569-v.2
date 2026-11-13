@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-13.3';
+const APP_VERSION = '2026-11-13.4';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -6042,7 +6042,70 @@ function applyTuhDateLogoSettingsV13(){
 function adminSaveRegistrationType(token,conferenceId,p){return runSafely_('adminSaveRegistrationType',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN'],conferenceId);p=p||{};let r=p.RegistrationTypeID?findOne_('RegistrationTypes',{ConferenceID:conferenceId,RegistrationTypeID:p.RegistrationTypeID}):null;const patch={TypeCode:upper_(p.TypeCode),TypeNameTH:clean_(p.TypeNameTH),TypeNameEN:clean_(p.TypeNameEN),IsInternal:bool_(p.IsInternal),FeeAmount:num_(p.FeeAmount),Quota:num_(p.Quota),PaymentRequired:bool_(p.PaymentRequired),WorkRequiresPayment:bool_(p.WorkRequiresPayment),Active:bool_(p.Active),SortOrder:num_(p.SortOrder,99)};if(r)updateRecord_('RegistrationTypes',r.__row,patch);else appendRecord_('RegistrationTypes',Object.assign({RegistrationTypeID:nextId_('RT'),ConferenceID:conferenceId,UsedQuota:0},patch));invalidateCache_(conferenceId);return true;});}
 function adminSaveReviewRound(token,conferenceId,p){return runSafely_('adminSaveReviewRound',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);p=p||{};let r=p.ReviewRoundID?findOne_('ReviewRounds',{ConferenceID:conferenceId,ReviewRoundID:p.ReviewRoundID}):null;const patch={RoundNo:num_(p.RoundNo),RoundNameTH:clean_(p.RoundNameTH),RoundNameEN:clean_(p.RoundNameEN),StartAt:p.StartAt||'',EndAt:p.EndAt||'',MinReviewers:num_(p.MinReviewers,2),MaxReviewers:num_(p.MaxReviewers,3),BlindReview:bool_(p.BlindReview),AllowEditAfterSubmit:bool_(p.AllowEditAfterSubmit),AllowDecline:bool_(p.AllowDecline),CalculationMethod:upper_(p.CalculationMethod||'AVERAGE'),PassingScore:num_(p.PassingScore,60),Status:upper_(p.Status||'DRAFT'),SortOrder:num_(p.SortOrder,99)};if(r)updateRecord_('ReviewRounds',r.__row,patch);else appendRecord_('ReviewRounds',Object.assign({ReviewRoundID:nextId_('RR'),ConferenceID:conferenceId},patch));return true;});}
 function adminDeleteScoringCriterion(token,conferenceId,criteriaId){return runSafely_('adminDeleteScoringCriterion',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);var cid=conferenceId||APP.DEFAULT_CONFERENCE_ID;var r=findOne_('ScoringCriteria',{ConferenceID:cid,CriteriaID:criteriaId});if(!r)throw new Error('ไม่พบเกณฑ์คะแนนที่ต้องการลบ');updateRecord_('ScoringCriteria',r.__row,{Active:false,UpdatedAt:new Date()});clearTableCache_('ScoringCriteria');invalidateCache_(cid);return {success:true};});}
-function adminSaveScoringCriterion(token,conferenceId,p){return runSafely_('adminSaveScoringCriterion',function(){requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);p=p||{};let r=p.CriteriaID?findOne_('ScoringCriteria',{ConferenceID:conferenceId,CriteriaID:p.CriteriaID}):null;const patch={ReviewRoundID:clean_(p.ReviewRoundID),CategoryID:clean_(p.CategoryID),PresentationTypeID:clean_(p.PresentationTypeID),ItemNo:num_(p.ItemNo),CriteriaNameTH:clean_(p.CriteriaNameTH),CriteriaNameEN:clean_(p.CriteriaNameEN),DescriptionTH:clean_(p.DescriptionTH),MaxScore:num_(p.MaxScore),WeightPercent:num_(p.WeightPercent,100),RequiredComment:bool_(p.RequiredComment),Active:bool_(p.Active),SortOrder:num_(p.SortOrder,99)};if(r)updateRecord_('ScoringCriteria',r.__row,patch);else appendRecord_('ScoringCriteria',Object.assign({CriteriaID:nextId_('CRIT'),ConferenceID:conferenceId},patch));invalidateCache_(conferenceId);return true;});}
+// กลุ่มประเภทผลงานที่ใช้เกณฑ์ชุดเดียวกัน: ในรอบตัดสิน เกณฑ์ถูกเก็บแยกตามรหัสประเภท (SERVICE/CQI/PRIMARY, RESEARCH/INNOVATION)
+// การแก้ไข/เพิ่ม/ลบข้อจากหน้าแอดมินจึงต้องทำกับทุกประเภทในกลุ่มพร้อมกัน เพื่อให้กรรมการทุกประเภทได้เกณฑ์เหมือนกัน
+const CRITERIA_GROUPS_ = {
+  SERVICE_CQI_PRIMARY: ['SERVICE', 'CQI', 'PRIMARY'],
+  RESEARCH_INNOVATION: ['RESEARCH', 'INNOVATION']
+};
+function criteriaGroupOf_(categoryId) {
+  const c = upper_(categoryId);
+  if (CRITERIA_GROUPS_[c]) return c;
+  for (const g in CRITERIA_GROUPS_) { if (CRITERIA_GROUPS_[g].indexOf(c) >= 0) return g; }
+  return '';
+}
+function adminSaveScoringCriterion(token,conferenceId,p){return runSafely_('adminSaveScoringCriterion',function(){
+  requireSession_(token,['SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'],conferenceId);
+  p=p||{};
+  const has=function(k){return Object.prototype.hasOwnProperty.call(p,k);};
+  // แก้เฉพาะช่องที่ส่งมา (เดิมเขียนทับทุกช่อง ทำให้การลบล้างชื่อ/รอบ/ประเภท/คะแนน)
+  const patch={};
+  if(has('ReviewRoundID'))patch.ReviewRoundID=clean_(p.ReviewRoundID);
+  if(has('PresentationTypeID'))patch.PresentationTypeID=clean_(p.PresentationTypeID);
+  if(has('ItemNo'))patch.ItemNo=num_(p.ItemNo);
+  if(has('CriteriaNameTH'))patch.CriteriaNameTH=clean_(p.CriteriaNameTH);
+  if(has('CriteriaNameEN'))patch.CriteriaNameEN=clean_(p.CriteriaNameEN);
+  if(has('DescriptionTH'))patch.DescriptionTH=clean_(p.DescriptionTH);
+  if(has('MaxScore'))patch.MaxScore=num_(p.MaxScore);
+  if(has('WeightPercent'))patch.WeightPercent=num_(p.WeightPercent,100);
+  if(has('RequiredComment'))patch.RequiredComment=bool_(p.RequiredComment);
+  if(has('Active'))patch.Active=bool_(p.Active);
+  if(has('SortOrder'))patch.SortOrder=num_(p.SortOrder,99);
+  const all=findMany_('ScoringCriteria',{ConferenceID:conferenceId});
+  const isActive=function(c){return c.Active===undefined||c.Active===null||c.Active===''||bool_(c.Active);};
+  let r=p.CriteriaID?all.find(function(c){return String(c.CriteriaID)===String(p.CriteriaID);}):null;
+  let touched=0;
+  if(r){
+    const oldCat=upper_(r.CategoryID), group=criteriaGroupOf_(oldCat), newCat=has('CategoryID')?upper_(clean_(p.CategoryID)):oldCat;
+    // ถ้าเลือกกลุ่มเดียวกับที่ข้อนี้สังกัดอยู่ ให้คงรหัสประเภทเดิมไว้ (ไม่เปลี่ยน SERVICE เป็น SERVICE_CQI_PRIMARY)
+    const keepCat = !has('CategoryID') || newCat===oldCat || (group && criteriaGroupOf_(newCat)===group);
+    const own=Object.assign({},patch); if(!keepCat)own.CategoryID=newCat;
+    own.UpdatedAt=new Date();
+    updateRecord_('ScoringCriteria',r.__row,own); touched++;
+    if(group && keepCat){
+      const sibs=all.filter(function(c){
+        return c.__row!==r.__row && isActive(c) && String(c.ReviewRoundID)===String(r.ReviewRoundID) &&
+          String(c.ItemNo)===String(r.ItemNo) && upper_(c.CategoryID)!==oldCat && criteriaGroupOf_(c.CategoryID)===group;
+      });
+      sibs.forEach(function(c){ const sp=Object.assign({},patch); delete sp.ReviewRoundID; sp.UpdatedAt=new Date(); updateRecord_('ScoringCriteria',c.__row,sp); touched++; });
+    }
+  }else{
+    const cat=upper_(clean_(p.CategoryID)), round=clean_(p.ReviewRoundID);
+    let cats=[cat];
+    if(CRITERIA_GROUPS_[cat]){
+      // ถ้ารอบนี้เก็บเกณฑ์แยกตามรหัสประเภทย่อย ให้สร้างข้อใหม่ให้ครบทุกประเภทในกลุ่มที่ใช้อยู่
+      const used=CRITERIA_GROUPS_[cat].filter(function(m){return all.some(function(c){return isActive(c)&&String(c.ReviewRoundID)===round&&upper_(c.CategoryID)===m;});});
+      if(used.length)cats=used;
+    }
+    cats.forEach(function(cc){
+      appendRecord_('ScoringCriteria',Object.assign({CriteriaID:nextId_('CRIT'),ConferenceID:conferenceId,ReviewRoundID:round,CategoryID:cc,PresentationTypeID:clean_(p.PresentationTypeID)||'ALL',ItemNo:num_(p.ItemNo),CriteriaNameTH:clean_(p.CriteriaNameTH),CriteriaNameEN:clean_(p.CriteriaNameEN),DescriptionTH:clean_(p.DescriptionTH),MaxScore:num_(p.MaxScore),WeightPercent:num_(p.WeightPercent,100),RequiredComment:bool_(p.RequiredComment),Active:has('Active')?bool_(p.Active):true,SortOrder:num_(p.SortOrder,num_(p.ItemNo,99)),CreatedAt:new Date(),UpdatedAt:new Date()}));
+      touched++;
+    });
+  }
+  clearTableCache_('ScoringCriteria');
+  invalidateCache_(conferenceId);
+  return {success:true,rows:touched};
+});}
 function adminSetupCategoryScoringCriteria(token,conferenceId,roundId){
   return runSafely_("adminSetupCategoryScoringCriteria",function(){
     requireSession_(token,["SUPERADMIN","CONFERENCE_ADMIN","ACADEMIC_STAFF"],conferenceId);
