@@ -3505,10 +3505,14 @@ function renderWorksTable(){
     let r1Asn = num(w.ReviewerAssignedCountR1 !== undefined ? w.ReviewerAssignedCountR1 : w.ReviewerAssignedCount);
     let r2Comp = num(w.ReviewerCompletedCountR2);
     let r2Asn = num(w.ReviewerAssignedCountR2);
+    let r2Abs = num(w.ReviewerAbstainedCountR2);
 
     if (Array.isArray(w.reviewers) && w.reviewers.length > 0) {
       const r1Revs = w.reviewers.filter(r => !isRound2_(r));
-      const r2Revs = w.reviewers.filter(r => isRound2_(r));
+      const r2All = w.reviewers.filter(r => isRound2_(r));
+      // งดออกเสียง: ไม่นับเป็นผู้ประเมิน (มอบหมาย 3 งด 1 = คิดจาก 2 คน)
+      const r2Revs = r2All.filter(r => String(r.Status || '').toUpperCase() !== 'ABSTAINED');
+      r2Abs = r2All.length - r2Revs.length;
       r1Asn = r1Revs.length;
       r1Comp = r1Revs.filter(r => r.TotalScore !== null && r.TotalScore !== undefined && r.TotalScore !== '' && Number(r.TotalScore) > 0 && ['COMPLETE','PASS','REVISION','REJECT','LOCKED','SUBMITTED','SCORED','DONE','EVALUATED'].includes(String(r.Status||'').toUpperCase())).length;
       r2Asn = r2Revs.length;
@@ -3538,8 +3542,8 @@ function renderWorksTable(){
       ${pInfo.email ? `<div class="muted" style="font-size:0.75rem"><i class="fa-regular fa-envelope"></i> ${esc(pInfo.email)}</div>` : ''}
     </td>
     <td style="white-space:nowrap;">
-      ${r2Asn > 0
-        ? `<div style="font-weight:700; color:#92400e;" title="กรรมการรอบตัดสิน: ให้คะแนนแล้ว / ที่มอบหมาย">🏆 ${r2Comp}/${r2Asn}</div>`
+      ${(r2Asn > 0 || r2Abs > 0)
+        ? `<div style="font-weight:700; color:#92400e;" title="กรรมการรอบตัดสิน: ให้คะแนนแล้ว / ที่มอบหมาย (ไม่นับผู้งดออกเสียง)">🏆 ${r2Comp}/${r2Asn}</div>${r2Abs > 0 ? `<div style="font-size:0.72rem; color:#64748b; font-weight:600;" title="จำนวนกรรมการที่งดออกเสียง">🚫 งดออกเสียง ${r2Abs}</div>` : ''}`
         : `<div style="font-size:0.75rem; font-weight:600; color:#b45309;" title="รอบตัดสินยังไม่ได้มอบหมายกรรมการ">🏆 ยังไม่ assign</div>`}
       <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;" title="รอบประเมินผลงาน: ให้คะแนนแล้ว / ที่มอบหมาย">(${r1Comp}/${r1Asn})</div>
     </td>
@@ -4435,7 +4439,7 @@ async function openScoreSummary(wid){
       const scoreVal = Number(a.TotalScore);
       if (isNaN(scoreVal) || scoreVal <= 0) return false;
       const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
-      if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED'].includes(st) || !st) return false;
+      if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED', 'ABSTAINED'].includes(st) || !st) return false;
       const isConfirmedSubmitted = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st);
       if (isConfirmedSubmitted) return true;
       if (isDraft && (a.CompletedAt || (a.Decision && ['PASS', 'REVISION', 'REJECT'].includes(String(a.Decision).toUpperCase())))) {
@@ -4444,7 +4448,8 @@ async function openScoreSummary(wid){
       return false;
     };
     const completed = (assignments || []).filter(isScored);
-    const totalAssigned = (assignments || []).length;
+    const abstainedCount = (assignments || []).filter(a => String(a.Status || '').toUpperCase() === 'ABSTAINED').length;
+    const totalAssigned = (assignments || []).length - abstainedCount;
 
     // Immediately keep local work row in sync so the Works table displays accurate count (e.g. 2/3)
     const rowItem = (window.WORK_ROWS || []).find(x => x.WorkID === wid);
@@ -4468,7 +4473,7 @@ async function openScoreSummary(wid){
           <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH || work.TitleEN || '')}</div>
           <div style="margin-top:4px; color:#475569;"><small>ประเภท: <b>${esc(work.CategoryName || work.CategoryNameTH || work.Category || '-')}</b> | ผู้ส่ง/ผู้แต่ง: <b>${authorNames}</b></small></div>
           <div style="margin-top:5px; font-size:0.85rem; color:#006D70; font-weight:700; display:flex; align-items:center; gap:6px;">
-            <i class="fa-solid fa-users-viewfinder"></i> กรรมการประเมิน: ให้คะแนนแล้ว ${completed.length}/${totalAssigned} ท่าน
+            <i class="fa-solid fa-users-viewfinder"></i> กรรมการประเมิน: ให้คะแนนแล้ว ${completed.length}/${totalAssigned} ท่าน${abstainedCount ? ` <span style="color:#64748b;">(งดออกเสียง ${abstainedCount} ท่าน)</span>` : ''}
           </div>
         </div>
         <button type="button" class="btn primary" onclick="printCombinedWorkScoreSummary('${esc(wid)}')" style="display:inline-flex; align-items:center; gap:6px; font-size:0.82rem; padding:8px 14px; background:#006D70; color:#fff; border-radius:8px; border:none; cursor:pointer; font-weight:600; box-shadow:0 2px 6px rgba(0,109,112,0.25);">
@@ -4476,7 +4481,7 @@ async function openScoreSummary(wid){
         </button>
       </div>`;
     
-    if (totalAssigned === 0) {
+    if (totalAssigned + abstainedCount === 0) {
       html += `<div class="muted" style="text-align:center; padding:25px; background:#f1f5f9; border-radius:8px;">ยังไม่มีการมอบหมายกรรมการประเมินสำหรับผลงานนี้</div>`;
     } else {
       let totalSum = 0;
@@ -4485,7 +4490,17 @@ async function openScoreSummary(wid){
       
       assignments.forEach((a, i) => {
         const scored = isScored(a);
-        if (scored) {
+        if (String(a.Status || '').toUpperCase() === 'ABSTAINED') {
+          html += `<div style="margin-bottom:16px; border:1.5px dashed #94a3b8; border-radius:10px; padding:14px; background:#f1f5f9;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <div>
+                <b style="font-size:0.95rem; color:#334155;">กรรมการท่านที่ ${i+1}: ${esc(a.ReviewerName || a.ReviewerID || 'ผู้ประเมิน')}</b>
+                <span style="margin-left:8px;"><span class="badge" style="background:#e2e8f0; color:#334155; border:1px solid #cbd5e1; font-size:0.8rem; padding:3px 10px; border-radius:999px; font-weight:700;">🚫 งดออกเสียง</span></span>
+              </div>
+              <span style="background:#e2e8f0; color:#475569; padding:3px 12px; border-radius:999px; font-weight:600; font-size:0.85rem;">ไม่นำมาคิดคะแนน</span>
+            </div>
+          </div>`;
+        } else if (scored) {
           totalSum += Number(a.TotalScore) || 0;
           const myScores = scores.filter(s => s.AssignmentID === a.AssignmentID);
           const myScoreMap = {};
@@ -4677,6 +4692,7 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
       const st = String(a.Status || '').toUpperCase();
       const isDraft = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].includes(st);
       if (isDraft) return false;
+      if (st === 'ABSTAINED') return false;
       if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED'].includes(st)) {
         if (Number(a.TotalScore) > 0) return true;
         return false;
@@ -4728,6 +4744,7 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
       const validCompletedScores = [];
       const reviewerCells = displayReviewers.length ? displayReviewers.map((a, i) => {
         if (!isScored(a)) {
+          if (String(a.Status || '').toUpperCase() === 'ABSTAINED') return `<td style="text-align:center; padding:6px 8px; color:#64748b; font-weight:normal; font-size:10px;">งดออกเสียง</td>`;
           return `<td style="text-align:center; padding:6px 8px; color:#94a3b8; font-weight:normal;">-</td>`;
         }
         const aInfo = assignmentScoreMap[a.AssignmentID] || { myScores: [], byCritId: {}, byItemNo: {} };
@@ -4777,6 +4794,7 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
 
     const reviewerTotalCells = displayReviewers.length ? displayReviewers.map(a => {
       if (!isScored(a)) {
+        if (String(a.Status || '').toUpperCase() === 'ABSTAINED') return `<td style="text-align:center; padding:8px 4px; font-weight:700; font-size:10px; color:#475569;">งดออกเสียง</td>`;
         return `<td style="text-align:center; padding:8px 4px; font-weight:normal; font-size:10px; color:#94a3b8;">(รอคะแนน)</td>`;
       }
       return `<td style="text-align:center; padding:8px 4px; font-weight:800; font-size:12px; color:#006D70;">${Number(a.TotalScore) || 0}</td>`;
@@ -4786,7 +4804,7 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
       <th style="border:1px solid #333; padding:6px 4px; text-align:center; font-size:11px; background:#f1f5f9; min-width:85px;">
         <div><b>กรรมการ ${i+1}</b></div>
         <div style="font-size:10px; font-weight:normal; color:#334155; margin-top:2px;">${esc(a.ReviewerName || a.ReviewerID)}</div>
-        ${!isScored(a) ? '<div style="font-size:9px; color:#d97706; font-weight:600; margin-top:2px;">(ยังไม่ให้คะแนน)</div>' : ''}
+        ${String(a.Status || '').toUpperCase() === 'ABSTAINED' ? '<div style="font-size:9px; color:#475569; font-weight:700; margin-top:2px;">(งดออกเสียง)</div>' : (!isScored(a) ? '<div style="font-size:9px; color:#d97706; font-weight:600; margin-top:2px;">(ยังไม่ให้คะแนน)</div>' : '')}
       </th>
     `).join('') : `
       <th style="border:1px solid #333; padding:6px; text-align:center; background:#f1f5f9;">กรรมการ 1</th>
@@ -4819,7 +4837,7 @@ async function printCombinedWorkScoreSummary(wid, roundOption) {
       <div style="text-align:center; font-size:11px; line-height:1.6; margin-bottom:15px;">
         <div style="margin-bottom:8px;">ผู้ประเมิน.......................................................................</div>
         <div style="font-weight:bold;">( ${esc(a.ReviewerName || a.ReviewerID)} )</div>
-        ${!isScored(a) ? '<div style="font-size:9.5px; color:#d97706; font-style:italic;">(อยู่ระหว่างรอการประเมิน)</div>' : `<div style="font-size:10px; color:#475569;">${esc(a.ReviewerInstitution || a.ReviewerDepartment || a.ReviewerPosition || '')}</div>`}
+        ${String(a.Status || '').toUpperCase() === 'ABSTAINED' ? '<div style="font-size:9.5px; color:#475569; font-style:italic;">(งดออกเสียง)</div>' : !isScored(a) ? '<div style="font-size:9.5px; color:#d97706; font-style:italic;">(อยู่ระหว่างรอการประเมิน)</div>' : `<div style="font-size:10px; color:#475569;">${esc(a.ReviewerInstitution || a.ReviewerDepartment || a.ReviewerPosition || '')}</div>`}
       </div>
     `).join('') : `
       <div style="text-align:center; font-size:11px; line-height:1.6;">
@@ -5671,7 +5689,7 @@ async function printReviewerIndividualReport(reviewerId) {
     }
 
     const tot = assignments.length;
-    const com = assignments.filter(x => ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED'].includes(String(x.Status).toUpperCase()) || (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '')).length;
+    const com = assignments.filter(x => ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'ABSTAINED'].includes(String(x.Status).toUpperCase()) || (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '')).length;
     const pen = tot - com;
     const pct = tot ? Math.round(com * 100 / tot) + '%' : '0%';
     const dateStr = new Date().toLocaleString('th-TH');
@@ -5683,11 +5701,12 @@ async function printReviewerIndividualReport(reviewerId) {
         const scFromScores = Math.round(x.scores.reduce((sum, s) => sum + (Number(s.Score) || 0), 0) * 100) / 100;
         if (scFromScores > 0) scVal = scFromScores;
       }
-      const hasScore = (scVal !== null && scVal > 0);
-      const isDone = hasScore || ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED'].includes(String(x.Status).toUpperCase());
-      const st = isDone ? 'COMPLETE' : (x.Status || 'PENDING');
+      const isAbs = String(x.Status || '').toUpperCase() === 'ABSTAINED';
+      const hasScore = !isAbs && (scVal !== null && scVal > 0);
+      const isDone = isAbs || hasScore || ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED'].includes(String(x.Status).toUpperCase());
+      const st = isAbs ? 'งดออกเสียง' : (isDone ? 'COMPLETE' : (x.Status || 'PENDING'));
       const dec = x.Decision ? ` / ${esc(x.Decision)}` : '';
-      const sc = hasScore ? esc(scVal) : (isDone ? '0' : '-');
+      const sc = hasScore ? esc(scVal) : (isDone && !isAbs ? '0' : '-');
       const comment = esc(x.RecommendationToAuthor || x.InternalComment || '-');
 
       return `
