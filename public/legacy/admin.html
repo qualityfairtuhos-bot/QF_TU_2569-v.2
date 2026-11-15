@@ -72,7 +72,7 @@
       <div class="brand-pair"><img src="/images/tuh-logo.png" alt="TUH Quality Fair"><img src="/images/hacc-logo.png" alt="HACC"></div>
       <h1>TUH 19 & HA-Regional 1</h1><p>ระบบบริหารงานประชุม</p><p class="en" style="color:#dceff1">TUH Conference Management</p>
     </div>
-    <form class="login-form" id="loginForm" autocomplete="on"><div style="display:flex; border-bottom:1px solid #d9e3e8; margin-bottom:20px;"><a style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:var(--teal); border-bottom:2px solid var(--teal); font-weight:600; cursor:default;">Admin</a><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('reviewer')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">Reviewer</a><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('scanner')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">สแกนสิทธิ์</a></div><h2>เข้าสู่ระบบเจ้าหน้าที่<span class="en">Staff sign in</span></h2><div class="field"><label>Username / Email</label><input id="loginUser" name="username" autocomplete="username" required></div><div class="field password-wrap"><label>รหัสผ่าน<span class="en">Password</span></label><input type="password" id="loginPassword" name="password" autocomplete="current-password" required><button class="eye-btn" type="button" aria-label="แสดงหรือซ่อนรหัสผ่าน" onclick="togglePassword('loginPassword',this)">👁</button></div><label class="remember-row"><input type="checkbox" id="rememberLogin" checked><span>จำ Username และรหัสผ่านบนอุปกรณ์ส่วนตัวนี้<br><span class="en">Remember credentials on this device</span></span></label><button class="btn btn-primary" style="width:100%">เข้าสู่ระบบ<span class="en" style="color:#dceff1">Sign in</span></button><div style="display:flex; justify-content:space-between; margin-top:15px;"><a href="#" onclick="forgotPassword()" style="font-size:0.85rem; color:var(--teal); text-decoration:none;">ลืมรหัสผ่าน?</a><a href="#" onclick="signUp()" style="font-size:0.85rem; color:var(--teal); text-decoration:none; font-weight:600;">+ สมัครเข้าใช้งาน</a></div><div class="login-help">หากเปิดผ่าน Google Sites หรือเบราว์เซอร์ภายในแอปแล้วไม่สำเร็จ ให้ <a href="/admin?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer">เปิด Web App โดยตรง</a> โดยไม่ต้องออกจากบัญชี Google</div></form>
+    <form class="login-form" id="loginForm" autocomplete="on"><div style="display:flex; border-bottom:1px solid #d9e3e8; margin-bottom:20px;"><a style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:var(--teal); border-bottom:2px solid var(--teal); font-weight:600; cursor:default;">Admin</a><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('reviewer')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">Reviewer</a><a onclick="if(typeof show==='function')show('กำลังเปลี่ยนหน้า...'); else if(typeof setBusy==='function')setBusy(true,'กำลังเปลี่ยนหน้า...'); else Swal.fire({title:'กำลังเปลี่ยนหน้า...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); window.top.location.href=canonicalRoute('scanner')" style="flex:1; padding:10px 0; text-align:center; text-decoration:none; color:#758593; font-weight:600; cursor:pointer;">สแกนสิทธิ์</a></div><h2>เข้าสู่ระบบเจ้าหน้าที่<span class="en">Staff sign in</span></h2><div class="field"><label>Username / Email</label><input id="loginUser" name="username" readonly onfocus="qfUnlockLoginInput(this)" onpointerdown="qfUnlockLoginInput(this)" autocomplete="username" required></div><div class="field password-wrap"><label>รหัสผ่าน<span class="en">Password</span></label><input type="password" id="loginPassword" name="password" readonly onfocus="qfUnlockLoginInput(this)" onpointerdown="qfUnlockLoginInput(this)" autocomplete="current-password" required><button class="eye-btn" type="button" aria-label="แสดงหรือซ่อนรหัสผ่าน" onclick="togglePassword('loginPassword',this)">👁</button></div><label class="remember-row"><input type="checkbox" id="rememberLogin" checked><span>จำ Username และรหัสผ่านบนอุปกรณ์ส่วนตัวนี้<br><span class="en">Remember credentials on this device</span></span></label><button class="btn btn-primary" style="width:100%">เข้าสู่ระบบ<span class="en" style="color:#dceff1">Sign in</span></button><div style="display:flex; justify-content:space-between; margin-top:15px;"><a href="#" onclick="forgotPassword()" style="font-size:0.85rem; color:var(--teal); text-decoration:none;">ลืมรหัสผ่าน?</a><a href="#" onclick="signUp()" style="font-size:0.85rem; color:var(--teal); text-decoration:none; font-weight:600;">+ สมัครเข้าใช้งาน</a></div><div class="login-help">หากเปิดผ่าน Google Sites หรือเบราว์เซอร์ภายในแอปแล้วไม่สำเร็จ ให้ <a href="/admin?conferenceId=CONF-TUH-QF-2569" target="_blank" rel="noopener noreferrer">เปิด Web App โดยตรง</a> โดยไม่ต้องออกจากบัญชี Google</div></form>
   </div>
 </section>
 <section class="app" id="app">
@@ -589,6 +589,32 @@ function refreshTableSortHeaders(){document.querySelectorAll('table.table, table
 document.addEventListener('click',function(e){const th=e.target.closest('th');if(!th)return;const table=th.closest('table');if(!table)return;if(e.target.tagName==='INPUT'||th.querySelector('input[type="checkbox"]'))return;const thText=(th.textContent||'').trim();if(thText==='จัดการ'||thText==='Actions'||thText===''||th.classList.contains('no-sort')||th.dataset.noSort)return;const tr=th.parentElement;if(!tr)return;const ths=Array.from(tr.children);const colIndex=ths.indexOf(th);if(colIndex<0)return;sortTableByColumn(table,colIndex)});
 
 const ADMIN_CRED_KEY='tuhAdminRememberedCredentials';
+const QF_PORTAL='admin';
+const ADMIN_PORTAL_ROLES=['SUPERADMIN','CONFERENCE_ADMIN','REGISTRATION_STAFF','FINANCE_STAFF','ACADEMIC_STAFF','FOOD_STAFF','VIEWER'];
+// ===== Portal guard: the 3 portals share ONE session cookie on this domain =====
+// - Auto sign-in on page load only when the last sign-in on this device was made on THIS portal
+// - If another account signs in (any portal / window), this window returns to the login screen
+// - Login inputs start read-only so the browser cannot silently autofill another portal's account
+const QF_ACTIVE_PORTAL_KEY='tuhActivePortal';
+let QF_MY_EMAIL='';
+function qfGetActivePortal(){try{return JSON.parse(localStorage.getItem(QF_ACTIVE_PORTAL_KEY)||'null')||{}}catch(e){return {}}}
+function qfSetActivePortal(portal,email){const em=String(email||'').trim().toLowerCase();try{localStorage.setItem(QF_ACTIVE_PORTAL_KEY,JSON.stringify({portal:portal||'',email:em,at:Date.now()}))}catch(e){}if(portal===QF_PORTAL)QF_MY_EMAIL=em}
+function qfClearActivePortal(){try{if(qfGetActivePortal().portal===QF_PORTAL)localStorage.removeItem(QF_ACTIVE_PORTAL_KEY)}catch(e){}QF_MY_EMAIL=''}
+function qfCanAutoLogin(){const m=qfGetActivePortal();if(m.portal!==QF_PORTAL)return false;QF_MY_EMAIL=m.email||'';return true}
+// Refused sign-in still replaced the shared cookie: tell other windows only if it is a different account
+function qfMarkForeignLogin(email){const em=String(email||'').trim().toLowerCase();if(qfGetActivePortal().email!==em)qfSetActivePortal('',em)}
+function qfUnlockLoginInput(el){if(el&&el.hasAttribute('readonly'))el.removeAttribute('readonly')}
+window.addEventListener('storage',function(e){
+  if(e.key!==QF_ACTIVE_PORTAL_KEY||!qfAppVisible())return;
+  let m={};try{m=JSON.parse(e.newValue||'null')||{}}catch(x){}
+  if(m.email&&QF_MY_EMAIL&&m.email===QF_MY_EMAIL)return;
+  qfForceLoginView();
+  const who=m.email?('บัญชี '+m.email):'อีกบัญชี';
+  Swal.fire({icon:'info',title:'มีการเข้าสู่ระบบด้วยบัญชีอื่น',html:(m.email?who+' ได้เข้าสู่ระบบในหน้าต่าง/แท็บอื่นของเบราว์เซอร์นี้':'มีการออกจากระบบในหน้าต่างอื่น')+'<br>กรุณาเข้าสู่ระบบใหม่ในหน้านี้',confirmButtonColor:'#006D70'});
+});
+function qfAppVisible(){return !!BOOT && $('#app') && $('#app').style.display!=='none'}
+function qfForceLoginView(){TOKEN='';BOOT=null;CURRENT='';try{localStorage.removeItem('tuhAdminBootCache_'+CID)}catch(e){}$('#app').style.display='none';$('#login').style.display='flex';try{$('#loginPassword').value=''}catch(e){}}
+
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const showing=el.type==='text';el.type=showing?'password':'text';if(btn)btn.textContent=showing?'👁':'🙈'}
 function loadRememberedLogin(){try{const username=localStorage.getItem(ADMIN_CRED_KEY)||'';$('#loginUser').value=username;$('#rememberLogin').checked=!!username}catch(e){}}
 function saveRememberedLogin(){if($('#rememberLogin').checked)localStorage.setItem(ADMIN_CRED_KEY,$('#loginUser').value.trim());else localStorage.removeItem(ADMIN_CRED_KEY)}
@@ -613,6 +639,15 @@ $('#loginForm').onsubmit=async e=>{
   show('กำลังเข้าสู่ระบบ');
   try{
     const r=await rpc('loginUser',$('#loginUser').value,$('#loginPassword').value,CID,navigator.userAgent);
+    const loginEmail=(r.user&&(r.user.Email||r.user.Username))||$('#loginUser').value;
+    if(!ADMIN_PORTAL_ROLES.includes(String(r.role||'').toUpperCase())){
+      qfMarkForeignLogin(loginEmail);
+      throw new Error(String(r.role||'').toUpperCase()==='REVIEWER'
+        ? 'บัญชีนี้เป็นบัญชี Reviewer กรุณาเข้าสู่ระบบที่แท็บ "Reviewer"'
+        : 'บัญชีนี้ไม่มีสิทธิ์ใช้งานหน้า Admin');
+    }
+    qfSetActivePortal('admin',loginEmail);
+    try{localStorage.removeItem('tuhAdminBootCache_'+CID)}catch(e){}
     TOKEN=r.token;
     saveRememberedLogin();
     storeAdminToken(TOKEN);
@@ -635,11 +670,20 @@ function menuForRole(role){const all=[['dashboard','ภาพรวม','Overvie
 async function boot(){
   try{
     const cached=JSON.parse(localStorage.getItem('tuhAdminBootCache_'+CID)||'null');
-    if(cached && cached.user && cached.role) {
+    const cachedEmail=String((cached&&cached.user&&cached.user.Email)||'').trim().toLowerCase();
+    if(cached && cached.user && cached.role && ADMIN_PORTAL_ROLES.includes(String(cached.role).toUpperCase()) && (!QF_MY_EMAIL || cachedEmail===QF_MY_EMAIL)) {
       renderAppShell(cached);
     }
   }catch(e){}
   BOOT=await rpc('adminBootstrap',TOKEN,CID);
+  if(!BOOT || !ADMIN_PORTAL_ROLES.includes(String(BOOT.role||'').toUpperCase())){
+    const em=(BOOT&&BOOT.user&&BOOT.user.Email)||'';
+    BOOT=null;
+    try{localStorage.removeItem('tuhAdminBootCache_'+CID)}catch(e){}
+    const wrong=new Error('Session ปัจจุบัน'+(em?' ('+em+')':'')+' ไม่มีสิทธิ์ใช้งานหน้า Admin กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่');
+    wrong.qfWrongPortal=true;
+    throw wrong;
+  }
   try{localStorage.setItem('tuhAdminBootCache_'+CID,JSON.stringify(BOOT))}catch(e){}
   renderAppShell(BOOT);
   const items=menuForRole(BOOT.role);
@@ -760,7 +804,7 @@ async function refreshPage(){
   await nav(CURRENT, true);
   refreshTableSortHeaders();
   toast('รีเฟรชข้อมูลหน้าเรียบร้อยแล้ว');
-}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
+}async function logout(){show('กำลังออกจากระบบ');try{await rpc('logoutUser',TOKEN)}catch(e){}qfClearActivePortal();localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');localStorage.removeItem('tuhAdminBootCache_'+CID);TOKEN='';BOOT=null;CURRENT='';$('#app').style.display='none';$('#login').style.display='flex';hide();}
 let chartRegByType, chartWorksIntent, chartWorksByStatus, chartWorksByCategory, chartDailyQuota;
 if (window.ChartDataLabels) Chart.register(ChartDataLabels);
 function renderDashboardUi(d, filterType){
@@ -7325,7 +7369,7 @@ async function viewUserScanHistory(id){
     err(e);
   }
 }
-window.addEventListener('load',async()=>{loadRememberedLogin();TOKEN=currentAdminToken();if(TOKEN){show('กำลังตรวจสอบ Session');try{await boot();hide()}catch(e){TOKEN='';localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');$('#login').style.display='';$('#app').style.display='none';hide()}}});
+window.addEventListener('load',async()=>{loadRememberedLogin();try{$('#loginPassword').value=''}catch(e){}if(!qfCanAutoLogin())return;TOKEN=currentAdminToken();if(TOKEN){show('กำลังตรวจสอบ Session');try{await boot();hide()}catch(e){TOKEN='';BOOT=null;localStorage.removeItem('tuhAdminToken');sessionStorage.removeItem('tuhAdminToken');$('#login').style.display='';$('#app').style.display='none';hide();if(e&&e.qfWrongPortal)Swal.fire({icon:'info',title:'กรุณาเข้าสู่ระบบ',text:e.message,confirmButtonColor:'#006D70'})}}});
 
 
 // ==================== ใบรายงานรวมทุกผลงานวิจัย / ผลงานวิชาการ ====================
