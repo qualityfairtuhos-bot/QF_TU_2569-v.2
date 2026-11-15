@@ -3537,11 +3537,11 @@ function renderWorksTable(){
       ${pInfo.regId ? `<div class="muted" style="font-size:0.75rem"><i class="fa-solid fa-id-card"></i> ${esc(pInfo.regId)}</div>` : ''}
       ${pInfo.email ? `<div class="muted" style="font-size:0.75rem"><i class="fa-regular fa-envelope"></i> ${esc(pInfo.email)}</div>` : ''}
     </td>
-    <td>
-      <div style="font-weight:600; color:#0f172a;">${r1Comp}/${r1Asn}</div>
-      ${r2Asn > 0 
-        ? `<div style="margin-top:3px;"><span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:0.72rem; padding:1px 6px; font-weight:700; white-space:nowrap;" title="กรรมการรอบตัดสิน (ประเมินแล้ว / ที่มอบหมาย)">🏆 ตัดสิน: ${r2Comp}/${r2Asn}</span></div>` 
-        : ''}
+    <td style="white-space:nowrap;">
+      ${r2Asn > 0
+        ? `<div style="font-weight:700; color:#92400e;" title="กรรมการรอบตัดสิน: ให้คะแนนแล้ว / ที่มอบหมาย">🏆 ${r2Comp}/${r2Asn}</div>`
+        : `<div style="font-size:0.75rem; font-weight:600; color:#b45309;" title="รอบตัดสินยังไม่ได้มอบหมายกรรมการ">🏆 ยังไม่ assign</div>`}
+      <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;" title="รอบประเมินผลงาน: ให้คะแนนแล้ว / ที่มอบหมาย">(${r1Comp}/${r1Asn})</div>
     </td>
     <td>
       <div style="font-weight:700; color:#0f172a;">${w.AverageScore?Number(w.AverageScore).toFixed(2):'-'}</div>
