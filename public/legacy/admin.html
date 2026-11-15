@@ -315,6 +315,7 @@
           </select>
           <button class="btn btn-soft" onclick="loadWorks(true)"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
         </div>
+        <div id="workFilterSummary" style="display:none; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:4px 0 10px; padding:8px 12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; font-size:0.86rem; color:#0c4a6e;"></div>
         <div class="table-wrap">
           <table class="table" style="font-size:0.85rem">
             <thead>
@@ -3334,6 +3335,39 @@ function getWorkPresenterDisplay(w){
   };
 }
 
+// One-line summary above the works table: active filters + how many works match
+function renderWorkFilterSummary(allRows, shownRows, f){
+  const box = $('#workFilterSummary');
+  if (!box) return;
+  const total = (allRows || []).length;
+  if (!total) { box.style.display = 'none'; return; }
+  const selText = id => {
+    const el = $('#' + id);
+    const opt = el && el.options && el.options[el.selectedIndex];
+    return opt ? String(opt.textContent || '').replace(/\s*\(\d+(\s*เรื่อง)?\)\s*$/, '').trim() : '';
+  };
+  const chip = (label, val) => `<span style="background:#fff; border:1px solid #bae6fd; border-radius:999px; padding:1px 8px; font-size:0.8rem;">${label}: <b>${esc(val)}</b></span>`;
+  const chips = [];
+  if (f.statusVal) chips.push(chip('สถานะ', selText('workStatus')));
+  if (f.catVal) chips.push(chip('ประเภท', selText('workCategory') || f.catVal));
+  if (f.ptVal) chips.push(chip('รูปแบบ', selText('workPresentationType') || f.ptVal));
+  if (f.searchVal) chips.push(chip('ค้นหา', f.searchVal));
+  const n = (shownRows || []).length;
+  let oral = 0, poster = 0;
+  (shownRows || []).forEach(w => {
+    const pt = [w.PresentationTypeName, w.PresentationType, w.PresentationTypeFinal, w.PresentationTypeRequested].filter(Boolean).join(' ');
+    if (/บรรยาย|oral|PT-2026-000001/i.test(pt)) oral++;
+    else if (/โปสเตอร์|poster|PT-2026-000002/i.test(pt)) poster++;
+  });
+  const lead = chips.length
+    ? `<i class="fa-solid fa-filter"></i> กรองตาม ${chips.join(' ')}`
+    : `<i class="fa-solid fa-list"></i> แสดงผลงานทั้งหมด`;
+  box.innerHTML = `${lead}
+    <span style="margin-left:auto; white-space:nowrap;">พบ <b style="font-size:1.05rem; color:#0C385B;">${n}</b> เรื่อง${chips.length ? ` จากทั้งหมด ${total} เรื่อง` : ''}
+    <span class="muted" style="font-size:0.8rem;">(บรรยาย ${oral} · โปสเตอร์ ${poster})</span></span>`;
+  box.style.display = 'flex';
+}
+
 function renderWorksTable(){
   const rows = window.WORK_ROWS || [];
   const searchVal = ($('#workSearch')?.value || '').trim().toLowerCase();
@@ -3466,6 +3500,8 @@ function renderWorksTable(){
       return raw.includes(ptf);
     });
   }
+
+  renderWorkFilterSummary(rows, filteredRows, { searchVal, catVal, statusVal, ptVal });
 
   $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
     const pInfo = getWorkPresenterDisplay(w);
