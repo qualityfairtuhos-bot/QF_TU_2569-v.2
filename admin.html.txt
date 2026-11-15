@@ -4190,11 +4190,16 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
   show('กำลังเปิดหน้าต่างจ่ายงาน...');
   try{
     const d = await rpc('adminGetReviewConfig', TOKEN, CID);
-    const revs = await rpc('adminListReviewers', TOKEN, CID);
-    const summary = await rpc('adminGetWorkScoreSummary', TOKEN, CID, wid);
+    const rounds = d.rounds || [];
+    // adminGetWorkScoreSummary without a round returns only ONE round's assignments
+    // (the round that has scores), so ask for each round separately to know who is already assigned.
+    const [revs, summary, ...perRoundSummaries] = await Promise.all([
+      rpc('adminListReviewers', TOKEN, CID),
+      rpc('adminGetWorkScoreSummary', TOKEN, CID, wid),
+      ...rounds.map(rd => rpc('adminGetWorkScoreSummary', TOKEN, CID, wid, rd.ReviewRoundID).catch(() => null))
+    ]);
     hide();
 
-    const rounds = d.rounds || [];
     const openRounds = rounds.filter(isRoundOpen);
     if (!openRounds.length) return Swal.fire({ icon: 'info', title: 'ไม่มีรอบที่เปิดอยู่', text: 'ทุกรอบปิดแล้ว เปิดรอบได้ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน', confirmButtonColor: '#006D70' });
     let initialRoundId = (rounds[0] && rounds[0].ReviewRoundID) || '';
@@ -4209,7 +4214,12 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
 
     if (!openRounds.some(r => r.ReviewRoundID === initialRoundId)) initialRoundId = openRounds[0].ReviewRoundID;
 
-    const allAssignments = (summary && summary.assignments) || [];
+    const allAssignments = [];
+    rounds.forEach((rd, i) => {
+      const s = perRoundSummaries[i];
+      ((s && s.assignments) || []).forEach(a => allAssignments.push(Object.assign({}, a, { ReviewRoundID: a.ReviewRoundID || rd.ReviewRoundID })));
+    });
+    if (!allAssignments.length) ((summary && summary.assignments) || []).forEach(a => allAssignments.push(a));
     const workObj = (summary && summary.work) || (window.WORK_ROWS || []).find(w => w.WorkID === wid) || {};
     const workCode = esc(workObj.WorkCode || wid);
     const workTitle = esc(workObj.TitleTH || workObj.TitleEN || workObj.ThaiTitle || '-');
@@ -4219,33 +4229,46 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
     const r1 = rounds.find(r => Number(r.RoundNo) === 1 || String(r.RoundNameTH).includes('ประเมิน'));
     const r1Id = r1 ? r1.ReviewRoundID : '';
     const r1Assignments = allAssignments.filter(a => String(a.ReviewRoundID) === String(r1Id) && !['CANCELLED', 'DECLINED'].includes(String(a.Status).toUpperCase()));
-    const r1RevIds = r1Assignments.map(a => a.ReviewerID);
+    const r1RevIds = r1Assignments.map(a => String(a.ReviewerID).trim());
 
     function renderRevsForRound(curRoundId) {
       const curRound = rounds.find(r => r.ReviewRoundID === curRoundId) || {};
       const isRound2 = Number(curRound.RoundNo) === 2 || String(curRound.RoundNameTH).includes('ตัดสิน');
       
       const curAssignments = allAssignments.filter(a => String(a.ReviewRoundID) === String(curRoundId) && !['CANCELLED', 'DECLINED'].includes(String(a.Status).toUpperCase()));
-      const curAssignedRevIds = new Set(curAssignments.map(a => a.ReviewerID));
+      const curAssignedRevIds = new Set(curAssignments.map(a => String(a.ReviewerID).trim()));
 
-      return (revs || []).map(r => {
-        const rid = r.reviewer.ReviewerID;
+      const sorted = (revs || []).slice().sort((a, b) => {
+        const rank = r => { const id = String(r.reviewer.ReviewerID).trim(); return curAssignedRevIds.has(id) ? 0 : (r1RevIds.includes(id) ? 1 : 2); };
+        return rank(a) - rank(b);
+      });
+      if (!sorted.length) return '<div class="muted" style="padding:10px; text-align:center;">ไม่พบรายชื่อกรรมการ</div>';
+
+      return sorted.map(r => {
+        const rid = String(r.reviewer.ReviewerID).trim();
         const isAssignedInThisRound = curAssignedRevIds.has(rid);
         const isFromRound1 = r1RevIds.includes(rid);
+        const searchText = [r.reviewer.FullName, r.reviewer.Institution, r.reviewer.Email, r.ExpertiseCategories].filter(Boolean).join(' ').toLowerCase();
 
         let badges = '';
         if (isFromRound1) {
           badges += `<span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.7rem; padding:1px 6px; margin-left:6px;"><i class="fa-solid fa-clock-rotate-left"></i> กรรมการรอบแรก</span>`;
         }
         if (isAssignedInThisRound) {
-          badges += `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:0.7rem; padding:1px 6px; margin-left:6px;"><i class="fa-solid fa-check"></i> มอบหมายรอบนี้แล้ว</span>`;
+          badges += `<span class="badge" style="background:#e2e8f0; color:#475569; font-size:0.7rem; padding:1px 6px; margin-left:6px;"><i class="fa-solid fa-check"></i> มอบหมายรอบนี้แล้ว</span>`;
+          badges += `<button type="button" class="assign-rev-unlock" data-rid="${esc(rid)}" title="ยกเลิกการมอบหมายกรรมการท่านนี้ในรอบนี้" style="margin-left:6px; background:none; border:none; color:#b91c1c; font-size:0.72rem; text-decoration:underline; cursor:pointer; padding:0;">ยกเลิกมอบหมาย</button>`;
         }
 
+        const rowStyle = isAssignedInThisRound
+          ? 'background:#f1f5f9; cursor:default; opacity:0.75;'
+          : 'cursor:pointer;';
+        const hover = isAssignedInThisRound ? '' : `onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"`;
+
         return `
-          <label style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border-bottom:1px solid #f1f5f9; cursor:pointer; margin:0;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-            <input type="checkbox" class="assign-rev" value="${esc(rid)}" ${isAssignedInThisRound ? 'checked' : ''} style="margin-top:3px; cursor:pointer; width:16px; height:16px;">
+          <label class="assign-rev-row" data-search="${esc(searchText)}" data-assigned="${isAssignedInThisRound ? '1' : ''}" style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border-bottom:1px solid #f1f5f9; margin:0; ${rowStyle}" ${hover}>
+            <input type="checkbox" class="assign-rev" value="${esc(rid)}" ${isAssignedInThisRound ? 'checked disabled data-locked="1"' : ''} style="margin-top:3px; cursor:${isAssignedInThisRound ? 'not-allowed' : 'pointer'}; width:16px; height:16px;">
             <div style="flex:1;">
-              <div style="font-weight:600; color:#0f172a; font-size:0.86rem; display:flex; align-items:center; flex-wrap:wrap;">
+              <div style="font-weight:600; color:${isAssignedInThisRound ? '#64748b' : '#0f172a'}; font-size:0.86rem; display:flex; align-items:center; flex-wrap:wrap;">
                 ${esc(r.reviewer.FullName)} <span class="muted" style="font-weight:400; font-size:0.78rem; margin-left:4px;">(${esc(r.reviewer.Institution || '-')})</span>
                 ${badges}
               </div>
@@ -4289,12 +4312,19 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
           </div>
         </div>
 
+        <div style="position:relative; margin-bottom:6px;">
+          <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.8rem;"></i>
+          <input type="search" id="assignRevSearch" class="field" placeholder="ค้นหาชื่อกรรมการ / หน่วยงาน / ความเชี่ยวชาญ" autocomplete="off" style="width:100%; box-sizing:border-box; padding:7px 10px 7px 30px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.85rem; margin:0;">
+        </div>
+        <div id="assignRevSearchEmpty" style="display:none; font-size:0.8rem; color:#64748b; padding:4px 2px;">ไม่พบกรรมการที่ตรงกับคำค้นหา</div>
+
         <div id="assignRevsWrap" style="max-height:260px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; padding:4px; background:#fff;">
           ${renderRevsForRound(initialRoundId)}
         </div>
 
         <div id="assignRoundNotice" style="margin-top:10px; font-size:0.8rem; color:#475569; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:6px 10px;">
-          💡 ติ๊กเลือก Reviewer ที่ต้องการมอบหมายในรอบนี้ (สามารถเลือกกรรมการชุดเดิม หรือเลือกกรรมการท่านใหม่ได้อย่างอิสระ)
+          💡 ติ๊กเลือก Reviewer ที่ต้องการมอบหมายในรอบนี้ (สามารถเลือกกรรมการชุดเดิม หรือเลือกกรรมการท่านใหม่ได้อย่างอิสระ)<br>
+          <span style="color:#64748b;">รายชื่อสีเทาด้านบน = มอบหมายในรอบนี้แล้ว (ติ๊กซ้ำไม่ได้) หากต้องการถอนออกให้กด "ยกเลิกมอบหมาย"</span>
         </div>
       </div>
     `;
@@ -4315,32 +4345,86 @@ async function openAssignReviewerModal(wid, targetRoundNoOrId = 1){
         const btnSelectAll = document.getElementById('btnSelectAllRevs');
         const btnDeselectAll = document.getElementById('btnDeselectAllRevs');
 
+        const searchInput = document.getElementById('assignRevSearch');
+        const searchEmpty = document.getElementById('assignRevSearchEmpty');
+        const applySearch = () => {
+          const q = String(searchInput && searchInput.value || '').trim().toLowerCase();
+          const words = q.split(/\s+/).filter(Boolean);
+          let shown = 0;
+          revsWrap.querySelectorAll('.assign-rev-row').forEach(row => {
+            const hay = row.getAttribute('data-search') || '';
+            const ok = !words.length || words.every(w => hay.includes(w));
+            row.style.display = ok ? 'flex' : 'none';
+            if (ok) shown++;
+          });
+          if (searchEmpty) searchEmpty.style.display = (words.length && !shown) ? 'block' : 'none';
+        };
+        // Only rows that are visible and not already assigned are affected by the bulk buttons
+        const freeVisibleBoxes = () => Array.from(revsWrap.querySelectorAll('.assign-rev-row'))
+          .filter(row => row.style.display !== 'none')
+          .map(row => row.querySelector('.assign-rev'))
+          .filter(cb => cb && !cb.disabled && cb.getAttribute('data-locked') !== '1' && cb.getAttribute('data-unlocked') !== '1');
+
+        if (searchInput) {
+          searchInput.addEventListener('input', applySearch);
+          searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+        }
+
+        revsWrap.addEventListener('click', e => {
+          const btn = e.target.closest('.assign-rev-unlock');
+          if (!btn) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const row = btn.closest('.assign-rev-row');
+          const cb = row && row.querySelector('.assign-rev');
+          if (!cb) return;
+          if (cb.getAttribute('data-unlocked') === '1') {
+            // undo: keep the assignment
+            cb.checked = true;
+            cb.disabled = true;
+            cb.removeAttribute('data-unlocked');
+            row.style.background = '#f1f5f9';
+            row.style.textDecoration = '';
+            btn.textContent = 'ยกเลิกมอบหมาย';
+          } else {
+            cb.checked = false;
+            cb.disabled = true;
+            cb.setAttribute('data-unlocked', '1');
+            row.style.background = '#fef2f2';
+            row.style.textDecoration = 'line-through';
+            btn.textContent = 'เก็บไว้ตามเดิม';
+          }
+        });
+
         if (roundSelect) {
           roundSelect.addEventListener('change', () => {
             const currentSelectedRound = roundSelect.value;
             revsWrap.innerHTML = renderRevsForRound(currentSelectedRound);
+            applySearch();
           });
         }
 
         if (btnPull) {
           btnPull.addEventListener('click', () => {
-            document.querySelectorAll('.assign-rev').forEach(cb => {
-              if (r1RevIds.includes(cb.value)) cb.checked = true;
+            revsWrap.querySelectorAll('.assign-rev').forEach(cb => {
+              if (!cb.disabled && r1RevIds.includes(cb.value)) cb.checked = true;
             });
           });
         }
 
         if (btnSelectAll) {
           btnSelectAll.addEventListener('click', () => {
-            document.querySelectorAll('.assign-rev').forEach(cb => cb.checked = true);
+            freeVisibleBoxes().forEach(cb => cb.checked = true);
           });
         }
 
         if (btnDeselectAll) {
           btnDeselectAll.addEventListener('click', () => {
-            document.querySelectorAll('.assign-rev').forEach(cb => cb.checked = false);
+            freeVisibleBoxes().forEach(cb => cb.checked = false);
           });
         }
+
+        if (searchInput) setTimeout(() => searchInput.focus(), 50);
       },
       preConfirm: () => {
         const roundId = document.getElementById('assignRoundSelect')?.value;
