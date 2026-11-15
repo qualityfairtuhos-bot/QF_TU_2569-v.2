@@ -315,6 +315,7 @@
           </select>
           <button class="btn btn-soft" onclick="loadWorks(true)"><i class="fa-solid fa-rotate"></i> โหลดข้อมูล</button>
         </div>
+        <div id="workFilterSummary" style="display:none; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:4px 0 10px; padding:8px 12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; font-size:0.86rem; color:#0c4a6e;"></div>
         <div class="table-wrap">
           <table class="table" style="font-size:0.85rem">
             <thead>
@@ -3334,6 +3335,39 @@ function getWorkPresenterDisplay(w){
   };
 }
 
+// One-line summary above the works table: active filters + how many works match
+function renderWorkFilterSummary(allRows, shownRows, f){
+  const box = $('#workFilterSummary');
+  if (!box) return;
+  const total = (allRows || []).length;
+  if (!total) { box.style.display = 'none'; return; }
+  const selText = id => {
+    const el = $('#' + id);
+    const opt = el && el.options && el.options[el.selectedIndex];
+    return opt ? String(opt.textContent || '').replace(/\s*\(\d+(\s*เรื่อง)?\)\s*$/, '').trim() : '';
+  };
+  const chip = (label, val) => `<span style="background:#fff; border:1px solid #bae6fd; border-radius:999px; padding:1px 8px; font-size:0.8rem;">${label}: <b>${esc(val)}</b></span>`;
+  const chips = [];
+  if (f.statusVal) chips.push(chip('สถานะ', selText('workStatus')));
+  if (f.catVal) chips.push(chip('ประเภท', selText('workCategory') || f.catVal));
+  if (f.ptVal) chips.push(chip('รูปแบบ', selText('workPresentationType') || f.ptVal));
+  if (f.searchVal) chips.push(chip('ค้นหา', f.searchVal));
+  const n = (shownRows || []).length;
+  let oral = 0, poster = 0;
+  (shownRows || []).forEach(w => {
+    const pt = [w.PresentationTypeName, w.PresentationType, w.PresentationTypeFinal, w.PresentationTypeRequested].filter(Boolean).join(' ');
+    if (/บรรยาย|oral|PT-2026-000001/i.test(pt)) oral++;
+    else if (/โปสเตอร์|poster|PT-2026-000002/i.test(pt)) poster++;
+  });
+  const lead = chips.length
+    ? `<i class="fa-solid fa-filter"></i> กรองตาม ${chips.join(' ')}`
+    : `<i class="fa-solid fa-list"></i> แสดงผลงานทั้งหมด`;
+  box.innerHTML = `${lead}
+    <span style="margin-left:auto; white-space:nowrap;">พบ <b style="font-size:1.05rem; color:#0C385B;">${n}</b> เรื่อง${chips.length ? ` จากทั้งหมด ${total} เรื่อง` : ''}
+    <span class="muted" style="font-size:0.8rem;">(บรรยาย ${oral} · โปสเตอร์ ${poster})</span></span>`;
+  box.style.display = 'flex';
+}
+
 function renderWorksTable(){
   const rows = window.WORK_ROWS || [];
   const searchVal = ($('#workSearch')?.value || '').trim().toLowerCase();
@@ -3466,6 +3500,8 @@ function renderWorksTable(){
       return raw.includes(ptf);
     });
   }
+
+  renderWorkFilterSummary(rows, filteredRows, { searchVal, catVal, statusVal, ptVal });
 
   $('#workRows').innerHTML=filteredRows.length?filteredRows.map(w=>{
     const pInfo = getWorkPresenterDisplay(w);
@@ -5860,13 +5896,42 @@ async function printReviewerIndividualReport(reviewerId) {
       });
     }
 
+    // --- Split assignments by round (รอบประเมิน / รอบตัดสิน) ---
+    // The report API may not return the round, so map AssignmentID -> round from the works list.
+    let roundsCfg = [];
+    try { roundsCfg = ((await rpc('adminGetReviewConfig', TOKEN, CID)) || {}).rounds || []; } catch(e) {}
+    let workRows = window.WORK_ROWS || [];
+    if (!workRows.length) { try { workRows = (await rpc('adminListWorks', TOKEN, CID, {})) || []; } catch(e) {} }
+    const asgRoundMap = {};
+    workRows.forEach(w => (w.reviewers || []).forEach(r => {
+      if (r && r.AssignmentID) asgRoundMap[String(r.AssignmentID).trim()] = { rid: r.ReviewRoundID || '', isR2: !!r.isRound2 };
+    }));
+    const roundIsFinal = rid => {
+      const rd = roundsCfg.find(r => String(r.ReviewRoundID) === String(rid));
+      if (!rd) return null;
+      return Number(rd.RoundNo) === 2 || String(rd.RoundNameTH || '').includes('ตัดสิน');
+    };
+    const roundKeyOf = x => {
+      if (x.ReviewRoundID) { const f = roundIsFinal(x.ReviewRoundID); if (f !== null) return f ? 'R2' : 'R1'; }
+      const m = asgRoundMap[String(x.AssignmentID || '').trim()];
+      if (m) { const f = m.rid ? roundIsFinal(m.rid) : null; return (f !== null ? f : m.isR2) ? 'R2' : 'R1'; }
+      if (x.RoundNo !== undefined && x.RoundNo !== null && x.RoundNo !== '') return Number(x.RoundNo) === 2 ? 'R2' : 'R1';
+      return 'UNKNOWN';
+    };
+    const roundName = key => {
+      const rd = roundsCfg.find(r => key === 'R2' ? (Number(r.RoundNo) === 2 || String(r.RoundNameTH || '').includes('ตัดสิน')) : (Number(r.RoundNo) === 1 || String(r.RoundNameTH || '').includes('ประเมิน')));
+      if (key === 'UNKNOWN') return 'ไม่ระบุรอบ';
+      return (rd && (rd.RoundNameTH || rd.RoundNameEN)) || (key === 'R2' ? 'รอบตัดสิน' : 'รอบประเมินผลงาน');
+    };
+
+    const isDoneAsg = x => ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'ABSTAINED'].includes(String(x.Status).toUpperCase()) || (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '' && Number(x.TotalScore) > 0);
     const tot = assignments.length;
-    const com = assignments.filter(x => ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'ABSTAINED'].includes(String(x.Status).toUpperCase()) || (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '')).length;
+    const com = assignments.filter(isDoneAsg).length;
     const pen = tot - com;
     const pct = tot ? Math.round(com * 100 / tot) + '%' : '0%';
     const dateStr = new Date().toLocaleString('th-TH');
 
-    const rows = assignments.map(x => {
+    const renderRow = x => {
       const scNum = Number(x.TotalScore);
       let scVal = (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '' && !isNaN(scNum)) ? scNum : null;
       if ((scVal === null || scVal === 0) && x.scores && x.scores.length > 0) {
@@ -5890,6 +5955,40 @@ async function printReviewerIndividualReport(reviewerId) {
           <td style="font-size:11px; padding:8px 10px; line-height:1.5;">${comment}</td>
         </tr>
       `;
+    };
+
+    const groups = { R1: [], R2: [], UNKNOWN: [] };
+    assignments.forEach(x => groups[roundKeyOf(x)].push(x));
+    const byCode = (a, b) => String(a.WorkCode || a.WorkID).localeCompare(String(b.WorkCode || b.WorkID));
+    const sectionsHtml = ['R1', 'R2', 'UNKNOWN'].filter(k => groups[k].length).map(k => {
+      const list = groups[k].slice().sort(byCode);
+      const t = list.length, c = list.filter(isDoneAsg).length;
+      return `
+  <div class="round-section">
+    <div class="round-head">
+      <span class="round-title">${esc(roundName(k))}</span>
+      <span class="round-stat">ได้รับมอบหมาย <b>${t}</b> เรื่อง · ประเมินแล้ว <b class="g">${c}</b> · รอดำเนินการ <b>${t - c}</b></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px;">ลำดับ</th>
+          <th style="width:120px;">รหัส</th>
+          <th>ชื่อผลงาน</th>
+          <th style="width:110px;">สถานะ</th>
+          <th style="width:60px;">คะแนน</th>
+          <th>ข้อเสนอแนะ</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((x, i) => renderRow(x).replace('<tr>', `<tr><td style="text-align:center; padding:8px 6px;">${i + 1}</td>`)).join('')}
+      </tbody>
+    </table>
+  </div>`;
+    }).join('');
+    const roundSummaryHtml = ['R1', 'R2', 'UNKNOWN'].filter(k => groups[k].length).map(k => {
+      const t = groups[k].length, c = groups[k].filter(isDoneAsg).length;
+      return `<div>${esc(roundName(k))}: <b>${c}</b>/${t} เรื่อง</div>`;
     }).join('');
 
     const docTitle = `รายงานการประเมิน_${rn}`;
@@ -5916,6 +6015,15 @@ async function printReviewerIndividualReport(reviewerId) {
     th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; vertical-align: top; }
     th { background: #e8f4f9; font-weight: 600; color: #0f172a; text-align: center; }
     tr:nth-child(even) { background: #f8fafc; }
+    .round-section { margin-top: 18px; }
+    .round-section + .round-section { margin-top: 26px; }
+    .round-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; border-left: 4px solid #006D70; background: #f0fdfa; padding: 6px 10px; border-radius: 4px; page-break-after: avoid; }
+    .round-title { font-size: 13.5px; font-weight: 700; color: #0C385B; }
+    .round-stat { font-size: 11px; color: #334155; }
+    .round-stat .g { color: #1b8f5a; }
+    .round-section table { margin-top: 8px; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
     .sig-section { margin-top: 40px; display: flex; justify-content: flex-end; page-break-inside: avoid; }
     .sig-box { text-align: center; min-width: 320px; font-size: 12px; line-height: 1.8; }
     @media print {
@@ -5945,24 +6053,12 @@ async function printReviewerIndividualReport(reviewerId) {
       <div>ประเมินแล้ว <span class="val green">${com}</span> เรื่อง</div>
       <div>รอดำเนินการ <span class="val">${pen}</span> เรื่อง</div>
     </div>
+    <div class="box-row" style="font-size:11.5px; color:#334155; margin-top:2px;">${roundSummaryHtml}</div>
     <div style="border-top:1px solid #e2e8f0; margin:10px 0 8px 0;"></div>
     <div>ความก้าวหน้า <span class="val green" style="font-size:16px;">${pct}</span></div>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th style="width:130px;">รหัส</th>
-        <th>ชื่อผลงาน</th>
-        <th style="width:110px;">สถานะ</th>
-        <th style="width:70px;">คะแนน</th>
-        <th>ข้อเสนอแนะ</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows}
-    </tbody>
-  </table>
+  ${sectionsHtml}
 
   <div class="sig-section">
     <div class="sig-box">
