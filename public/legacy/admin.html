@@ -3858,14 +3858,52 @@ async function openAssignByCategoryModal(){
       'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์'
     ];
 
+    const workCatOf = w => formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+
+    // --- Rounds: the selected round decides which assignment count is used ---
+    const openRoundsList = (d.rounds || []).filter(isRoundOpen);
+    if (!openRoundsList.length) return Swal.fire({ icon: 'info', title: 'ไม่มีรอบที่เปิดอยู่', text: 'ทุกรอบปิดแล้ว เปิดรอบได้ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน', confirmButtonColor: '#006D70' });
+    const isFinalRound = rid => {
+      const rd = (d.rounds || []).find(r => String(r.ReviewRoundID) === String(rid)) || {};
+      return Number(rd.RoundNo) === 2 || String(rd.RoundNameTH || '').includes('ตัดสิน');
+    };
+    // ReviewerAssignedCount = Round 1 only; use the count of the round being assigned
+    const assignedCountFor = (w, rid) => isFinalRound(rid)
+      ? num(w.ReviewerAssignedCountR2)
+      : num(w.ReviewerAssignedCountR1 != null && w.ReviewerAssignedCountR1 !== '' ? w.ReviewerAssignedCountR1 : w.ReviewerAssignedCount);
+
+    // --- Work status filter (multi-select) ---
+    const workStatusOf = w => String(w.Status || w.CurrentStatus || '').trim().toUpperCase() || 'NO_STATUS';
+    const STATUS_LABELS = {
+      DRAFT: 'ฉบับร่าง', SUBMITTED: 'ส่งผลงานแล้ว', RECEIVED: 'ส่งผลงานแล้ว', ACADEMIC_SCREENING: 'ตรวจสอบวิชาการ',
+      RETURNED_FOR_EDIT: 'ส่งคืนให้แก้ไข', WAITING_REVIEWER_ASSIGN: 'รอจ่ายงาน', UNDER_REVIEW: 'กำลังพิจารณา',
+      REVIEW_COMPLETED: 'ประเมินครบแล้ว', REVISION_REQUIRED: 'ต้องแก้ไข', REVISION_SUBMITTED: 'ส่งฉบับแก้ไขแล้ว',
+      ACCEPTED_ORAL: 'ผ่าน - นำเสนอวาจา', ACCEPTED_POSTER: 'ผ่าน - โปสเตอร์', REJECTED: 'ไม่ผ่านการพิจารณา',
+      FAIL: 'ไม่ผ่านการพิจารณา', WAITING_PRESENTATION_FILE: 'รอไฟล์นำเสนอ', PRESENTATION_FILE_SUBMITTED: 'ส่งไฟล์นำเสนอแล้ว',
+      PRESENTATION_FILE_APPROVED: 'ไฟล์นำเสนอผ่านแล้ว', SCHEDULED: 'จัดตารางนำเสนอแล้ว', PUBLISHED: 'ตีพิมพ์เผยแพร่',
+      CANCELLED: 'ยกเลิก', NO_STATUS: 'ไม่ระบุสถานะ'
+    };
+    const STATUS_ORDER = Object.keys(STATUS_LABELS);
+    const DEFAULT_EXCLUDED_STATUSES = ['REJECTED', 'FAIL', 'CANCELLED', 'DRAFT'];
+    const presentStatuses = Array.from(new Set(allWorks.map(workStatusOf))).sort((a, b) => {
+      const ia = STATUS_ORDER.indexOf(a), ib = STATUS_ORDER.indexOf(b);
+      return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
+    });
+    const statusChipsHtml = presentStatuses.map(st => {
+      const color = /^(REJECTED|FAIL|CANCELLED)$/.test(st) ? '#b91c1c' : (/^ACCEPTED|PRESENTATION_FILE|SCHEDULED|PUBLISHED/.test(st) ? '#15803d' : '#0f172a');
+      return `<label class="batch-status-chip" style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border:1px solid #cbd5e1; border-radius:999px; background:#fff; font-size:0.76rem; cursor:pointer; margin:0; user-select:none; color:${color};">
+        <input type="checkbox" class="batch-status-item" value="${esc(st)}" ${DEFAULT_EXCLUDED_STATUSES.includes(st) ? '' : 'checked'} style="width:14px; height:14px; margin:0; cursor:pointer;">
+        <span>${esc(STATUS_LABELS[st] || st)}</span> <span class="batch-status-count muted" data-st="${esc(st)}" style="font-size:0.72rem;">(0)</span>
+      </label>`;
+    }).join('');
+
     allWorks.forEach(w => {
-      const cat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
+      const cat = workCatOf(w);
       if(!categoryStats[cat]) {
         categoryStats[cat] = { total: 0, unassigned: 0, assigned: 0 };
       }
       categoryStats[cat].total++;
-      const assignedCount = num(w.ReviewerAssignedCount);
-      if(assignedCount === 0) {
+      if(assignedCountFor(w, openRoundsList[0].ReviewRoundID) === 0 && !DEFAULT_EXCLUDED_STATUSES.includes(workStatusOf(w))) {
         categoryStats[cat].unassigned++;
       } else {
         categoryStats[cat].assigned++;
@@ -3885,14 +3923,18 @@ async function openAssignByCategoryModal(){
     }).join('') : '<option value="">ไม่มีผลงานในระบบ</option>';
     if (!defaultCat && activeCatList.length > 0) defaultCat = activeCatList[0];
 
-    const openRoundsList = (d.rounds || []).filter(isRoundOpen);
-    if (!openRoundsList.length) return Swal.fire({ icon: 'info', title: 'ไม่มีรอบที่เปิดอยู่', text: 'ทุกรอบปิดแล้ว เปิดรอบได้ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน', confirmButtonColor: '#006D70' });
     const roundsHtml = openRoundsList.map(rd => `<option value="${esc(rd.ReviewRoundID)}">${esc(rd.RoundNameTH || rd.RoundNameEN || rd.ReviewRoundID)}</option>`).join('');
 
     const modalHtml = `
       <div style="text-align:left; font-size:0.88rem;">
         <!-- Step 1: Select Category -->
         <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+          <label style="font-weight:700; color:#166534; display:block; margin-bottom:4px; font-size:0.92rem;">
+            <i class="fa-solid fa-flag"></i> รอบการประเมินที่จะมอบหมาย:
+          </label>
+          <select id="batchRoundSelect" class="field" style="width:100%; padding:8px 10px; border-radius:6px; border:1.5px solid #006D70; background:#fff; font-size:0.88rem; font-weight:600; color:#0f172a; margin-bottom:10px;">
+            ${roundsHtml}
+          </select>
           <label style="font-weight:700; color:#166534; display:block; margin-bottom:6px; font-size:0.92rem;">
             <i class="fa-solid fa-folder-tree"></i> 1. เลือกสาขา / ประเภทผลงาน:
           </label>
@@ -3903,9 +3945,22 @@ async function openAssignByCategoryModal(){
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.8rem;">
             <label style="cursor:pointer; display:flex; align-items:center; gap:6px; color:#1e293b; user-select:none;">
               <input type="checkbox" id="batchOnlyUnassigned" checked style="width:16px; height:16px; cursor:pointer;">
-              <span>แสดงเฉพาะผลงานที่<b>ยังไม่ได้รับ Assign</b> (0 คน)</span>
+              <span>แสดงเฉพาะผลงานที่<b>ยังไม่ได้รับ Assign ในรอบนี้</b> (0 คน)</span>
             </label>
             <span id="batchWorksCountBadge" class="badge" style="background:#dcfce7; color:#15803d; font-size:0.75rem; padding:3px 8px;">0 เรื่อง</span>
+          </div>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #bbf7d0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+              <label style="font-weight:700; color:#166534; font-size:0.86rem; margin:0;"><i class="fa-solid fa-filter"></i> สถานะผลงาน (เลือกได้หลายสถานะ):</label>
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="btn btn-sm btn-soft" id="btnBatchStatusAll" style="font-size:0.7rem; padding:2px 8px;">ทุกสถานะ</button>
+                <button type="button" class="btn btn-sm btn-soft" id="btnBatchStatusNone" style="font-size:0.7rem; padding:2px 8px;">ล้าง</button>
+              </div>
+            </div>
+            <div id="batchStatusWrap" style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${statusChipsHtml || '<span class="muted" style="font-size:0.78rem;">ไม่มีข้อมูลสถานะ</span>'}
+            </div>
+            <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">ค่าเริ่มต้นไม่รวม: ไม่ผ่านการพิจารณา / ยกเลิก / ฉบับร่าง</div>
           </div>
         </div>
 
@@ -3961,16 +4016,7 @@ async function openAssignByCategoryModal(){
           </div>
         </div>
 
-        <!-- Step 4: Round & Summary -->
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
-          <div style="flex:1;">
-            <label style="font-weight:600; font-size:0.82rem; color:#475569; display:block; margin-bottom:2px;">รอบการประเมิน:</label>
-            <select id="batchRoundSelect" class="field" style="width:100%; padding:6px 8px; font-size:0.84rem; border:1px solid #ccc; border-radius:6px;">
-              ${roundsHtml}
-            </select>
-          </div>
-        </div>
-
+        <!-- Step 4: Summary -->
         <div id="batchSummaryNotice" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 12px; font-size:0.82rem; color:#1e40af; text-align:left;">
           💡 กรุณาเลือกผลงานและ Reviewer เพื่อดำเนินการ Assign
         </div>
@@ -3996,23 +4042,56 @@ async function openAssignByCategoryModal(){
         const revsBadge = document.getElementById('batchRevsCountBadge');
         const summaryNotice = document.getElementById('batchSummaryNotice');
 
+        const roundSel = document.getElementById('batchRoundSelect');
+        const statusWrap = document.getElementById('batchStatusWrap');
+        const selectedRoundId = () => roundSel ? roundSel.value : openRoundsList[0].ReviewRoundID;
+        const selectedStatuses = () => new Set(Array.from(document.querySelectorAll('.batch-status-item:checked')).map(cb => cb.value));
+        const inCat = (w, selectedCat) => {
+          if (selectedCat === '__ALL__' || !selectedCat) return true;
+          return workCatOf(w) === selectedCat || String(w.CategoryName||'').includes(selectedCat);
+        };
+
+        // Refresh category option labels + status chip counts for current round / statuses
+        function refreshCounts() {
+          const rid = selectedRoundId();
+          const sts = selectedStatuses();
+          if (catSelect) {
+            Array.from(catSelect.options).forEach(opt => {
+              const cat = opt.value;
+              if (!cat || cat === '__ALL__') return;
+              const ws = allWorks.filter(w => inCat(w, cat));
+              const inStatus = ws.filter(w => sts.has(workStatusOf(w)));
+              const un = inStatus.filter(w => assignedCountFor(w, rid) === 0).length;
+              opt.textContent = `${cat} (ยังไม่ Assign: ${un} / สถานะที่เลือก ${inStatus.length} / ทั้งหมด ${ws.length} เรื่อง)`;
+            });
+          }
+          const selectedCat = catSelect ? catSelect.value : '';
+          const counts = {};
+          allWorks.filter(w => inCat(w, selectedCat)).forEach(w => { const st = workStatusOf(w); counts[st] = (counts[st] || 0) + 1; });
+          document.querySelectorAll('.batch-status-count').forEach(el => { el.textContent = `(${counts[el.getAttribute('data-st')] || 0})`; });
+          document.querySelectorAll('.batch-status-chip').forEach(chip => {
+            const cb = chip.querySelector('input');
+            chip.style.background = cb && cb.checked ? '#ecfdf5' : '#fff';
+            chip.style.borderColor = cb && cb.checked ? '#86efac' : '#cbd5e1';
+          });
+        }
+
         if (defaultCat && catSelect) {
           catSelect.value = defaultCat;
         }
 
         function updateWorksList() {
+          refreshCounts();
           const selectedCat = catSelect ? catSelect.value : '';
           const onlyUn = onlyUnassignedCb ? onlyUnassignedCb.checked : true;
           const q = (workSearchInput ? workSearchInput.value : '').trim().toLowerCase();
+          const rid = selectedRoundId();
+          const sts = selectedStatuses();
 
           const matchingWorks = allWorks.filter(w => {
-            const rawCat = formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-');
-            if (selectedCat !== '__ALL__' && selectedCat) {
-              if (rawCat !== selectedCat && !String(w.CategoryName||'').includes(selectedCat)) {
-                return false;
-              }
-            }
-            const assignedCount = num(w.ReviewerAssignedCount);
+            if (!inCat(w, selectedCat)) return false;
+            if (!sts.has(workStatusOf(w))) return false;
+            const assignedCount = assignedCountFor(w, rid);
             if (onlyUn && assignedCount > 0) {
               return false;
             }
@@ -4036,7 +4115,7 @@ async function openAssignByCategoryModal(){
             worksContainer.innerHTML = `
               <div style="padding:20px; text-align:center; color:#64748b; font-size:0.85rem;">
                 <i class="fa-solid fa-circle-check" style="font-size:1.8rem; color:#10b981; margin-bottom:8px; display:block;"></i>
-                ไม่พบผลงานที่ตรงตามเงื่อนไข (อาจได้รับการมอบหมายครบแล้ว หรือลองปลดติ๊ก "เฉพาะที่ยังไม่ได้รับ Assign")
+                ไม่พบผลงานที่ตรงตามเงื่อนไข (อาจได้รับการมอบหมายในรอบนี้ครบแล้ว ลองปลดติ๊ก "เฉพาะที่ยังไม่ได้รับ Assign" หรือเลือกสถานะเพิ่ม)
               </div>
             `;
           } else {
@@ -4045,7 +4124,9 @@ async function openAssignByCategoryModal(){
               const code = esc(w.WorkCode || w.WorkID);
               const title = esc(w.TitleTH || w.TitleEN || w.ThaiTitle || '-');
               const presenter = esc(getWorkPresenterDisplay(w).name);
-              const assigned = num(w.ReviewerAssignedCount);
+              const assigned = assignedCountFor(w, rid);
+              const stCode = workStatusOf(w);
+              const stLabel = `<span class="badge" style="background:#f1f5f9; color:#334155; font-size:0.7rem; padding:1px 6px;">${esc(STATUS_LABELS[stCode] || stCode)}</span>`;
               const rawPt = String(w.PresentationTypeName || w.PresentationType || '').trim();
               let ptBadge = '';
               if (/oral|บรรยาย/i.test(rawPt)) ptBadge = '<span class="badge ok" style="font-size:0.7rem; padding:1px 6px;">บรรยาย</span>';
@@ -4062,6 +4143,7 @@ async function openAssignByCategoryModal(){
                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                       <b style="color:#0C385B; font-size:0.86rem;"># ${code}</b>
                       ${ptBadge}
+                      ${stLabel}
                       ${stBadge}
                     </div>
                     <div style="font-size:0.82rem; color:#1e293b; margin-top:2px; font-weight:500;">${title}</div>
@@ -4103,6 +4185,12 @@ async function openAssignByCategoryModal(){
         }
 
         if (catSelect) catSelect.addEventListener('change', updateWorksList);
+        if (roundSel) roundSel.addEventListener('change', updateWorksList);
+        if (statusWrap) statusWrap.addEventListener('change', updateWorksList);
+        const btnStAll = document.getElementById('btnBatchStatusAll');
+        if (btnStAll) btnStAll.addEventListener('click', () => { document.querySelectorAll('.batch-status-item').forEach(cb => cb.checked = true); updateWorksList(); });
+        const btnStNone = document.getElementById('btnBatchStatusNone');
+        if (btnStNone) btnStNone.addEventListener('click', () => { document.querySelectorAll('.batch-status-item').forEach(cb => cb.checked = false); updateWorksList(); });
         if (onlyUnassignedCb) onlyUnassignedCb.addEventListener('change', updateWorksList);
         if (workSearchInput) workSearchInput.addEventListener('input', updateWorksList);
 
