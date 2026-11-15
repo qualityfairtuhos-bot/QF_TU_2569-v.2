@@ -6956,13 +6956,19 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     }
     const isOriginal = (reviewerIds === '__ORIGINAL__' || (Array.isArray(reviewerIds) && reviewerIds.indexOf('__ORIGINAL__') >= 0));
     if(!isOriginal && (!reviewerIds||!reviewerIds.length))throw new Error('No reviewers provided');
-    let created=0,skipped=0;
+    let created=0,skipped=0,skippedWorks=0;
     const revCountAdd = {};
     const assignEmailQueue = {};
     workIds.forEach(function(wid){
       const w = findOne_('Works',{ConferenceID:conferenceId,WorkID:wid});
       let targetRids = reviewerIds;
       if (isOriginal) {
+        // Safety: "pull original reviewers" only fills works that have NO reviewer in this round yet,
+        // so pressing it again never adds people on top of a manually adjusted panel.
+        const activeInRound = findMany_('ReviewAssignments',{ConferenceID:conferenceId,WorkID:wid,ReviewRoundID:roundId}).filter(function(a){
+          return upper_(a.Status) !== 'CANCELLED' && upper_(a.Status) !== 'DECLINED';
+        });
+        if (activeInRound.length) { skippedWorks++; return; }
         // Find previous assignments for this work in other rounds (e.g. Round 1)
         const prevAssignments = findMany_('ReviewAssignments',{ConferenceID:conferenceId,WorkID:wid}).filter(function(a){
           return String(a.ReviewRoundID) !== String(roundId) && upper_(a.Status) !== 'CANCELLED' && upper_(a.Status) !== 'DECLINED';
@@ -7012,7 +7018,7 @@ function adminAssignReviewersBulk(token,conferenceId,workIds,roundId,reviewerIds
     try { cacheRemoveLarge_('ADM_WORKS_' + conferenceId); } catch(e){}
     if (sendEmail) { try { flushAssignmentEmails_(conferenceId, assignEmailQueue); } catch(e){} }
 
-    return {created:created,skipped:skipped,emailSent:sendEmail};
+    return {created:created,skipped:skipped,skippedWorks:skippedWorks,emailSent:sendEmail};
   });
 }
 function adminSyncWorkRoundReviewers(token, conferenceId, workId, roundId, reviewerIds, options) {

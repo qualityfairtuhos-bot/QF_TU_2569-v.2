@@ -273,6 +273,7 @@
             </button>
             <button class="btn btn-blue" onclick="openAssignByCategoryModal()"><i class="fa-solid fa-users-gear"></i> Assign ตามสาขา</button>
             <button class="btn" onclick="openAssignFinalRoundModal()" style="background:#b45309; color:#fff; border-color:#92400e; font-weight:600;"><i class="fa-solid fa-trophy"></i> Assign กรรมการรอบตัดสิน</button>
+            <button class="btn" onclick="openFinalAssignmentReport()" style="background:#fffbeb; color:#92400e; border:1px solid #fcd34d; font-weight:600;"><i class="fa-solid fa-clipboard-list"></i> รายงาน assign รอบตัดสิน</button>
             <button class="btn" onclick="notifyFinalRoundReviewers()" style="background:#fff7ed; color:#9a3412; border:1px solid #fdba74; font-weight:600;"><i class="fa-solid fa-envelope"></i> ส่งอีเมลแจ้งกรรมการรอบตัดสิน</button>
             <button class="btn btn-gold" onclick="exportWorks()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
           </div>
@@ -3638,7 +3639,11 @@ function num(v){return Number(v)||0;}
 
 
 function toggleSelectAllFinalWorks(select) {
-  document.querySelectorAll('.final-round-work-item').forEach(cb => cb.checked = !!select);
+  document.querySelectorAll('.final-round-work-item').forEach(cb => {
+    if (cb.disabled) return;
+    cb.checked = !!select;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   updateFinalWorkCount();
 }
 
@@ -3650,83 +3655,119 @@ function updateFinalWorkCount() {
   }
 }
 
-async function openAssignFinalRoundModal() {
-  const hasRows = !!(window.WORK_ROWS && window.WORK_ROWS.length);
-  if(!hasRows){
-    show('กำลังโหลดข้อมูลผลงาน...');
-    try{
-      const rows = await rpc('adminListWorks', TOKEN, CID, {});
-      window.WORK_ROWS = rows || [];
-      updateWorkCategoryDropdown(window.WORK_ROWS);
-      renderWorksTable();
-    }finally{
-      hide();
-    }
-  }
+// ===== Shared helpers: work status chips / round-2 assignments =====
+const QF_STATUS_LABELS = {
+  DRAFT: 'ฉบับร่าง', SUBMITTED: 'ส่งผลงานแล้ว', RECEIVED: 'ส่งผลงานแล้ว', ACADEMIC_SCREENING: 'ตรวจสอบวิชาการ',
+  RETURNED_FOR_EDIT: 'ส่งคืนให้แก้ไข', WAITING_REVIEWER_ASSIGN: 'รอจ่ายงาน', UNDER_REVIEW: 'กำลังพิจารณา',
+  REVIEW_COMPLETED: 'ประเมินครบแล้ว', REVISION_REQUIRED: 'ต้องแก้ไข', REVISION_SUBMITTED: 'ส่งฉบับแก้ไขแล้ว',
+  ACCEPTED_ORAL: 'ผ่าน - นำเสนอวาจา', ACCEPTED_POSTER: 'ผ่าน - โปสเตอร์', REJECTED: 'ไม่ผ่านการพิจารณา',
+  FAIL: 'ไม่ผ่านการพิจารณา', WAITING_PRESENTATION_FILE: 'รอไฟล์นำเสนอ', PRESENTATION_FILE_SUBMITTED: 'ส่งไฟล์นำเสนอแล้ว',
+  PRESENTATION_FILE_APPROVED: 'ไฟล์นำเสนอผ่านแล้ว', SCHEDULED: 'จัดตารางนำเสนอแล้ว', PUBLISHED: 'ตีพิมพ์เผยแพร่',
+  WITHDRAWN: 'ถอนผลงาน', CANCELLED: 'ยกเลิก', NO_STATUS: 'ไม่ระบุสถานะ'
+};
+const QF_DEFAULT_EXCLUDED_STATUSES = ['REJECTED', 'FAIL', 'CANCELLED', 'WITHDRAWN', 'DRAFT'];
+const QF_STANDARD_CATS = [
+  'Service Excellence', 'CQI/ Best Practice', 'Primary Care & Community Network Development',
+  'ผลงานวิจัยด้านคุณภาพและความปลอดภัย', 'ผลงานนวัตกรรมด้านคุณภาพและความปลอดภัย',
+  'การพัฒนางานประจำสู่งานวิจัย (R2R)', 'นโยบาย/ระบบงาน/การพัฒนาคุณภาพระดับองค์กร',
+  'เรื่องเล่าเร้าพลัง / การบริการด้วยหัวใจความเป็นมนุษย์'
+];
+function qfWorkStatus(w) { return String((w && (w.Status || w.CurrentStatus)) || '').trim().toUpperCase() || 'NO_STATUS'; }
+function qfStatusLabel(st) { return QF_STATUS_LABELS[st] || st; }
+function qfWorkCat(w) { return formatWorkCategory(w.CategoryName || w.CategoryNameTH || w.Category || w.WorkType || w.Field || w.Theme || w.CategoryID || '-'); }
+function qfPresentation(w) {
+  const pt = [w.PresentationTypeName, w.PresentationType, w.PresentationTypeFinal, w.PresentationTypeRequested].filter(Boolean).join(' ');
+  if (/บรรยาย|oral|PT-2026-000001/i.test(pt)) return 'บรรยาย';
+  if (/โปสเตอร์|poster|PT-2026-000002/i.test(pt)) return 'โปสเตอร์';
+  return pt || '-';
+}
+function qfSortedStatuses(works) {
+  const order = Object.keys(QF_STATUS_LABELS);
+  return Array.from(new Set((works || []).map(qfWorkStatus))).sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
+  });
+}
+// Status filter chips; cls = checkbox class used to read the selection back
+function qfStatusChipsHtml(works, cls) {
+  const counts = {};
+  (works || []).forEach(w => { const st = qfWorkStatus(w); counts[st] = (counts[st] || 0) + 1; });
+  return qfSortedStatuses(works).map(st => {
+    const color = /^(REJECTED|FAIL|CANCELLED|WITHDRAWN)$/.test(st) ? '#b91c1c' : (/^ACCEPTED|PRESENTATION_FILE|SCHEDULED|PUBLISHED/.test(st) ? '#15803d' : '#0f172a');
+    return `<label style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border:1px solid #cbd5e1; border-radius:999px; background:#fff; font-size:0.76rem; cursor:pointer; margin:0; user-select:none; color:${color};">
+      <input type="checkbox" class="${cls}" value="${esc(st)}" ${QF_DEFAULT_EXCLUDED_STATUSES.includes(st) ? '' : 'checked'} style="width:14px; height:14px; margin:0; cursor:pointer;">
+      <span>${esc(qfStatusLabel(st))}</span> <span class="muted" style="font-size:0.72rem;">(${counts[st] || 0})</span>
+    </label>`;
+  }).join('');
+}
+function qfCheckedStatuses(cls) { return new Set(Array.from(document.querySelectorAll('.' + cls + ':checked')).map(cb => cb.value)); }
+function qfFinalRound(rounds) {
+  return (rounds || []).find(r => Number(r.RoundNo) === 2 || String(r.RoundNameTH || '').includes('ตัดสิน')) || null;
+}
+// Active final-round assignments of a work (adminListWorks already drops CANCELLED / DECLINED)
+function qfFinalAssignments(w, r2Id) {
+  return (w.reviewers || []).filter(r => r && (r.ReviewRoundID ? String(r.ReviewRoundID) === String(r2Id) : !!r.isRound2));
+}
+function qfHasFinalAssignment(w, r2Id) {
+  return qfFinalAssignments(w, r2Id).length > 0 || num(w.ReviewerAssignedCountR2) > 0 || num(w.ReviewerAbstainedCountR2) > 0;
+}
+function qfRound1Assignments(w, r2Id) {
+  return (w.reviewers || []).filter(r => r && !(r.ReviewRoundID ? String(r.ReviewRoundID) === String(r2Id) : !!r.isRound2));
+}
+async function qfLoadFreshWorks() {
+  const rows = await rpc('adminListWorks', TOKEN, CID, {});
+  window.WORK_ROWS = rows || [];
+  try { updateWorkCategoryDropdown(window.WORK_ROWS); renderWorksTable(); } catch (e) {}
+  return window.WORK_ROWS;
+}
 
-  show('กำลังเตรียมข้อมูลรอบตัดสิน...');
+// ===== Final round: pull Round-1 reviewers (only works with NO final-round reviewer yet) =====
+async function openAssignFinalRoundModal() {
+  show('กำลังโหลดข้อมูลผลงานล่าสุด...');
   try {
-    const config = await rpc('adminGetReviewConfig', TOKEN, CID);
+    const [allWorks, config] = await Promise.all([qfLoadFreshWorks(), rpc('adminGetReviewConfig', TOKEN, CID)]);
     hide();
-    const allWorks = window.WORK_ROWS || [];
-    const rounds = config.rounds || [];
-    const r2 = rounds.find(r => Number(r.RoundNo) === 2 || String(r.RoundNameTH).includes('ตัดสิน')) || rounds[1] || rounds[0];
-    const r2Id = r2 ? r2.ReviewRoundID : 'RR-2026-000002';
-    if (r2 && !isRoundOpen(r2)) {
+    const r2 = qfFinalRound(config.rounds || []);
+    if (!r2) return Swal.fire({ icon: 'info', title: 'ไม่พบรอบตัดสิน', text: 'ยังไม่ได้ตั้งค่ารอบตัดสิน (รอบที่ 2)', confirmButtonColor: '#006D70' });
+    const r2Id = r2.ReviewRoundID;
+    if (!isRoundOpen(r2)) {
       return Swal.fire({ icon: 'info', title: 'รอบตัดสินปิดอยู่', text: 'เปิดรอบตัดสินก่อน ที่เมนู Reviewer ส่วนกำหนดเกณฑ์คะแนน แล้วจึงมอบหมายกรรมการ', confirmButtonColor: '#006D70' });
     }
 
-    // Filter works that are accepted / qualified for presentation
-    const qualifiedWorks = allWorks.filter(w => {
-      const st = String(w.Status || w.CurrentStatus || '').toUpperCase();
-      const isAccepted = ['ACCEPTED_ORAL', 'ACCEPTED_POSTER', 'PASS', 'WAITING_PRESENTATION_FILE', 'PRESENTATION_FILE_SUBMITTED', 'PRESENTATION_FILE_APPROVED', 'SCHEDULED'].includes(st);
-      const isOralOrPoster = /oral|poster|บรรยาย|โปสเตอร์/i.test(String(w.PresentationTypeName || w.PresentationType || ''));
-      const hasPassingScore = Number(w.AverageScore) >= 60;
-      return isAccepted || isOralOrPoster || hasPassingScore;
-    });
-
-    const worksToDisplay = qualifiedWorks.length > 0 ? qualifiedWorks : allWorks;
-
-    const worksListHtml = worksToDisplay.map(w => {
-      const wid = esc(w.WorkID);
-      const code = esc(w.WorkCode || w.WorkID);
-      const title = esc(w.TitleTH || w.TitleEN || '-');
-      const presenter = esc(getWorkPresenterDisplay(w).name);
-      const r1Count = num(w.ReviewerCompletedCount);
-      const assignedCount = num(w.ReviewerAssignedCount);
-      const avg = w.AverageScore ? Number(w.AverageScore).toFixed(2) : '-';
-      const pt = String(w.PresentationTypeName || w.PresentationType || '-');
-
-      return `
-        <label style="display:flex; align-items:flex-start; gap:10px; padding:8px 10px; border-bottom:1px solid #f1f5f9; cursor:pointer;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-          <input type="checkbox" class="final-round-work-item" value="${wid}" checked onchange="updateFinalWorkCount()" style="margin-top:3px; width:16px; height:16px; cursor:pointer;">
-          <div style="flex:1;">
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <b style="color:#0C385B; font-size:0.88rem;"># ${code}</b>
-              <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.75rem;">${esc(pt)}</span>
-              <span class="badge" style="background:#f0fdf4; color:#166534; font-size:0.75rem;">รอบแรก: ประเมินแล้ว ${r1Count}/${assignedCount} ท่าน (เฉลี่ย ${avg} คะแนน)</span>
-            </div>
-            <div style="font-weight:600; font-size:0.86rem; color:#1e293b; margin-top:2px;">${title}</div>
-            <div style="font-size:0.78rem; color:#64748b;">ผู้นำเสนอ: ${presenter}</div>
-          </div>
-        </label>
-      `;
-    }).join('');
+    // Safety: a work that already has ANY final-round reviewer is never offered here
+    const alreadyAssigned = allWorks.filter(w => qfHasFinalAssignment(w, r2Id));
+    const eligible = allWorks.filter(w => !qfHasFinalAssignment(w, r2Id));
 
     const modalHtml = `
       <div style="text-align:left; font-size:0.88rem;">
-        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:12px 14px; margin-bottom:14px; color:#92400e;">
+        <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:12px 14px; margin-bottom:12px; color:#92400e;">
           <div style="font-weight:700; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
             <i class="fa-solid fa-trophy"></i> มอบหมายคณะกรรมการสำหรับรอบตัดสิน (Final Round)
           </div>
           <div style="margin-top:4px; font-size:0.82rem; line-height:1.5;">
-            ระบบจะดึงรายชื่อ <b>คณะกรรมการชุดเดิมที่เคยประเมินในรอบแรก</b> ของแต่ละผลงาน มามอบหมายเป็นกรรมการในรอบตัดสินผลงาน (รอบที่ 2) โดยอัตโนมัติ โดยคะแนนรอบแรกและรอบตัดสินจะถูกแยกจากกันโดยเด็ดขาด
+            ระบบจะดึงรายชื่อ <b>คณะกรรมการชุดเดิมที่เคยประเมินในรอบแรก</b> ของแต่ละผลงาน มามอบหมายเป็นกรรมการรอบตัดสิน
+            <br><b>แสดงเฉพาะผลงานที่ยังไม่มีกรรมการรอบตัดสินเลยแม้แต่คนเดียว</b>
+            ${alreadyAssigned.length ? `<span style="color:#7c2d12;">(ซ่อน ${alreadyAssigned.length} เรื่องที่มีกรรมการรอบตัดสินแล้ว — ปรับรายเรื่องได้ที่ปุ่ม assign ของผลงานนั้น)</span>` : ''}
           </div>
         </div>
 
-        <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="margin-bottom:10px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+            <label style="font-weight:700; color:#0f172a; font-size:0.86rem; margin:0;"><i class="fa-solid fa-filter"></i> สถานะผลงาน (เลือกได้หลายสถานะ):</label>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn soft btn-sm" id="finalStAll" style="font-size:0.72rem; padding:2px 8px;">ทุกสถานะ</button>
+              <button type="button" class="btn soft btn-sm" id="finalStNone" style="font-size:0.72rem; padding:2px 8px;">ล้าง</button>
+            </div>
+          </div>
+          <div id="finalStatusWrap" style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${eligible.length ? qfStatusChipsHtml(eligible, 'final-status-item') : '<span class="muted" style="font-size:0.8rem;">-</span>'}
+          </div>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">ค่าเริ่มต้นไม่รวม: ไม่ผ่านการพิจารณา / ยกเลิก / ถอนผลงาน / ฉบับร่าง</div>
+        </div>
+
+        <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <label style="font-weight:700; color:#1e293b;">
-            เลือกผลงานที่ผ่านการคัดเลือกเข้ารอบตัดสิน (<span id="finalWorkSelectedCount">${worksToDisplay.length}</span> เรื่อง):
+            เลือกผลงาน (เลือกแล้ว <span id="finalWorkSelectedCount">0</span> / <span id="finalWorkShownCount">0</span> เรื่อง):
           </label>
           <div style="display:flex; gap:6px;">
             <button type="button" class="btn soft btn-sm" onclick="toggleSelectAllFinalWorks(true)" style="font-size:0.75rem; padding:3px 8px;">เลือกทั้งหมด</button>
@@ -3734,28 +3775,83 @@ async function openAssignFinalRoundModal() {
           </div>
         </div>
 
-        <div id="finalWorksListContainer" style="max-height:260px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; background:#fff; margin-bottom:12px;">
-          ${worksListHtml}
-        </div>
-        <label style="display:flex; align-items:flex-start; gap:8px; margin:10px 0 0; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; font-size:0.82rem; color:#7c2d12; cursor:pointer; text-align:left;"><input type="checkbox" id="finalSendEmail" style="margin-top:2px; width:16px; height:16px;"><span><b>ส่งอีเมลแจ้งกรรมการทันที</b><br><span style="color:#9a3412;">ถ้าไม่ติ๊ก: บันทึกการมอบหมายอย่างเดียว แล้วกดปุ่ม "ส่งอีเมลแจ้งกรรมการรอบตัดสิน" ภายหลังเพื่อแจ้งทีเดียว</span></span></label>
+        <div id="finalWorksListContainer" style="max-height:280px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; background:#fff; margin-bottom:12px;"></div>
+        <label style="display:flex; align-items:flex-start; gap:8px; margin:10px 0; padding:8px 10px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; font-size:0.82rem; color:#7c2d12; cursor:pointer; text-align:left;"><input type="checkbox" id="finalSendEmail" style="margin-top:2px; width:16px; height:16px;"><span><b>ส่งอีเมลแจ้งกรรมการทันที</b><br><span style="color:#9a3412;">ถ้าไม่ติ๊ก: บันทึกการมอบหมายอย่างเดียว แล้วกดปุ่ม "ส่งอีเมลแจ้งกรรมการรอบตัดสิน" ภายหลังเพื่อแจ้งทีเดียว</span></span></label>
 
         <div style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
           <div style="font-weight:600; color:#0f172a; margin-bottom:4px;">รอบการประเมินเป้าหมาย:</div>
           <div style="font-size:0.88rem; color:#006D70; font-weight:700;">
-            <i class="fa-solid fa-award"></i> ${esc(r2 ? r2.RoundNameTH : 'รอบตัดสินผลงาน')} (${esc(r2Id)})
+            <i class="fa-solid fa-award"></i> ${esc(r2.RoundNameTH || 'รอบตัดสินผลงาน')} (${esc(r2Id)})
           </div>
         </div>
       </div>
     `;
 
+    const unchecked = new Set();
+    const renderList = () => {
+      const box = document.getElementById('finalWorksListContainer');
+      if (!box) return;
+      const sts = qfCheckedStatuses('final-status-item');
+      const shown = eligible.filter(w => sts.has(qfWorkStatus(w)))
+        .sort((a, b) => String(a.WorkCode || a.WorkID).localeCompare(String(b.WorkCode || b.WorkID)));
+      document.getElementById('finalWorkShownCount').textContent = shown.length;
+      if (!shown.length) {
+        box.innerHTML = `<div style="padding:20px; text-align:center; color:#64748b; font-size:0.85rem;">
+          <i class="fa-solid fa-circle-check" style="font-size:1.6rem; color:#10b981; display:block; margin-bottom:6px;"></i>
+          ไม่มีผลงานที่ยังไม่มีกรรมการรอบตัดสิน ในสถานะที่เลือก</div>`;
+        updateFinalWorkCount();
+        return;
+      }
+      box.innerHTML = shown.map(w => {
+        const wid = String(w.WorkID);
+        const r1 = qfRound1Assignments(w, r2Id);
+        const r1Names = r1.map(r => r.ReviewerName || r.ReviewerID).filter(Boolean);
+        const canPull = r1Names.length > 0;
+        const avg = w.AverageScore ? Number(w.AverageScore).toFixed(2) : '-';
+        const st = qfWorkStatus(w);
+        return `
+        <label style="display:flex; align-items:flex-start; gap:10px; padding:8px 10px; border-bottom:1px solid #f1f5f9; cursor:${canPull ? 'pointer' : 'not-allowed'}; ${canPull ? '' : 'opacity:0.6;'}">
+          <input type="checkbox" class="final-round-work-item" value="${esc(wid)}" ${canPull && !unchecked.has(wid) ? 'checked' : ''} ${canPull ? '' : 'disabled'} style="margin-top:3px; width:16px; height:16px; cursor:pointer;">
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <b style="color:#0C385B; font-size:0.88rem;"># ${esc(w.WorkCode || wid)}</b>
+              <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.72rem;">${esc(qfPresentation(w))}</span>
+              <span class="badge" style="background:#f1f5f9; color:#334155; font-size:0.72rem;">${esc(qfStatusLabel(st))}</span>
+              <span class="badge" style="background:#f0fdf4; color:#166534; font-size:0.72rem;">รอบแรก เฉลี่ย ${esc(avg)}</span>
+            </div>
+            <div style="font-weight:600; font-size:0.86rem; color:#1e293b; margin-top:2px;">${esc(w.TitleTH || w.TitleEN || '-')}</div>
+            <div style="font-size:0.76rem; color:${canPull ? '#475569' : '#b91c1c'}; margin-top:1px;">
+              ${canPull ? `<i class="fa-solid fa-user-group"></i> จะดึงกรรมการ: ${esc(r1Names.join(', '))}` : 'ไม่มีกรรมการรอบแรกให้ดึง — มอบหมายรายเรื่องแทน'}
+            </div>
+          </div>
+        </label>`;
+      }).join('');
+      updateFinalWorkCount();
+    };
+
     const result = await Swal.fire({
       title: 'มอบหมายกรรมการรอบตัดสิน (ดึงกรรมการชุดเดิม)',
       html: modalHtml,
-      width: 720,
+      width: 760,
       showCancelButton: true,
       confirmButtonText: '🚀 ยืนยันการมอบหมายกรรมการชุดเดิม',
       confirmButtonColor: '#b45309',
       cancelButtonText: 'ยกเลิก',
+      didOpen: () => {
+        const wrap = document.getElementById('finalStatusWrap');
+        if (wrap) wrap.addEventListener('change', renderList);
+        const all = document.getElementById('finalStAll');
+        if (all) all.addEventListener('click', () => { document.querySelectorAll('.final-status-item').forEach(cb => cb.checked = true); renderList(); });
+        const none = document.getElementById('finalStNone');
+        if (none) none.addEventListener('click', () => { document.querySelectorAll('.final-status-item').forEach(cb => cb.checked = false); renderList(); });
+        const box = document.getElementById('finalWorksListContainer');
+        if (box) box.addEventListener('change', e => {
+          if (!e.target || !e.target.classList.contains('final-round-work-item')) return;
+          if (e.target.checked) unchecked.delete(e.target.value); else unchecked.add(e.target.value);
+          updateFinalWorkCount();
+        });
+        renderList();
+      },
       preConfirm: () => {
         const selectedWids = Array.from(document.querySelectorAll('.final-round-work-item:checked')).map(el => el.value);
         if (!selectedWids.length) {
@@ -3767,20 +3863,220 @@ async function openAssignFinalRoundModal() {
     });
 
     if (result.isConfirmed) {
+      show('กำลังตรวจสอบข้อมูลล่าสุดก่อนมอบหมาย...');
+      // Re-check right before saving: someone else may have assigned meanwhile
+      const fresh = await qfLoadFreshWorks();
+      const freshMap = {};
+      fresh.forEach(w => { freshMap[String(w.WorkID)] = w; });
+      const safeIds = result.value.workIds.filter(id => freshMap[id] && !qfHasFinalAssignment(freshMap[id], r2Id));
+      const dropped = result.value.workIds.length - safeIds.length;
+      if (!safeIds.length) {
+        hide();
+        return Swal.fire({ icon: 'info', title: 'ไม่มีผลงานที่ต้องมอบหมาย', text: 'ผลงานที่เลือกมีกรรมการรอบตัดสินแล้วทั้งหมด (อาจมีผู้อื่นมอบหมายไปก่อน)', confirmButtonColor: '#006D70' });
+      }
       show('กำลังมอบหมายกรรมการชุดเดิมเข้ารอบตัดสิน...');
-      const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, result.value.workIds, result.value.roundId, ['__ORIGINAL__'], { sendEmail: result.value.sendEmail });
+      const res = await rpc('adminAssignReviewersBulk', TOKEN, CID, safeIds, result.value.roundId, ['__ORIGINAL__'], { sendEmail: result.value.sendEmail, onlyUnassignedWorks: true });
       hide();
       Swal.fire({
         icon: 'success',
         title: 'มอบหมายกรรมการรอบตัดสินสำเร็จ!',
-        html: `สร้างการมอบหมายใหม่ <b>${res.created}</b> รายการ<br><small style="color:#64748b;">(ข้ามรายการที่เคยได้รับมอบหมายแล้ว ${res.skipped} รายการ)</small>${assignEmailNote(res)}`,
+        html: `สร้างการมอบหมายใหม่ <b>${res.created}</b> รายการ ให้ผลงาน <b>${safeIds.length}</b> เรื่อง`
+          + (dropped ? `<br><small style="color:#9a3412;">ข้าม ${dropped} เรื่อง เพราะมีกรรมการรอบตัดสินแล้วระหว่างนี้</small>` : '')
+          + (res.skippedWorks ? `<br><small style="color:#9a3412;">ระบบข้าม ${res.skippedWorks} เรื่องที่มีกรรมการรอบตัดสินอยู่แล้ว</small>` : '')
+          + (res.skipped ? `<br><small style="color:#64748b;">(ข้ามกรรมการที่ใช้ไม่ได้/มีอยู่แล้ว ${res.skipped} รายการ)</small>` : '')
+          + assignEmailNote(res),
         confirmButtonColor: '#006D70'
       });
-      loadWorks();
+      loadWorks(true);
     }
   } catch(e) {
+    hide();
     err(e);
   }
+}
+
+// ===== Report: final-round assignments by category =====
+async function openFinalAssignmentReport() {
+  show('กำลังโหลดข้อมูลการมอบหมายรอบตัดสิน...');
+  try {
+    const [allWorks, config] = await Promise.all([qfLoadFreshWorks(), rpc('adminGetReviewConfig', TOKEN, CID)]);
+    hide();
+    const r2 = qfFinalRound(config.rounds || []);
+    if (!r2) return Swal.fire({ icon: 'info', title: 'ไม่พบรอบตัดสิน', confirmButtonColor: '#006D70' });
+    const r2Id = r2.ReviewRoundID;
+    const cats = Array.from(new Set([...QF_STANDARD_CATS, ...allWorks.map(qfWorkCat)]))
+      .filter(c => c && c !== '-' && allWorks.some(w => qfWorkCat(w) === c));
+    if (allWorks.some(w => qfWorkCat(w) === '-')) cats.push('-');
+
+    const choice = await Swal.fire({
+      title: '<span style="font-size:1.1rem; color:#0C385B;"><i class="fa-solid fa-clipboard-list" style="color:#b45309;"></i> รายงานการมอบหมายกรรมการรอบตัดสิน</span>',
+      width: 680,
+      html: `
+        <div style="text-align:left; font-size:0.86rem;">
+          <label style="font-weight:700; color:#0f172a; display:block; margin-bottom:4px;">สาขา:</label>
+          <select id="farCat" class="field" style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #cbd5e1; margin-bottom:10px;">
+            <option value="__ALL__">ทุกสาขา</option>
+            ${cats.map(c => `<option value="${esc(c)}">${esc(c === '-' ? 'ไม่ระบุสาขา' : c)}</option>`).join('')}
+          </select>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+            <label style="font-weight:700; color:#0f172a; margin:0;"><i class="fa-solid fa-filter"></i> สถานะผลงาน (เลือกได้หลายสถานะ):</label>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn soft btn-sm" id="farStAll" style="font-size:0.72rem; padding:2px 8px;">ทุกสถานะ</button>
+              <button type="button" class="btn soft btn-sm" id="farStNone" style="font-size:0.72rem; padding:2px 8px;">ล้าง</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">${qfStatusChipsHtml(allWorks, 'far-status-item')}</div>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">ค่าเริ่มต้นไม่รวม: ไม่ผ่านการพิจารณา / ยกเลิก / ถอนผลงาน / ฉบับร่าง</div>
+          <div id="farCount" style="margin-top:10px; padding:6px 10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; color:#0c4a6e;"></div>
+        </div>`,
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: '<i class="fa-solid fa-print"></i> พิมพ์รายงาน',
+      denyButtonText: '<i class="fa-solid fa-file-excel"></i> ดาวน์โหลด Excel',
+      cancelButtonText: 'ปิด',
+      confirmButtonColor: '#006D70',
+      denyButtonColor: '#a16207',
+      didOpen: () => {
+        const upd = () => {
+          const sel = farPick();
+          const asg = sel.filter(w => qfFinalAssignments(w, r2Id).length > 0).length;
+          const el = document.getElementById('farCount');
+          if (el) el.innerHTML = `ผลงานในรายงาน <b>${sel.length}</b> เรื่อง · มีกรรมการรอบตัดสินแล้ว <b style="color:#15803d;">${asg}</b> · ยังไม่ assign <b style="color:#b91c1c;">${sel.length - asg}</b>`;
+        };
+        document.getElementById('farCat').addEventListener('change', upd);
+        document.querySelectorAll('.far-status-item').forEach(cb => cb.addEventListener('change', upd));
+        document.getElementById('farStAll').addEventListener('click', () => { document.querySelectorAll('.far-status-item').forEach(cb => cb.checked = true); upd(); });
+        document.getElementById('farStNone').addEventListener('click', () => { document.querySelectorAll('.far-status-item').forEach(cb => cb.checked = false); upd(); });
+        upd();
+      },
+      preConfirm: () => farSnapshot(),
+      preDeny: () => farSnapshot()
+    });
+    function farPick() {
+      const sts = qfCheckedStatuses('far-status-item');
+      const cat = (document.getElementById('farCat') || {}).value || '__ALL__';
+      return allWorks.filter(w => sts.has(qfWorkStatus(w)) && (cat === '__ALL__' || qfWorkCat(w) === cat));
+    }
+    function farSnapshot() {
+      const works = farPick();
+      if (!works.length) { Swal.showValidationMessage('ไม่มีผลงานตามเงื่อนไขที่เลือก'); return false; }
+      const cat = document.getElementById('farCat').value;
+      const sts = Array.from(qfCheckedStatuses('far-status-item')).map(qfStatusLabel);
+      return { works, catLabel: cat === '__ALL__' ? 'ทุกสาขา' : (cat === '-' ? 'ไม่ระบุสาขา' : cat), statusLabels: Array.from(new Set(sts)) };
+    }
+    if (!choice.value) return;
+    const snap = choice.value;
+
+    // Build category groups
+    const groups = cats.map(c => ({
+      cat: c,
+      works: snap.works.filter(w => qfWorkCat(w) === c)
+        .sort((a, b) => String(a.WorkCode || a.WorkID).localeCompare(String(b.WorkCode || b.WorkID)))
+    })).filter(g => g.works.length);
+    const reviewersOf = w => qfFinalAssignments(w, r2Id).map(r => ({
+      name: r.ReviewerName || r.ReviewerID || '-',
+      abstained: String(r.Status || '').toUpperCase() === 'ABSTAINED'
+    })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+    if (choice.isDenied) return exportFinalAssignmentCsv(groups, reviewersOf, r2);
+    printFinalAssignmentReport(groups, reviewersOf, r2, snap);
+  } catch (e) {
+    hide();
+    err(e);
+  }
+}
+
+function printFinalAssignmentReport(groups, reviewersOf, r2, snap) {
+  const total = groups.reduce((n, g) => n + g.works.length, 0);
+  const totalAsg = groups.reduce((n, g) => n + g.works.filter(w => reviewersOf(w).length).length, 0);
+  const dateStr = new Date().toLocaleString('th-TH');
+  const sections = groups.map(g => {
+    const asg = g.works.filter(w => reviewersOf(w).length).length;
+    const rows = g.works.map((w, i) => {
+      const revs = reviewersOf(w);
+      const revHtml = revs.length
+        ? revs.map((r, k) => `<div>${k + 1}. ${esc(r.name)}${r.abstained ? ' <span class="abs">(งดออกเสียง)</span>' : ''}</div>`).join('')
+        : '<span class="none">ยังไม่ assign</span>';
+      return `<tr>
+        <td class="c">${i + 1}</td>
+        <td class="code">${esc(w.WorkCode || w.WorkID)}</td>
+        <td><div class="t">${esc(w.TitleTH || w.TitleEN || '-')}</div><div class="sub">${esc(qfPresentation(w))} · ${esc(qfStatusLabel(qfWorkStatus(w)))}</div></td>
+        <td class="revs">${revHtml}</td>
+      </tr>`;
+    }).join('');
+    return `<section>
+      <div class="cat-head"><span class="cat">${esc(g.cat === '-' ? 'ไม่ระบุสาขา' : g.cat)}</span>
+        <span class="stat">${g.works.length} เรื่อง · มีกรรมการแล้ว <b class="ok">${asg}</b> · ยังไม่ assign <b class="bad">${g.works.length - asg}</b></span></div>
+      <table><thead><tr><th style="width:34px">ลำดับ</th><th style="width:118px">รหัส</th><th>ชื่อผลงาน</th><th style="width:34%">กรรมการรอบตัดสิน</th></tr></thead>
+      <tbody>${rows}</tbody></table></section>`;
+  }).join('');
+
+  const win = window.open('', '_blank');
+  if (!win) return Swal.fire({ icon: 'warning', title: 'เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาตป็อปอัป' });
+  win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  <title>รายงานการมอบหมายกรรมการรอบตัดสิน</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4 portrait; margin: 12mm 12mm; }
+    body { font-family: 'Prompt', sans-serif; font-size: 11.5px; color: #102a43; margin: 0; padding: 20px; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h2 { text-align: center; margin: 0 0 2px; font-size: 18px; color: #0C385B; }
+    h3 { text-align: center; margin: 0 0 14px; font-size: 13px; color: #006D70; font-weight: 600; }
+    .box { border: 1px solid #d9e3e8; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+    .box div { margin: 2px 0; }
+    section { margin-top: 16px; }
+    .cat-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; border-left: 4px solid #b45309; background: #fffbeb; padding: 6px 10px; border-radius: 4px; page-break-after: avoid; }
+    .cat { font-size: 13.5px; font-weight: 700; color: #0C385B; }
+    .stat { font-size: 11px; color: #334155; }
+    .ok { color: #15803d; } .bad { color: #b91c1c; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; text-align: left; }
+    th { background: #e8f4f9; text-align: center; font-weight: 600; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    tr:nth-child(even) { background: #f8fafc; }
+    td.c { text-align: center; } td.code { font-weight: 700; white-space: nowrap; }
+    .t { font-weight: 600; color: #0f172a; } .sub { font-size: 10px; color: #64748b; }
+    .revs div { margin: 1px 0; } .abs { color: #b45309; font-size: 10px; } .none { color: #b91c1c; font-weight: 600; }
+    @media print { button { display: none !important; } body { padding: 0; } }
+  </style></head><body>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+    <button onclick="window.print()" style="padding:6px 16px; background:#006D70; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-family:inherit;">🖨 พิมพ์เอกสาร (Print / Save PDF)</button>
+  </div>
+  <h2>รายงานการมอบหมายกรรมการรอบตัดสิน</h2>
+  <h3>TUH 19 & HA-Regional 1 · ${esc(r2.RoundNameTH || 'รอบตัดสิน')}</h3>
+  <div class="box">
+    <div><b>สาขา:</b> ${esc(snap.catLabel)}</div>
+    <div><b>สถานะผลงาน:</b> ${esc(snap.statusLabels.join(', '))}</div>
+    <div><b>รวม:</b> ${total} เรื่อง · มีกรรมการรอบตัดสินแล้ว <b class="ok">${totalAsg}</b> · ยังไม่ assign <b class="bad">${total - totalAsg}</b></div>
+    <div><b>วันที่พิมพ์รายงาน:</b> ${esc(dateStr)}</div>
+  </div>
+  ${sections}
+  <script>window.onload = () => setTimeout(() => window.print(), 450);<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+function exportFinalAssignmentCsv(groups, reviewersOf, r2) {
+  const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const maxRev = Math.max(3, ...groups.flatMap(g => g.works.map(w => reviewersOf(w).length)));
+  const header = ['ลำดับ', 'สาขา', 'รหัสผลงาน', 'ชื่อผลงาน', 'รูปแบบ', 'สถานะผลงาน', 'จำนวนกรรมการรอบตัดสิน'];
+  for (let i = 1; i <= maxRev; i++) header.push('กรรมการ ' + i);
+  const rows = [header.map(cell).join(',')];
+  let idx = 1;
+  groups.forEach(g => g.works.forEach(w => {
+    const revs = reviewersOf(w);
+    const line = [idx++, g.cat === '-' ? 'ไม่ระบุสาขา' : g.cat, w.WorkCode || w.WorkID, w.TitleTH || w.TitleEN || '', qfPresentation(w), qfStatusLabel(qfWorkStatus(w)), revs.length];
+    for (let i = 0; i < maxRev; i++) line.push(revs[i] ? revs[i].name + (revs[i].abstained ? ' (งดออกเสียง)' : '') : '');
+    rows.push(line.map(cell).join(','));
+  }));
+  const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `รายงานการมอบหมายกรรมการรอบตัดสิน_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('ดาวน์โหลดไฟล์ Excel สำเร็จ');
 }
 
 
