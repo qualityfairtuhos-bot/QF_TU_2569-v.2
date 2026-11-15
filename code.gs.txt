@@ -9145,6 +9145,8 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
 
       return {
         AssignmentID: a.AssignmentID,
+        ReviewRoundID: a.ReviewRoundID || '',
+        RoundNo: isRound2_(a) ? 2 : 1,
         WorkID: a.WorkID,
         WorkCode: a.WorkCode || w.WorkCode || a.WorkID,
         TitleTH: a.TitleTH || w.TitleTH || w.ThaiTitle || w.TitleEN || '',
