@@ -6172,16 +6172,40 @@ function renderReviewersTable(){
 async function printReviewerIndividualReport(reviewerId) {
   show('กำลังจัดเตรียมรายงานการประเมินรายบุคคล...');
   try {
-    const rep = await rpc('adminGetReviewerEvaluationReport', TOKEN, CID, reviewerId);
+    // NOTE: do NOT call adminGetReviewerEvaluationReport here. That API "self-heals" assignment rows
+    // and (before the v2026-11-15.2 fix) copied Round-1 decisions/status into Final-round rows.
+    // Build the report read-only from the works list: each assignment there carries its own
+    // round, status, score and decision.
+    const [workRowsFresh, roundsCfgFresh] = await Promise.all([
+      rpc('adminListWorks', TOKEN, CID, {}),
+      rpc('adminGetReviewConfig', TOKEN, CID).then(d => (d && d.rounds) || []).catch(() => [])
+    ]);
     hide();
-    if (!rep || !rep.reviewer) throw new Error('ไม่พบข้อมูล Reviewer');
-
-    const rev = rep.reviewer || {};
+    window.WORK_ROWS = workRowsFresh || [];
+    const ridKey = String(reviewerId || '').trim().toLowerCase();
+    const revRow = (window.REVIEWER_ROWS || []).find(r => String((r.reviewer || {}).ReviewerID || '').trim().toLowerCase() === ridKey) || {};
+    const rev = revRow.reviewer || { ReviewerID: reviewerId };
     const rn = rev.FullName || [rev.Prefix, rev.FirstName, rev.LastName].filter(Boolean).join(' ') || rev.Email || reviewerId;
     const email = rev.Email || '-';
     const pos = rev.Position || '';
     const inst = rev.Institution || rev.Department || '';
-    const assignments = rep.assignments || [];
+    const assignments = [];
+    (window.WORK_ROWS || []).forEach(w => (w.reviewers || []).forEach(a => {
+      if (String(a.ReviewerID || '').trim().toLowerCase() !== ridKey) return;
+      assignments.push({
+        AssignmentID: a.AssignmentID,
+        ReviewRoundID: a.ReviewRoundID || '',
+        WorkID: w.WorkID,
+        WorkCode: w.WorkCode || w.WorkID,
+        TitleTH: w.TitleTH || w.ThaiTitle || '',
+        TitleEN: w.TitleEN || w.EnglishTitle || '',
+        Status: a.Status || '',
+        TotalScore: (a.TotalScore === null || a.TotalScore === undefined) ? '' : a.TotalScore,
+        Decision: a.Decision || '',
+        RecommendationToAuthor: a.RecommendationToAuthor || '',
+        InternalComment: a.InternalComment || ''
+      });
+    }));
 
     if (!assignments.length) {
       return Swal.fire({
@@ -6194,10 +6218,8 @@ async function printReviewerIndividualReport(reviewerId) {
 
     // --- Split assignments by round (รอบประเมิน / รอบตัดสิน) ---
     // The report API may not return the round, so map AssignmentID -> round from the works list.
-    let roundsCfg = [];
-    try { roundsCfg = ((await rpc('adminGetReviewConfig', TOKEN, CID)) || {}).rounds || []; } catch(e) {}
-    let workRows = window.WORK_ROWS || [];
-    if (!workRows.length) { try { workRows = (await rpc('adminListWorks', TOKEN, CID, {})) || []; } catch(e) {} }
+    const roundsCfg = roundsCfgFresh || [];
+    const workRows = window.WORK_ROWS || [];
     const asgRoundMap = {};
     workRows.forEach(w => (w.reviewers || []).forEach(r => {
       if (r && r.AssignmentID) asgRoundMap[String(r.AssignmentID).trim()] = { rid: r.ReviewRoundID || '', isR2: !!r.isRound2 };
