@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-15.1';
+const APP_VERSION = '2026-11-15.2';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -9094,10 +9094,10 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
           var sEmail = normalizeEmail_(s.ReviewerEmail || s.ReviewerID || '');
           var isMyRev = (sRid && revIds[sRid]) || (sEmail && revEmails[sEmail]);
           if (isMyRev) {
-            if (aRoundClean && s.ReviewRoundID) {
-              return String(s.ReviewRoundID).trim().toLowerCase() === aRoundClean;
-            }
-            return true;
+            // Round-strict: a score row without a round cannot be attributed to a specific
+            // round, so it never matches here (it would leak Round-1 scores into the Final round).
+            var sRound = String(s.ReviewRoundID || '').trim().toLowerCase();
+            return !!aRoundClean && !!sRound && sRound === aRoundClean;
           }
         }
         return false;
@@ -9110,6 +9110,8 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
         if (aWorkClean && smWid && smWid === aWorkClean) {
           var smRid = String(sm.ReviewerID || '').trim().toLowerCase();
           var smEmail = normalizeEmail_(sm.ReviewerEmail || sm.ReviewerID || '');
+          var smRound = String(sm.ReviewRoundID || '').trim().toLowerCase();
+          if (!aRoundClean || !smRound || smRound !== aRoundClean) return false;
           return (smRid && revIds[smRid]) || (smEmail && revEmails[smEmail]);
         }
         return false;
@@ -9135,19 +9137,8 @@ function adminGetReviewerEvaluationReport(token, conferenceId, reviewerId) {
         curStatus = 'COMPLETE';
       }
 
-      if (a.__row && (asg === 0 && fin > 0 || (!a.Decision && dec) || (!a.RecommendationToAuthor && rec))) {
-        try {
-          var patch = { UpdatedAt: new Date() };
-          if (asg === 0 && fin > 0) patch.TotalScore = fin;
-          if (!a.Decision && dec) patch.Decision = dec;
-          if (!a.RecommendationToAuthor && rec) patch.RecommendationToAuthor = rec;
-          if (curStatus === 'COMPLETE' && a.Status !== 'COMPLETE') {
-            patch.Status = 'COMPLETE';
-            if (!a.CompletedAt) patch.CompletedAt = new Date();
-          }
-          updateRecord_('ReviewAssignments', a.__row, patch);
-        } catch(e) {}
-      }
+      // Read-only report: never write back to ReviewAssignments from here.
+      // (The old "self-heal" copied Round-1 status/decision into Final-round rows.)
 
       return {
         AssignmentID: a.AssignmentID,
