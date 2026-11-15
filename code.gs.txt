@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-13.4';
+const APP_VERSION = '2026-11-15.1';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -270,7 +270,7 @@ const STATUS = Object.freeze({
     'REJECTED','WAITING_PRESENTATION_FILE','PRESENTATION_FILE_SUBMITTED',
     'PRESENTATION_FILE_APPROVED','SCHEDULED','PUBLISHED','CANCELLED'
   ]),
-  ASSIGNMENT: Object.freeze(['ASSIGNED','OPENED','DRAFT_SAVED','COMPLETE','DECLINED','LOCKED','CANCELLED'])
+  ASSIGNMENT: Object.freeze(['ASSIGNED','OPENED','DRAFT_SAVED','COMPLETE','DECLINED','LOCKED','CANCELLED','ABSTAINED'])
 });
 
 const FOLDERS = Object.freeze([
@@ -4412,6 +4412,7 @@ function verifyWorkAccess(conferenceId,regId,emailOrPhone){
 
       // Fetch completed or submitted reviews for this work
       const assignments = findMany_('ReviewAssignments', {ConferenceID: cid, WorkID: w.WorkID}).filter(function(a){
+        if (isAbstainedAssignment_(a) || upper_(a.Status) === 'CANCELLED') return false;
         return ['COMPLETE', 'LOCKED'].indexOf(upper_(a.Status)) >= 0 || clean_(a.RecommendationToAuthor);
       });
 
@@ -5717,6 +5718,9 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
       throw new Error('ผู้ดูแลระบบได้สรุปผลและรับคะแนนของผลงานนี้แล้ว แบบประเมินจึงถูกล็อก ไม่สามารถแก้ไขได้');
     }
     
+    if (isAbstainedAssignment_(a)) {
+      throw new Error('ท่านเลือก "งดออกเสียง" ผลงานนี้ไว้ หากต้องการให้คะแนน กรุณากด "ยกเลิกงดออกเสียง" ก่อน');
+    }
     const scores=payload.Scores||[];
     let allCriteria=findMany_('ScoringCriteria',{ConferenceID:cid});
     if(a.ReviewRoundID){
@@ -5877,6 +5881,71 @@ function reviewerSaveReview(token,conferenceId,assignmentId,payload,submit){
       }),
       scores: serialize_(savedScoresList)
     };
+  });
+}
+
+// ---- งดออกเสียง (รอบตัดสินเท่านั้น): กรรมการกดเองและกดคืนได้ ----
+// Status = 'ABSTAINED' → ไม่นับเป็นผู้ประเมิน และไม่นำคะแนนมาเฉลี่ย (มอบหมาย 3 คน งด 1 = เฉลี่ยจาก 2 คน)
+// คะแนนที่เคยบันทึกไว้ในชีต ReviewScores ยังเก็บไว้ ถ้ากดคืนจะกลับมาใช้ได้
+function isAbstainedAssignment_(a) {
+  return upper_(a && a.Status) === 'ABSTAINED';
+}
+function reviewerSetAbstain(token, conferenceId, assignmentId, abstain) {
+  return runSafely_('reviewerSetAbstain', function() {
+    const ctx = requireSession_(token, ['REVIEWER','SUPERADMIN','CONFERENCE_ADMIN','ACADEMIC_STAFF'], conferenceId);
+    const cid = conferenceId || APP.DEFAULT_CONFERENCE_ID;
+    const wantAbstain = bool_(abstain);
+
+    const role = findOne_('UserConferenceRoles', {ConferenceID: cid, UserID: ctx.user.UserID, Role: 'REVIEWER'}) ||
+                 findOne_('UserConferenceRoles', {UserID: ctx.user.UserID, Role: 'REVIEWER'});
+    const perm = jsonParse_(role && role.PermissionsJson, '{}');
+    let rid = perm.ReviewerID;
+    if (!rid) {
+      const rev = findOne_('Reviewers', {ConferenceID: cid, Email: ctx.user.Email}) ||
+                  findOne_('Reviewers', {Email: ctx.user.Email}) ||
+                  findOne_('Reviewers', {UserID: ctx.user.UserID});
+      if (rev) rid = rev.ReviewerID;
+    }
+    const a = findOne_('ReviewAssignments', {ConferenceID: cid, AssignmentID: assignmentId});
+    if (!a || upper_(a.Status) === 'CANCELLED') throw new Error('ไม่พบข้อมูลการมอบหมายผลงานนี้');
+    const userEmail = normalizeEmail_(ctx.user.Email);
+    const isOwner = (rid && String(a.ReviewerID).trim() === String(rid).trim()) ||
+                    (userEmail && normalizeEmail_(a.ReviewerEmail || '') === userEmail);
+    if (!isOwner && upper_(ctx.role) === 'REVIEWER') throw new Error('ท่านไม่มีสิทธิ์ในผลงานนี้');
+
+    const round = findOne_('ReviewRounds', {ConferenceID: cid, ReviewRoundID: a.ReviewRoundID}) ||
+                  findOne_('ReviewRounds', {ReviewRoundID: a.ReviewRoundID});
+    if (!isRound2_(round || a)) throw new Error('งดออกเสียงได้เฉพาะรอบตัดสินเท่านั้น');
+    if (round && isReviewRoundClosed_(round)) throw new Error('รอบตัดสินปิดแล้ว ไม่สามารถเปลี่ยนแปลงได้');
+    if (bool_(a.ScoreAcceptedByAdmin) || bool_(a.AdminLocked)) throw new Error('ผู้ดูแลระบบล็อกคะแนนของผลงานนี้แล้ว');
+
+    let newStatus;
+    if (wantAbstain) {
+      newStatus = 'ABSTAINED';
+    } else if (!isAbstainedAssignment_(a)) {
+      newStatus = upper_(a.Status) || 'OPENED';
+    } else {
+      // กดคืน: ถ้าเคยส่งคะแนนแล้วให้กลับเป็นส่งแล้ว ถ้ามีคะแนนร่างให้เป็นร่าง ไม่งั้นเป็นเปิดอ่านแล้ว
+      const hasScores = findManyFast_('ReviewScores', 'AssignmentID', {ConferenceID: cid, AssignmentID: assignmentId}).length > 0;
+      if (a.CompletedAt && num_(a.TotalScore) > 0) newStatus = 'COMPLETE';
+      else if (hasScores || num_(a.TotalScore) > 0) newStatus = 'DRAFT_SAVED';
+      else newStatus = 'OPENED';
+    }
+    if (newStatus !== upper_(a.Status)) {
+      updateRecord_('ReviewAssignments', a.__row, {Status: newStatus, UpdatedAt: new Date()});
+      logAudit_(cid, ctx.user, ctx.role, wantAbstain ? 'REVIEWER_ABSTAIN' : 'REVIEWER_UNABSTAIN', 'ReviewAssignments', assignmentId, {workId: a.WorkID, status: newStatus});
+    }
+
+    const work = findOne_('Works', {ConferenceID: cid, WorkID: a.WorkID});
+    try { cacheRemoveLarge_('REV_ASG_' + assignmentId); } catch(e) {}
+    try { cacheRemoveLarge_('ADM_WORKS_' + cid); } catch(e) {}
+    [rid, a.ReviewerID, ctx.user.UserID, ctx.user.Email, userEmail, normalizeEmail_(a.ReviewerEmail || '')].forEach(function(k) {
+      if (k) { try { cacheRemoveLarge_('REV_BOOT_' + cid + '_' + k); } catch(e) {} }
+    });
+    if (work && work.RegID) { try { cacheRemoveLarge_('AUTH_WORKS_' + cid + '_' + work.RegID); } catch(e) {} }
+    clearTableCache_('ReviewAssignments');
+    clearRequestCache_();
+    return {status: newStatus, abstained: newStatus === 'ABSTAINED', assignmentId: assignmentId};
   });
 }
 
@@ -7402,7 +7471,7 @@ function exportWorksToExcel(token,conferenceId){
     findMany_('WorkAuthors',{ConferenceID:conferenceId}).forEach(function(a){(authorsByWork[a.WorkID]||(authorsByWork[a.WorkID]=[])).push(a);});
     const assigns=findMany_('ReviewAssignments',{ConferenceID:conferenceId});
     const asc=assigns.reduce(function(a,c){
-      if(upper_(c.Status)!=='CANCELLED'&&upper_(c.Status)!=='DECLINED'){
+      if(upper_(c.Status)!=='CANCELLED'&&upper_(c.Status)!=='DECLINED'&&!isAbstainedAssignment_(c)){
         if(!a[c.WorkID])a[c.WorkID]={a:0,c:0,t:0};
         a[c.WorkID].a++;
         var st1 = upper_(c.Status);
@@ -8300,7 +8369,9 @@ function adminListWorks(token, conferenceId, filters) {
       var asc = assigns.reduce(function(acc, c) {
         if (upper_(c.Status) !== 'CANCELLED' && upper_(c.Status) !== 'DECLINED') {
           (assignsByWork[c.WorkID] || (assignsByWork[c.WorkID] = [])).push(c);
-          if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0, r1A: 0, r1C: 0, r1T: 0, r2A: 0, r2C: 0, r2T: 0 };
+          if (!acc[c.WorkID]) acc[c.WorkID] = { a: 0, c: 0, t: 0, r1A: 0, r1C: 0, r1T: 0, r2A: 0, r2C: 0, r2T: 0, r2Abs: 0 };
+          // งดออกเสียง: แสดงชื่อในรายการ แต่ไม่นับเป็นผู้ประเมินและไม่นำคะแนนมาเฉลี่ย
+          if (isAbstainedAssignment_(c)) { if (isRound2_(c)) acc[c.WorkID].r2Abs++; return acc; }
           var isR2 = isRound2_(c);
           if (isR2) {
             acc[c.WorkID].r2A++;
@@ -8507,11 +8578,12 @@ function adminListWorks(token, conferenceId, filters) {
           AverageScoreR1: ac.r1C ? (ac.r1T / ac.r1C).toFixed(2) : '0',
           ReviewerAssignedCountR2: ac.r2A,
           ReviewerCompletedCountR2: ac.r2C,
+          ReviewerAbstainedCountR2: ac.r2Abs || 0,
           AverageScoreR2: ac.r2C ? (ac.r2T / ac.r2C).toFixed(2) : '0',
           reviewers: (assignsByWork[w.WorkID] || []).map(function(a){
             var stA = upper_(a.Status);
             var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(stA) >= 0;
-            var isNotSubmitted = isDraftA || stA === 'ASSIGNED' || stA === 'OPENED' || !stA;
+            var isNotSubmitted = isDraftA || stA === 'ASSIGNED' || stA === 'OPENED' || stA === 'ABSTAINED' || !stA;
             var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : null;
             // ถ้าเป็นแบบบันทึกร่าง หรือคะแนนเป็น 0 ให้ถือว่ายังไม่มีคะแนน (null)
             var sc = (isNotSubmitted || rawSc === 0 || rawSc === null) ? null : rawSc;
@@ -8822,6 +8894,7 @@ function adminGetWorkScoreSummary(token, conferenceId, workId, roundOption) {
 
     // Self-heal assignments to match reviewer's actual evaluation
     assignments.forEach(function(a) {
+      if (isAbstainedAssignment_(a)) return; // งดออกเสียง: ห้ามเปลี่ยนสถานะเป็น COMPLETE
       var myScores = scores.filter(function(s){ return String(s.AssignmentID) === String(a.AssignmentID); });
       var recalculatedTotal = myScores.length > 0 
         ? Math.round(myScores.reduce(function(sum, s){ return sum + num_(s.Score); }, 0) * 100) / 100
@@ -9616,6 +9689,7 @@ const API_ACTIONS = Object.freeze({
   reviewerBootstrap: reviewerBootstrap,
   reviewerGetAssignment: reviewerGetAssignment,
   reviewerSaveReview: reviewerSaveReview,
+  reviewerSetAbstain: reviewerSetAbstain,
   saveAdminSettings: saveAdminSettings,
   saveRegistrationEdit: saveRegistrationEdit,
   submitRegistration: submitRegistration,
@@ -9635,7 +9709,7 @@ const API_WRITE_ACTIONS = Object.freeze({
   adminImportFromGoogleSheet:1, adminSendIncompleteProfileEmails:1, adminSendBatchImportEmails:1, adminDeleteWorkFile:1,
   commitImportBatch:1, confirmEventScanner:1,
   emailMyMealPass:1, registerNewUser:1,
-  replaceWorkFile:1, reviewerSaveReview:1,
+  replaceWorkFile:1, reviewerSaveReview:1, reviewerSetAbstain:1,
   adminSaveScoringCriterion:1, adminDeleteScoringCriterion:1, adminSaveReviewRound:1, adminSaveRegistrationType:1, adminSetupCategoryScoringCriteria:1,
   adminAcceptWorkScores:1, adminUnlockWorkScores:1,
   saveAdminSettings:1, saveRegistrationEdit:1, submitRegistration:1,
@@ -9652,7 +9726,7 @@ const API_PERMISSION_MAP = Object.freeze({
     'replaceWorkFile','uploadFileChunk','emailMyMealPass','getMealPass','loginUser',
     'requestPasswordReset','registerNewUser','getPublicFinanceDocuments'
   ]),
-  REVIEWER: Object.freeze(['reviewerBootstrap','reviewerGetAssignment','reviewerSaveReview']),
+  REVIEWER: Object.freeze(['reviewerBootstrap','reviewerGetAssignment','reviewerSaveReview','reviewerSetAbstain']),
   SCANNER: Object.freeze([
     'getEventScannerBootstrap','inspectEventScanner','confirmEventScanner',
     'getEventScannerRecent','getEventScannerUserHistory','getEventScannerDailyAll'

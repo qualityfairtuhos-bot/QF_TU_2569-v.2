@@ -298,7 +298,9 @@ function prefetchAssignments(){
   });
 }
 function renderAll() { renderAssignments(); renderDashboard(); renderReportPage(); prefetchAssignments(); }
-function statusBadge(s){const st=String(s||'').toUpperCase();if(st==='COMPLETE'||st==='PASS')return `<span class="badge ok">${esc(s||'-')}</span>`;if(st==='DRAFT_SAVED'||st==='DRAFT'||st==='SAVED')return `<span class="badge warn" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">บันทึกร่าง</span>`;if(st==='ASSIGNED')return `<span class="badge" style="background:#f1f5f9; color:#475569;">รอดำเนินการ</span>`;return `<span class="badge warn">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
+function isAbstained_(x){return String((x&&x.Status)||'').toUpperCase()==='ABSTAINED'}
+function isDoneAsn_(x){const st=String((x&&x.Status)||'').toUpperCase();return st==='COMPLETE'||st==='ABSTAINED'}
+function statusBadge(s){const st=String(s||'').toUpperCase();if(st==='ABSTAINED')return `<span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-weight:700;">🚫 งดออกเสียง</span>`;if(st==='COMPLETE'||st==='PASS')return `<span class="badge ok">${esc(s||'-')}</span>`;if(st==='DRAFT_SAVED'||st==='DRAFT'||st==='SAVED')return `<span class="badge warn" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">บันทึกร่าง</span>`;if(st==='ASSIGNED')return `<span class="badge" style="background:#f1f5f9; color:#475569;">รอดำเนินการ</span>`;return `<span class="badge warn">${esc(s||'-')}</span>`}function formatDate(d){if(!d)return '-';try{const x=new Date(d);return isNaN(x)?String(d):x.toLocaleString('th-TH',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return String(d)}}
 let currentFilter = 'all';
 
 let currentRoundTab = 'all';
@@ -379,7 +381,7 @@ function renderAssignments(){
   if (currentRoundTab === 'round1') a = r1List;
   else if (currentRoundTab === 'round2') a = r2List;
 
-  const complete = a.filter(x => x.Status === 'COMPLETE').length;
+  const complete = a.filter(isDoneAsn_).length;
   const pending = a.length - complete;
   const roundLabel = currentRoundTab === 'round1' ? ' (รอบประเมินผลงาน)' : (currentRoundTab === 'round2' ? ' (รอบตัดสิน)' : '');
   
@@ -445,8 +447,8 @@ function renderAssignmentsGrid(){
     const isR2 = isRound2_(x);
     if(currentRoundTab === 'round1' && isR2) return false;
     if(currentRoundTab === 'round2' && !isR2) return false;
-    if(currentFilter === 'pending' && x.Status === 'COMPLETE') return false;
-    if(currentFilter === 'completed' && x.Status !== 'COMPLETE') return false;
+    if(currentFilter === 'pending' && isDoneAsn_(x)) return false;
+    if(currentFilter === 'completed' && !isDoneAsn_(x)) return false;
     if(search){
       const cat = getAssignmentCategory(x);
       const txt = `${x.WorkCode||''} ${x.TitleTH||''} ${x.TitleEN||''} ${x.AuthorName||''} ${x.PresenterName||''} ${cat} ${x.CategoryName||''}`.toLowerCase();
@@ -475,7 +477,7 @@ function renderAssignmentsGrid(){
   // Render each category group with clear headers
   container.innerHTML = groupOrder.map(cat => {
     const list = groups[cat];
-    const completedCount = list.filter(item => item.Status === 'COMPLETE').length;
+    const completedCount = list.filter(isDoneAsn_).length;
     const pendingCount = list.length - completedCount;
 
     let catIcon = '📂';
@@ -488,7 +490,7 @@ function renderAssignmentsGrid(){
 
     const cardsHtml = list.map(x => {
       const isComplete = x.Status === 'COMPLETE';
-      const scoreVal = (x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '') ? x.TotalScore : '-';
+      const scoreVal = isAbstained_(x) ? '-' : ((x.TotalScore !== null && x.TotalScore !== undefined && x.TotalScore !== '') ? x.TotalScore : '-');
       return `
         <div class="kanban-card ${isComplete ? 'is-complete' : ''}" onclick="openAssignment('${esc(x.AssignmentID)}')">
           <div class="kanban-header">
@@ -776,6 +778,20 @@ function updateLiveReviewScores() {
 function renderReview() {
   nav('assignments');
   const d = CURRENT, w = d.work, a = d.assignment, scoreMap = {};
+  // งดออกเสียง (รอบตัดสินเท่านั้น): กดแล้วปิดแบบให้คะแนน และไม่นับคะแนนของท่านในค่าเฉลี่ย
+  const abstained = isAbstained_(a);
+  const abstainPanelHtml = isRound2_(a) ? (abstained ? `
+      <div style="background:#f1f5f9; border:2px solid #94a3b8; border-radius:14px; padding:16px 18px; margin:0 0 18px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+          <div style="font-weight:800; color:#334155; font-size:1.05rem;">🚫 ท่านเลือก "งดออกเสียง" ผลงานนี้แล้ว</div>
+          <div style="font-size:0.88rem; color:#475569; margin-top:4px;">ระบบปิดการให้คะแนน และจะไม่นำท่านมาคิดคะแนนเฉลี่ยของผลงานนี้</div>
+        </div>
+        <button type="button" class="btn primary" style="padding:10px 18px" onclick="setAbstain(false)">↩️ ยกเลิกงดออกเสียง</button>
+      </div>` : `
+      <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:14px; padding:12px 16px; margin:0 0 18px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="font-size:0.88rem; color:#475569;">หากท่านไม่ประสงค์จะให้คะแนนผลงานนี้ (เช่น มีส่วนได้ส่วนเสีย) กด "งดออกเสียง" ได้ ระบบจะคิดคะแนนเฉลี่ยจากกรรมการท่านอื่น</div>
+        <button type="button" class="btn soft" style="padding:9px 16px; border:1.5px solid #94a3b8; color:#334155; font-weight:700;" onclick="setAbstain(true)">🚫 งดออกเสียง</button>
+      </div>`) : '';
   (d.scores || []).forEach(x => scoreMap[x.CriteriaID] = x);
   
   let prevRoundHtml = '';
@@ -1115,7 +1131,10 @@ function renderReview() {
 
       ${oldEvaluationHtml}
 
+      ${abstainPanelHtml}
+
       <form id="reviewForm" onsubmit="return false;">
+        <fieldset ${abstained ? 'disabled' : ''} style="border:0; padding:0; margin:0; min-width:0;${abstained ? ' opacity:0.45; pointer-events:none;' : ''}">
         <div class="category-section" style="margin:0 0 20px 0;">
           <div class="category-header">
             <h3>📋 รายการประเมินตามเกณฑ์ (${criteriaList.length} หัวข้อ)</h3>
@@ -1153,6 +1172,7 @@ function renderReview() {
           <button type="button" class="btn soft" style="padding:12px 20px" onclick="saveReview(false)">💾 บันทึกร่าง (Draft)</button>
           <button type="button" class="btn primary" style="padding:12px 24px" onclick="saveReview(true)">🚀 ยืนยันส่งผลประเมิน (Submit)</button>
         </div>
+        </fieldset>
       </form>
     </div>
   `;
@@ -1209,7 +1229,41 @@ function autoFillProportionalScores() {
   toast('คำนวณคะแนนตามสัดส่วนเดิม (' + Math.round(ratio * 100) + '%) ให้เรียบร้อยแล้ว สามารถปรับแก้ได้ตามต้องการ');
 }
 
+async function setAbstain(on) {
+  if (!CURRENT || !CURRENT.assignment) return;
+  const a = CURRENT.assignment;
+  const ask = await Swal.fire({
+    icon: on ? 'warning' : 'question',
+    title: on ? 'ยืนยันงดออกเสียง?' : 'ยกเลิกงดออกเสียง?',
+    html: on
+      ? `ผลงาน <b>${esc(a.WorkCode || '')}</b><br>ระบบจะปิดการให้คะแนนของท่าน และคิดคะแนนเฉลี่ยจากกรรมการท่านอื่นเท่านั้น<br><small style="color:#64748b">กดยกเลิกงดออกเสียงภายหลังได้</small>`
+      : `ผลงาน <b>${esc(a.WorkCode || '')}</b><br>ท่านจะกลับมาให้คะแนนผลงานนี้ได้ตามปกติ`,
+    showCancelButton: true,
+    confirmButtonText: on ? '🚫 งดออกเสียง' : '↩️ ยกเลิกงดออกเสียง',
+    cancelButtonText: 'ปิด',
+    confirmButtonColor: on ? '#475569' : '#006D70'
+  });
+  if (!ask.isConfirmed) return;
+  show(on ? 'กำลังบันทึกการงดออกเสียง' : 'กำลังยกเลิกงดออกเสียง');
+  try {
+    const res = await rpc('reviewerSetAbstain', TOKEN, CID, a.AssignmentID, !!on);
+    hide();
+    a.Status = res.status;
+    ASSIGNMENT_CACHE[a.AssignmentID] = CURRENT;
+    const inList = (BOOT && BOOT.assignments || []).find(x => x.AssignmentID === a.AssignmentID);
+    if (inList) inList.Status = res.status;
+    renderReview();
+    renderAssignments(); renderDashboard(); renderReportPage();
+    Swal.fire({ icon: 'success', title: on ? 'บันทึกงดออกเสียงแล้ว' : 'ยกเลิกงดออกเสียงแล้ว', timer: 1800, showConfirmButton: false });
+  } catch (e) {
+    hide();
+    Swal.fire({ icon: 'error', title: 'ทำรายการไม่สำเร็จ', text: e.message });
+  }
+}
 async function saveReview(submit) {
+  if (CURRENT && isAbstained_(CURRENT.assignment)) {
+    return Swal.fire({ icon: 'info', title: 'ท่านงดออกเสียงผลงานนี้อยู่', text: 'หากต้องการให้คะแนน กรุณากด "ยกเลิกงดออกเสียง" ก่อน' });
+  }
   try {
     const f = $('#reviewForm') || document.querySelector('form#reviewForm') || document.forms['reviewForm'];
     if (!f) {
@@ -1368,9 +1422,9 @@ async function saveReview(submit) {
   }
 }
 async function refreshData() { show('กำลังดึงข้อมูล'); try { BOOT = await rpc('reviewerBootstrap', TOKEN, CID); renderAll(); hide(); Swal.fire({icon:'success', title:'รีเฟรชข้อมูลเรียบร้อย', timer:1500, showConfirmButton:false}); } catch(e) { hide(); Swal.fire({icon:'error', title:'ผิดพลาด', text:e.message}); } }
-function renderDashboard() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pass=a.filter(x=>x.Decision==='PASS').length, rev=a.filter(x=>x.Decision==='REVISION'||x.Decision==='REJECT').length, pct=(v)=>tot?Math.round(v*100/tot)+'%':'0%'; $('#dashboard-kpis').innerHTML=`<div class="dash-kpi-card"><div class="dash-kpi-title">ได้รับมอบหมาย</div><div class="dash-kpi-value" style="color:var(--blue)">${tot}</div><div class="dash-kpi-sub">${tot?'100%':'0%'}</div><div class="dash-icon">📋</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ประเมินแล้ว</div><div class="dash-kpi-value" style="color:var(--green)">${com}</div><div class="dash-kpi-sub">${pct(com)}</div><div class="dash-icon">✅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">รอดำเนินการ</div><div class="dash-kpi-value" style="color:#d97706">${pen}</div><div class="dash-kpi-sub">${pct(pen)}</div><div class="dash-icon">⏳</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ผ่าน</div><div class="dash-kpi-value" style="color:var(--green)">${pass}</div><div class="dash-kpi-sub">${pct(pass)}</div><div class="dash-icon">🏅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ให้ปรับปรุง/ปฏิเสธ</div><div class="dash-kpi-value" style="color:var(--red)">${rev}</div><div class="dash-kpi-sub">${pct(rev)}</div><div class="dash-icon">⚠️</div></div>`; }
-function renderReportPage() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pct=tot?Math.round(com*100/tot)+'%':'0%'; const rn=BOOT.reviewer.FullName||BOOT.reviewer.Email; const el=$('#report-reviewer-name'); if(el)el.textContent=rn+' ('+BOOT.reviewer.Email+')'; const rt=$('#rep-tot');if(rt)rt.textContent=tot; const rc=$('#rep-com');if(rc)rc.textContent=com; const rp=$('#rep-pen');if(rp)rp.textContent=pen; const rprog=$('#rep-prog');if(rprog)rprog.textContent=pct; const tbody=$('#reportRows'); if(tbody){tbody.innerHTML=a.length?a.map(x=>`<tr><td style="font-weight:600; white-space:nowrap">${esc(x.WorkCode)}</td><td><div style="font-weight:500">${esc(x.TitleTH||'-')}</div></td><td>${statusBadge(x.Status)}<br>${x.Decision?statusBadge(x.Decision):''}</td><td style="font-weight:600; color:var(--teal)">${esc(x.TotalScore||'-')}</td><td style="font-size:0.8rem">${esc(x.RecommendationToAuthor||'-')}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center">ไม่มีข้อมูล</td></tr>';} }
-function printMyReport() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(x=>x.Status==='COMPLETE').length, pen=tot-com, pct=tot?Math.round(com*100/tot)+'%':'0%'; const rn=BOOT.reviewer.FullName||BOOT.reviewer.Email; const dateStr=new Date().toLocaleString('th-TH'); const rows=a.map((x,i)=>`<tr><td style="white-space:nowrap; font-weight:bold">${esc(x.WorkCode)}</td><td>${esc(x.TitleTH||'-')}</td><td>${esc(x.Status)} ${x.Decision?'/ '+esc(x.Decision):''}</td><td>${esc(x.TotalScore||'-')}</td><td>${esc(x.RecommendationToAuthor||'-')}</td></tr>`).join(''); const win=window.open('','_blank'); win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานการประเมิน_${esc(rn)}</title><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Prompt',sans-serif;font-size:12px;color:#102a43;margin:0;padding:20px;}h2{text-align:center;margin:0 0 5px 0;font-size:18px;}h3{text-align:center;margin:0 0 20px 0;font-size:14px;color:#006d70;font-weight:500;}.box{border:1px solid #d9e3e8;border-radius:8px;padding:15px;margin-bottom:20px;}.box-row{display:flex;gap:20px;margin-bottom:5px;}.val{font-size:16px;font-weight:bold;}.val.green{color:#1b8f5a;}.val.teal{color:#006d70;}table{width:100%;border-collapse:collapse;margin-top:20px;margin-bottom:20px;}th,td{border:1px solid #d9e3e8;padding:8px 10px;text-align:left;vertical-align:top;}th{background:#e8f4f9;font-weight:600;}.sig-section{margin-top:40px;display:flex;justify-content:flex-end;page-break-inside:avoid;}.sig-box{text-align:center;min-width:300px;font-size:12px;line-height:1.8;}@media print{body{-webkit-print-color-adjust:exact;padding:0;}@page{margin:1cm;}}</style></head><body><h2>การประเมินผลงานวิชาการ</h2><h3>TUH 19 & HA-Regional 1</h3><div class="box"><div><b>ผู้ประเมิน:</b> ${esc(rn)}</div><div><b>Email:</b> ${esc(BOOT.reviewer.Email)}</div><div><b>วันที่พิมพ์รายงาน:</b> ${esc(dateStr)}</div></div><div class="box"><div class="box-row"><div>ได้รับมอบหมาย <span class="val teal">${tot}</span> เรื่อง</div><div>ประเมินแล้ว <span class="val green">${com}</span> เรื่อง</div><div>รอดำเนินการ <span class="val">${pen}</span> เรื่อง</div></div><div style="border-top:1px solid #d9e3e8; margin:10px 0;"></div><div>ความก้าวหน้า <span class="val green" style="font-size:18px">${pct}</span></div></div><table><thead><tr><th>รหัส</th><th>ชื่อผลงาน</th><th>สถานะ</th><th>คะแนน</th><th>ข้อเสนอแนะ</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="text-align:center">ไม่มีข้อมูล</td></tr>'}</tbody></table><div class="sig-section"><div class="sig-box"><div>ลงชื่อ....................................................................ผู้ประเมิน</div><div style="font-weight:bold; margin-top:4px;">( ${esc(rn)} )</div><div style="margin-top:4px;">วันที่........../........../..........</div></div></div><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`); win.document.close(); }
+function renderDashboard() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(isDoneAsn_).length, pen=tot-com, pass=a.filter(x=>x.Decision==='PASS').length, rev=a.filter(x=>x.Decision==='REVISION'||x.Decision==='REJECT').length, pct=(v)=>tot?Math.round(v*100/tot)+'%':'0%'; $('#dashboard-kpis').innerHTML=`<div class="dash-kpi-card"><div class="dash-kpi-title">ได้รับมอบหมาย</div><div class="dash-kpi-value" style="color:var(--blue)">${tot}</div><div class="dash-kpi-sub">${tot?'100%':'0%'}</div><div class="dash-icon">📋</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ประเมินแล้ว</div><div class="dash-kpi-value" style="color:var(--green)">${com}</div><div class="dash-kpi-sub">${pct(com)}</div><div class="dash-icon">✅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">รอดำเนินการ</div><div class="dash-kpi-value" style="color:#d97706">${pen}</div><div class="dash-kpi-sub">${pct(pen)}</div><div class="dash-icon">⏳</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ผ่าน</div><div class="dash-kpi-value" style="color:var(--green)">${pass}</div><div class="dash-kpi-sub">${pct(pass)}</div><div class="dash-icon">🏅</div></div><div class="dash-kpi-card"><div class="dash-kpi-title">ให้ปรับปรุง/ปฏิเสธ</div><div class="dash-kpi-value" style="color:var(--red)">${rev}</div><div class="dash-kpi-sub">${pct(rev)}</div><div class="dash-icon">⚠️</div></div>`; }
+function renderReportPage() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(isDoneAsn_).length, pen=tot-com, pct=tot?Math.round(com*100/tot)+'%':'0%'; const rn=BOOT.reviewer.FullName||BOOT.reviewer.Email; const el=$('#report-reviewer-name'); if(el)el.textContent=rn+' ('+BOOT.reviewer.Email+')'; const rt=$('#rep-tot');if(rt)rt.textContent=tot; const rc=$('#rep-com');if(rc)rc.textContent=com; const rp=$('#rep-pen');if(rp)rp.textContent=pen; const rprog=$('#rep-prog');if(rprog)rprog.textContent=pct; const tbody=$('#reportRows'); if(tbody){tbody.innerHTML=a.length?a.map(x=>`<tr><td style="font-weight:600; white-space:nowrap">${esc(x.WorkCode)}</td><td><div style="font-weight:500">${esc(x.TitleTH||'-')}</div></td><td>${statusBadge(x.Status)}<br>${x.Decision?statusBadge(x.Decision):''}</td><td style="font-weight:600; color:var(--teal)">${esc(x.TotalScore||'-')}</td><td style="font-size:0.8rem">${esc(x.RecommendationToAuthor||'-')}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center">ไม่มีข้อมูล</td></tr>';} }
+function printMyReport() { const a=BOOT.assignments||[], tot=a.length, com=a.filter(isDoneAsn_).length, pen=tot-com, pct=tot?Math.round(com*100/tot)+'%':'0%'; const rn=BOOT.reviewer.FullName||BOOT.reviewer.Email; const dateStr=new Date().toLocaleString('th-TH'); const rows=a.map((x,i)=>`<tr><td style="white-space:nowrap; font-weight:bold">${esc(x.WorkCode)}</td><td>${esc(x.TitleTH||'-')}</td><td>${esc(x.Status)} ${x.Decision?'/ '+esc(x.Decision):''}</td><td>${esc(x.TotalScore||'-')}</td><td>${esc(x.RecommendationToAuthor||'-')}</td></tr>`).join(''); const win=window.open('','_blank'); win.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานการประเมิน_${esc(rn)}</title><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Prompt',sans-serif;font-size:12px;color:#102a43;margin:0;padding:20px;}h2{text-align:center;margin:0 0 5px 0;font-size:18px;}h3{text-align:center;margin:0 0 20px 0;font-size:14px;color:#006d70;font-weight:500;}.box{border:1px solid #d9e3e8;border-radius:8px;padding:15px;margin-bottom:20px;}.box-row{display:flex;gap:20px;margin-bottom:5px;}.val{font-size:16px;font-weight:bold;}.val.green{color:#1b8f5a;}.val.teal{color:#006d70;}table{width:100%;border-collapse:collapse;margin-top:20px;margin-bottom:20px;}th,td{border:1px solid #d9e3e8;padding:8px 10px;text-align:left;vertical-align:top;}th{background:#e8f4f9;font-weight:600;}.sig-section{margin-top:40px;display:flex;justify-content:flex-end;page-break-inside:avoid;}.sig-box{text-align:center;min-width:300px;font-size:12px;line-height:1.8;}@media print{body{-webkit-print-color-adjust:exact;padding:0;}@page{margin:1cm;}}</style></head><body><h2>การประเมินผลงานวิชาการ</h2><h3>TUH 19 & HA-Regional 1</h3><div class="box"><div><b>ผู้ประเมิน:</b> ${esc(rn)}</div><div><b>Email:</b> ${esc(BOOT.reviewer.Email)}</div><div><b>วันที่พิมพ์รายงาน:</b> ${esc(dateStr)}</div></div><div class="box"><div class="box-row"><div>ได้รับมอบหมาย <span class="val teal">${tot}</span> เรื่อง</div><div>ประเมินแล้ว <span class="val green">${com}</span> เรื่อง</div><div>รอดำเนินการ <span class="val">${pen}</span> เรื่อง</div></div><div style="border-top:1px solid #d9e3e8; margin:10px 0;"></div><div>ความก้าวหน้า <span class="val green" style="font-size:18px">${pct}</span></div></div><table><thead><tr><th>รหัส</th><th>ชื่อผลงาน</th><th>สถานะ</th><th>คะแนน</th><th>ข้อเสนอแนะ</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="text-align:center">ไม่มีข้อมูล</td></tr>'}</tbody></table><div class="sig-section"><div class="sig-box"><div>ลงชื่อ....................................................................ผู้ประเมิน</div><div style="font-weight:bold; margin-top:4px;">( ${esc(rn)} )</div><div style="margin-top:4px;">วันที่........../........../..........</div></div></div><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`); win.document.close(); }
 function nav(p) { document.querySelectorAll('.page-view').forEach(el=>el.classList.add('hidden')); const tp = document.getElementById('page-'+p); if(tp) tp.classList.remove('hidden'); document.querySelectorAll('.sidebar-menu button').forEach(el=>el.classList.remove('active')); const tn = document.getElementById('nav-'+p); if(tn) tn.classList.add('active'); const titles={dashboard:'Dashboard Reviewer',assignments:'งานที่ต้องประเมิน',report:'พิมพ์รายงานของฉัน'}; document.getElementById('pageTitle').textContent=titles[p]||'Reviewer Portal'; }
 async function refreshPage(){if(CURRENT==='dashboard')await renderAll()}
 async function forgotPassword(){const{value:e}=await Swal.fire({title:'ลืมรหัสผ่าน',input:'email',inputLabel:'กรุณากรอกอีเมลที่ลงทะเบียนไว้',inputPlaceholder:'email@example.com',showCancelButton:true,confirmButtonText:'ส่งรหัสผ่านใหม่',cancelButtonText:'ยกเลิก',confirmButtonColor:'#007D80'});if(e){show('กำลังส่งข้อมูล...');try{await rpc('requestPasswordReset',e,CID);Swal.fire({icon:'success',title:'สำเร็จ',text:'ระบบได้ส่งรหัสผ่านใหม่ไปยังอีเมลของท่านแล้ว'})}catch(err){Swal.fire({icon:'error',title:'ไม่สำเร็จ',text:err.message})}finally{hide()}}}
