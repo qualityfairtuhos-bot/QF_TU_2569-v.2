@@ -4972,10 +4972,14 @@ async function openEmail(to, subj, msg, wid){
     }catch(e){err(e);}
   }
 }
-async function openScoreSummary(wid){
+async function openScoreSummary(wid, roundOpt){
+  // เลือกรอบให้ชัดเจนเสมอ: ถ้าไม่ระบุ และผลงานมีกรรมการรอบตัดสินแล้ว ให้เปิดรอบตัดสินก่อน
+  const rowForRound = (window.WORK_ROWS || []).find(x => x.WorkID === wid) || {};
+  const viewRound = String(roundOpt || (Number(rowForRound.ReviewerAssignedCountR2 || 0) + Number(rowForRound.ReviewerAbstainedCountR2 || 0) > 0 ? '2' : '1'));
+  const isR2View = viewRound === '2';
   show('กำลังโหลดข้อมูลคะแนน');
   try {
-    const res = await rpc('adminGetWorkScoreSummary', TOKEN, CID, wid);
+    const res = await rpc('adminGetWorkScoreSummary', TOKEN, CID, wid, viewRound);
     hide();
     const {work, authors, assignments, scores, criteria} = res;
     
@@ -4990,7 +4994,7 @@ async function openScoreSummary(wid){
       if (['ASSIGNED', 'OPENED', 'CANCELLED', 'DECLINED', 'ABSTAINED'].includes(st) || !st) return false;
       const isConfirmedSubmitted = ['COMPLETE', 'PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].includes(st);
       if (isConfirmedSubmitted) return true;
-      if (isDraft && (a.CompletedAt || (a.Decision && ['PASS', 'REVISION', 'REJECT'].includes(String(a.Decision).toUpperCase())))) {
+      if (isDraft && a.CompletedAt) {
         return true;
       }
       return false;
@@ -5002,20 +5006,31 @@ async function openScoreSummary(wid){
     // Immediately keep local work row in sync so the Works table displays accurate count (e.g. 2/3)
     const rowItem = (window.WORK_ROWS || []).find(x => x.WorkID === wid);
     if (rowItem) {
-      rowItem.ReviewerCompletedCount = completed.length;
-      rowItem.ReviewerAssignedCount = totalAssigned;
-      if (completed.length > 0) {
-        const totalSum = completed.reduce((sum, a) => sum + (Number(a.TotalScore) || 0), 0);
-        rowItem.AverageScore = (totalSum / completed.length).toFixed(2);
+      const avgStr = completed.length > 0
+        ? (completed.reduce((sum, a) => sum + (Number(a.TotalScore) || 0), 0) / completed.length).toFixed(2)
+        : '0';
+      if (isR2View) {
+        rowItem.ReviewerCompletedCountR2 = completed.length;
+        rowItem.ReviewerAssignedCountR2 = totalAssigned;
+        rowItem.ReviewerAbstainedCountR2 = abstainedCount;
+        rowItem.AverageScoreR2 = avgStr;
       } else {
-        rowItem.AverageScore = '0';
+        rowItem.ReviewerCompletedCount = completed.length;
+        rowItem.ReviewerAssignedCount = totalAssigned;
+        rowItem.AverageScore = avgStr;
       }
       renderWorksTable();
     }
+    const roundTabBtn = (val, label) => `<button type="button" onclick="openScoreSummary('${esc(wid)}','${val}')" style="padding:7px 14px; border-radius:999px; font-weight:700; font-size:0.85rem; cursor:pointer; border:1.5px solid #006D70; ${viewRound === val ? 'background:#006D70; color:#fff;' : 'background:#fff; color:#006D70;'}">${label}</button>`;
     
     const authorNames = (authors || []).map(x => esc(x.FullName || [x.Prefix, x.FirstName, x.LastName].filter(Boolean).join(' ') || x.FirstName)).filter(Boolean).join(', ') || esc(getWorkPresenterDisplay(work).name);
     
     let html = `<div style="text-align:left; font-size:0.9rem;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+        ${roundTabBtn('1', '📋 รอบประเมินผลงาน')}
+        ${roundTabBtn('2', '🏆 รอบตัดสิน')}
+        <span style="font-size:0.82rem; color:#64748b;">กำลังแสดง: <b style="color:#0C385B;">${isR2View ? 'รอบตัดสิน' : 'รอบประเมินผลงาน'}</b></span>
+      </div>
       <div style="margin-bottom:15px; background:#f8fafc; padding:12px 14px; border-radius:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
         <div style="flex:1; min-width:260px;">
           <div style="font-size:1.05rem; font-weight:700; color:#006D70;">${esc(work.WorkCode || work.WorkID)}: ${esc(work.TitleTH || work.TitleEN || '')}</div>
@@ -5024,7 +5039,7 @@ async function openScoreSummary(wid){
             <i class="fa-solid fa-users-viewfinder"></i> กรรมการประเมิน: ให้คะแนนแล้ว ${completed.length}/${totalAssigned} ท่าน${abstainedCount ? ` <span style="color:#64748b;">(งดออกเสียง ${abstainedCount} ท่าน)</span>` : ''}
           </div>
         </div>
-        <button type="button" class="btn primary" onclick="printCombinedWorkScoreSummary('${esc(wid)}')" style="display:inline-flex; align-items:center; gap:6px; font-size:0.82rem; padding:8px 14px; background:#006D70; color:#fff; border-radius:8px; border:none; cursor:pointer; font-weight:600; box-shadow:0 2px 6px rgba(0,109,112,0.25);">
+        <button type="button" class="btn primary" onclick="printCombinedWorkScoreSummary('${esc(wid)}','${viewRound}')" style="display:inline-flex; align-items:center; gap:6px; font-size:0.82rem; padding:8px 14px; background:#006D70; color:#fff; border-radius:8px; border:none; cursor:pointer; font-weight:600; box-shadow:0 2px 6px rgba(0,109,112,0.25);">
           <i class="fa-solid fa-print"></i> พิมพ์ใบรายงานคะแนนรวม
         </button>
       </div>`;
@@ -5138,6 +5153,7 @@ async function openScoreSummary(wid){
     const isRound1 = (a) => (a.ReviewRoundID === 'RR-2026-000001') || (Number(a.RoundNo) === 1) || (!a.ReviewRoundID && !a.RoundNo) || !String(a.ReviewRoundID || '').includes('000002');
     const round1Assignments = (assignments || []).filter(isRound1);
     const round1Locked = (res.isRound1Locked) || (round1Assignments.length > 0 && round1Assignments.some(a => a.Locked || a.ScoreAcceptedByAdmin || a.AdminLocked));
+    if (!isR2View) {
     html += `
       <div style="margin-top:20px; padding:12px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
@@ -5164,6 +5180,20 @@ async function openScoreSummary(wid){
         </div>
       </div>
     `;
+    } else {
+    html += `
+      <div style="margin-top:20px; padding:12px 16px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-weight:600; font-size:0.9rem; color:#1e293b;">รอบตัดสิน: กรรมการแก้ไขคะแนนของตนเองได้จนกว่าจะปิดรอบ</div>
+          <div style="font-size:0.8rem; color:#64748b; margin-top:3px;">เมื่อตัดสินครบทุกเรื่องแล้ว ให้ปิดรอบตัดสินเพื่อล็อกคะแนนทั้งหมด</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn primary" style="font-size:0.85rem; background:#006D70; display:inline-flex; align-items:center; gap:6px;" onclick="printCombinedWorkScoreSummary('${esc(wid)}','2')"><i class="fa-solid fa-print"></i> พิมพ์ใบรายงานคะแนนรอบตัดสิน</button>
+          <button type="button" class="btn primary" style="font-size:0.85rem;" onclick="Swal.close(); openUpdateWorkStatus('${esc(wid)}', '${esc(work.Status)}')">📝 ตัดสินผลงาน</button>
+        </div>
+      </div>
+    `;
+    }
     
     html += `</div>`;
     
@@ -5541,7 +5571,7 @@ async function adminLockScoresAction(wid) {
     await rpc('adminAcceptWorkScores', TOKEN, CID, wid, true);
     hide();
     toast('รับคะแนนและล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว');
-    openScoreSummary(wid);
+    openScoreSummary(wid, '1');
   } catch (e) {
     err(e);
   }
@@ -5563,7 +5593,7 @@ async function adminUnlockScoresAction(wid) {
     await rpc('adminUnlockWorkScores', TOKEN, CID, wid);
     hide();
     toast('ปลดล็อกแบบประเมินรอบที่ 1 เรียบร้อยแล้ว');
-    openScoreSummary(wid);
+    openScoreSummary(wid, '1');
   } catch (e) {
     err(e);
   }

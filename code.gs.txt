@@ -215,7 +215,7 @@ function syncOfficialCriteria_(cid) {
  * Google Apps Script + Google Sheets + Google Drive
  */
 // เครื่องหมายเวอร์ชันโค้ด: บันทึกลงคอลัมน์ ClientInfo ของชีต SystemLogs เพื่อดูว่า Apps Script ตัวไหนทำงานอยู่
-const APP_VERSION = '2026-11-15.2';
+const APP_VERSION = '2026-11-16.1';
 const APP = Object.freeze({
   NAME_TH: 'ระบบบริหารจัดการงานมหกรรมคุณภาพโรงพยาบาลธรรมศาสตร์',
   NAME_EN: 'TUH Quality Fair Conference Management',
@@ -5051,8 +5051,8 @@ function reviewerBootstrapInternal_(user, userRole, cid) {
     }
     var st = upper_(a.Status);
     var rawSc = (a.TotalScore !== '' && a.TotalScore !== null && a.TotalScore !== undefined && !isNaN(Number(a.TotalScore))) ? Number(a.TotalScore) : 0;
-    var hasValidDecision = a.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(a.Decision)) >= 0;
-    if (rawSc > 0 && (a.CompletedAt || hasValidDecision)) {
+    // นับว่าส่งแล้วเฉพาะเมื่อเคยกด "ยืนยันส่ง" (มี CompletedAt) — ร่างที่เลือก Decision ไว้แล้วยังเป็นร่าง
+    if (rawSc > 0 && a.CompletedAt) {
       if (['DRAFT_SAVED', 'DRAFT', 'SAVED', 'ASSIGNED', 'OPENED'].indexOf(st) >= 0 || !st) {
         a.Status = 'COMPLETE';
         if (!a.CompletedAt) a.CompletedAt = new Date();
@@ -8359,9 +8359,9 @@ function adminListWorks(token, conferenceId, filters) {
       var assigns = findMany_('ReviewAssignments', { ConferenceID: cid });
       assigns.forEach(function(c) {
         var rawSc = (c.TotalScore !== '' && c.TotalScore !== null && c.TotalScore !== undefined && !isNaN(Number(c.TotalScore))) ? Number(c.TotalScore) : 0;
-        var hasValidDecision = c.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(c.Decision)) >= 0;
         var st = upper_(c.Status);
-        if (rawSc > 0 && (c.CompletedAt || hasValidDecision)) {
+        // นับว่าส่งแล้วเฉพาะเมื่อเคยกด "ยืนยันส่ง" (มี CompletedAt) — ร่างที่เลือก Decision ไว้แล้วยังเป็นร่าง
+        if (rawSc > 0 && c.CompletedAt) {
           if (['DRAFT_SAVED', 'DRAFT', 'SAVED', 'ASSIGNED', 'OPENED'].indexOf(st) >= 0 || !st) {
             c.Status = 'COMPLETE';
             if (!c.CompletedAt) c.CompletedAt = new Date();
@@ -8914,8 +8914,8 @@ function adminGetWorkScoreSummary(token, conferenceId, workId, roundOption) {
         }
         var st = upper_(a.Status);
         var isDraftA = ['DRAFT_SAVED', 'DRAFT', 'SAVED'].indexOf(st) >= 0;
-        var hasValidDecision = a.Decision && ['PASS', 'REVISION', 'REJECT'].indexOf(upper_(a.Decision)) >= 0;
-        if (!isDraftA || a.CompletedAt || hasValidDecision) {
+        // ร่างที่เลือก Decision ไว้แต่ยังไม่กดยืนยันส่ง ต้องคงเป็นร่าง (ไม่นำไปเฉลี่ย)
+        if (!isDraftA || a.CompletedAt) {
           if (st !== 'COMPLETE' && ['PASS', 'REVISION', 'REJECT', 'LOCKED', 'SUBMITTED', 'SCORED', 'DONE', 'EVALUATED'].indexOf(st) < 0) {
             a.Status = 'COMPLETE';
             patch.Status = 'COMPLETE';
