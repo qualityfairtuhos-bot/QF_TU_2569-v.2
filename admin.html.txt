@@ -7404,9 +7404,14 @@ window.addEventListener('load',async()=>{loadRememberedLogin();try{$('#loginPass
 
 // ==================== ใบรายงานรวมทุกผลงานวิจัย / ผลงานวิชาการ ====================
 
-function prepareEnrichedWorksForReport(worksList) {
+// round: '1' = รอบประเมินผลงาน, '2' = รอบตัดสิน (แยกกรรมการ/คะแนนตามรอบ ไม่ปนกัน)
+function prepareEnrichedWorksForReport(worksList, round) {
+  const isR2 = String(round || '1') === '2';
   return (worksList || []).map(w => {
-    const revs = (w.reviewers || []).slice();
+    const roundRevs = (w.reviewers || []).filter(r => r && (!!r.isRound2 === isR2) && !['CANCELLED', 'DECLINED'].includes(String(r.Status || '').toUpperCase()));
+    // งดออกเสียง: ไม่นับเป็นกรรมการและไม่นำคะแนนมาเฉลี่ย
+    const abstainedCount = roundRevs.filter(r => String(r.Status || '').toUpperCase() === 'ABSTAINED').length;
+    const revs = roundRevs.filter(r => String(r.Status || '').toUpperCase() !== 'ABSTAINED');
     const validScores = [];
     const revSlots = [null, null, null];
 
@@ -7429,7 +7434,7 @@ function prepareEnrichedWorksForReport(worksList) {
       } else {
         meanSdText = `${mean.toFixed(2)}`;
       }
-    } else if (w.AverageScore && Number(w.AverageScore) > 0) {
+    } else if (!isR2 && w.AverageScore && Number(w.AverageScore) > 0) {
       mean = Number(w.AverageScore);
       meanSdText = `${mean.toFixed(2)}`;
     }
@@ -7438,16 +7443,36 @@ function prepareEnrichedWorksForReport(worksList) {
     let resultText = 'รอผลประเมิน';
     let resultColor = '#64748b';
     let resultBg = '#f1f5f9';
+    let resultKey = 'WAIT';
 
-    if (['PASS', 'PASSED', 'ACCEPTED', 'APPROVED'].includes(st)) {
+    if (isR2) {
+      // รอบตัดสิน: สรุปจากคะแนนรอบตัดสินเท่านั้น (สถานะผลงานเป็นผลของรอบประเมิน)
+      const assignedR2 = revs.length;
+      if (validScores.length === 0) {
+        resultText = 'รอผลประเมิน';
+      } else if (validScores.length < assignedR2) {
+        resultText = `ประเมินแล้ว ${validScores.length}/${assignedR2}`;
+        resultColor = '#0369a1';
+        resultBg = '#e0f2fe';
+        resultKey = 'PARTIAL';
+      } else {
+        resultText = `ประเมินครบ ${validScores.length}/${assignedR2}`;
+        resultColor = '#15803d';
+        resultBg = '#dcfce7';
+        resultKey = 'DONE';
+      }
+    } else if (['PASS', 'PASSED', 'ACCEPTED', 'APPROVED'].includes(st)) {
+      resultKey = 'PASS';
       resultText = 'ผ่าน';
       resultColor = '#15803d';
       resultBg = '#dcfce7';
     } else if (['REJECT', 'REJECTED'].includes(st)) {
+      resultKey = 'REJECT';
       resultText = 'ไม่ผ่าน';
       resultColor = '#b91c1c';
       resultBg = '#fee2e2';
     } else if (['REVISION', 'REVISE'].includes(st)) {
+      resultKey = 'REVISION';
       resultText = 'แก้ไข';
       resultColor = '#b45309';
       resultBg = '#fef3c7';
@@ -7455,15 +7480,18 @@ function prepareEnrichedWorksForReport(worksList) {
       const assignedCount = Number(w.ReviewerAssignedCount) || 3;
       if (validScores.length >= assignedCount || validScores.length >= 2) {
         if (mean >= 60) {
+          resultKey = 'PASS';
           resultText = 'ผ่าน (รอยืนยัน)';
           resultColor = '#15803d';
           resultBg = '#dcfce7';
         } else {
+          resultKey = 'REJECT';
           resultText = 'ไม่ผ่าน (รอยืนยัน)';
           resultColor = '#b91c1c';
           resultBg = '#fee2e2';
         }
       } else {
+        resultKey = 'PARTIAL';
         resultText = `ประเมินแล้ว ${validScores.length}/${assignedCount}`;
         resultColor = '#0369a1';
         resultBg = '#e0f2fe';
@@ -7475,6 +7503,7 @@ function prepareEnrichedWorksForReport(worksList) {
 
     const remarksList = [];
     if (w.PresentationTypeName) remarksList.push(w.PresentationTypeName);
+    if (abstainedCount) remarksList.push('งดออกเสียง ' + abstainedCount + ' ท่าน');
     revs.forEach(r => {
       if (r && (r.RecommendationToAuthor || r.InternalComment)) {
         const c = String(r.RecommendationToAuthor || r.InternalComment).trim();
@@ -7504,6 +7533,8 @@ function prepareEnrichedWorksForReport(worksList) {
       resultText: resultText,
       resultColor: resultColor,
       resultBg: resultBg,
+      resultKey: resultKey,
+      inRound: roundRevs.length > 0,
       remarks: remarksList.join('; ')
     };
   });
@@ -7533,7 +7564,36 @@ function groupAndSortWorks(enrichedWorks) {
   return { catNames, groups };
 }
 
-window._REPORT_ACTIVE_FILTER = { cat: '', status: '', q: '' };
+window._REPORT_ACTIVE_FILTER = { round: '1', cat: '', status: '', q: '' };
+
+function reportRoundLabel_(round) {
+  return String(round || '1') === '2' ? 'รอบตัดสิน' : 'รอบประเมินผลงาน';
+}
+function isReportPassKey_(w) { return w.resultKey === 'PASS'; }
+function isReportWaitKey_(w) { return w.resultKey === 'WAIT' || w.resultKey === 'PARTIAL'; }
+function filterReportWorks_(list, filter) {
+  return (list || []).filter(w => {
+    if (filter.cat && w.categoryName !== filter.cat) return false;
+    if (filter.status === 'PASS' && !isReportPassKey_(w)) return false;
+    if (filter.status === 'REVISION' && w.resultKey !== 'REVISION') return false;
+    if (filter.status === 'REJECT' && w.resultKey !== 'REJECT') return false;
+    if (filter.status === 'WAIT' && !isReportWaitKey_(w)) return false;
+    if (filter.status === 'DONE' && w.resultKey !== 'DONE') return false;
+    if (filter.q) {
+      const q = filter.q.toLowerCase();
+      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+}
+// สร้างข้อมูลรายงานตามรอบ: รอบตัดสินแสดงเฉพาะผลงานที่มีกรรมการรอบตัดสิน
+function buildReportDataForRound_(allWorks, round) {
+  let enrichedWorks = prepareEnrichedWorksForReport(allWorks, round);
+  if (String(round) === '2') enrichedWorks = enrichedWorks.filter(w => w.inRound);
+  const { catNames, groups } = groupAndSortWorks(enrichedWorks);
+  return { allWorks, round: String(round || '1'), enrichedWorks, catNames, groups };
+}
 
 async function openAllWorksEvaluationReport() {
   if (!window.WORK_ROWS || !window.WORK_ROWS.length) {
@@ -7546,11 +7606,8 @@ async function openAllWorksEvaluationReport() {
     return Swal.fire({ icon: 'info', title: 'ไม่พบข้อมูลผลงาน', text: 'ยังไม่มีผลงานในระบบ' });
   }
 
-  const enrichedWorks = prepareEnrichedWorksForReport(allWorks);
-  const { catNames, groups } = groupAndSortWorks(enrichedWorks);
-
-  window._CURRENT_REPORT_DATA = { allWorks, enrichedWorks, catNames, groups };
-  window._REPORT_ACTIVE_FILTER = { cat: '', status: '', q: '' };
+  window._REPORT_ACTIVE_FILTER = { round: '1', cat: '', status: '', q: '' };
+  window._CURRENT_REPORT_DATA = buildReportDataForRound_(allWorks, '1');
 
   renderAllWorksReportModalView();
 }
@@ -7561,41 +7618,37 @@ function renderAllWorksReportModalView() {
   const { enrichedWorks, catNames, groups } = data;
   const filter = window._REPORT_ACTIVE_FILTER;
 
-  let filteredList = enrichedWorks.filter(w => {
-    if (filter.cat && w.categoryName !== filter.cat) return false;
-    if (filter.status === 'PASS' && !w.resultText.includes('ผ่าน')) return false;
-    if (filter.status === 'REVISION' && !w.resultText.includes('แก้ไข')) return false;
-    if (filter.status === 'REJECT' && !w.resultText.includes('ไม่ผ่าน')) return false;
-    if (filter.status === 'WAIT' && !w.resultText.includes('รอ')) return false;
-    if (filter.q) {
-      const q = filter.q.toLowerCase();
-      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
-      if (!txt.includes(q)) return false;
-    }
-    return true;
-  });
+  let filteredList = filterReportWorks_(enrichedWorks, filter);
 
   const { catNames: filteredCatNames, groups: filteredGroups } = groupAndSortWorks(filteredList);
 
   const totalWorks = filteredList.length;
-  const passedWorks = filteredList.filter(w => w.resultText.includes('ผ่าน')).length;
-  const waitingWorks = filteredList.filter(w => w.resultText.includes('รอ')).length;
+  const isR2Report = data.round === '2';
+  const passedWorks = filteredList.filter(w => isR2Report ? w.resultKey === 'DONE' : isReportPassKey_(w)).length;
+  const waitingWorks = filteredList.filter(isReportWaitKey_).length;
 
   const html = `
     <div style="text-align:left; font-size:0.88rem; max-height:75vh; display:flex; flex-direction:column;">
       <!-- Toolbar & Actions -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <select id="reportRoundFilter" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; border-radius:6px; border:2px solid #006D70; font-weight:700; color:#006D70;" onchange="onReportFilterChange()">
+            <option value="1" ${filter.round !== '2' ? 'selected' : ''}>📋 รอบประเมินผลงาน</option>
+            <option value="2" ${filter.round === '2' ? 'selected' : ''}>🏆 รอบตัดสิน</option>
+          </select>
           <select id="reportCatFilter" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; border-radius:6px; border:1px solid #cbd5e1;" onchange="onReportFilterChange()">
-            <option value="">-- ทุกประเภทผลงาน (${totalWorks} เรื่อง) --</option>
+            <option value="">-- ทุกประเภทผลงาน (${enrichedWorks.length} เรื่อง) --</option>
             ${catNames.map(c => `<option value="${esc(c)}" ${filter.cat === c ? 'selected' : ''}>${esc(c)} (${(groups[c]||[]).length} เรื่อง)</option>`).join('')}
           </select>
           <select id="reportStatusFilter" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; border-radius:6px; border:1px solid #cbd5e1;" onchange="onReportFilterChange()">
             <option value="">-- ทุกผลการตัดสิน --</option>
+            ${filter.round === '2' ? `
+            <option value="DONE" ${filter.status === 'DONE' ? 'selected' : ''}>เฉพาะ: ประเมินครบแล้ว</option>
+            <option value="WAIT" ${filter.status === 'WAIT' ? 'selected' : ''}>เฉพาะ: ยังประเมินไม่ครบ</option>` : `
             <option value="PASS" ${filter.status === 'PASS' ? 'selected' : ''}>เฉพาะ: ผ่าน</option>
             <option value="REVISION" ${filter.status === 'REVISION' ? 'selected' : ''}>เฉพาะ: แก้ไข</option>
             <option value="REJECT" ${filter.status === 'REJECT' ? 'selected' : ''}>เฉพาะ: ไม่ผ่าน</option>
-            <option value="WAIT" ${filter.status === 'WAIT' ? 'selected' : ''}>เฉพาะ: รอผลประเมิน</option>
+            <option value="WAIT" ${filter.status === 'WAIT' ? 'selected' : ''}>เฉพาะ: รอผลประเมิน</option>`}
           </select>
           <input type="text" id="reportSearchQ" placeholder="ค้นหา รหัส / ชื่อเรื่อง / ผู้แต่ง" value="${esc(filter.q)}" class="field" style="margin:0; padding:6px 10px; font-size:0.84rem; width:180px; border-radius:6px; border:1px solid #cbd5e1;" oninput="onReportFilterChange()">
         </div>
@@ -7612,7 +7665,7 @@ function renderAllWorksReportModalView() {
       <!-- Quick Summary Stats -->
       <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; font-size:0.82rem;">
         <span style="background:#f1f5f9; padding:4px 10px; border-radius:6px; color:#334155;"><b>จำนวนผลงานทั้งหมด:</b> ${totalWorks} เรื่อง</span>
-        <span style="background:#dcfce7; padding:4px 10px; border-radius:6px; color:#166534;"><b>ผ่านเกณฑ์:</b> ${passedWorks} เรื่อง</span>
+        <span style="background:#dcfce7; padding:4px 10px; border-radius:6px; color:#166534;"><b>${isR2Report ? 'ประเมินครบแล้ว' : 'ผ่านเกณฑ์'}:</b> ${passedWorks} เรื่อง</span>
         <span style="background:#e0f2fe; padding:4px 10px; border-radius:6px; color:#0369a1;"><b>อยู่ระหว่างประเมิน/รอสรุป:</b> ${waitingWorks} เรื่อง</span>
         <span class="muted" style="margin-left:auto; align-self:center;">จัดกลุ่มตามประเภทผลงาน & เรียงตามรหัสผลงาน</span>
       </div>
@@ -7687,7 +7740,7 @@ function renderAllWorksReportModalView() {
 
   Swal.fire({
     title: `<div style="display:flex; justify-content:space-between; align-items:center; width:100%; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
-      <span style="font-size:1.18rem; color:#0C385B; font-weight:700;"><i class="fa-solid fa-file-invoice" style="color:#006D70;"></i> ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน</span>
+      <span style="font-size:1.18rem; color:#0C385B; font-weight:700;"><i class="fa-solid fa-file-invoice" style="color:#006D70;"></i> ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน <span style="color:#006D70;">(${esc(reportRoundLabel_(data.round))})</span></span>
     </div>`,
     html: html,
     width: '95vw',
@@ -7701,8 +7754,18 @@ function onReportFilterChange() {
   const cat = ($('#reportCatFilter') && $('#reportCatFilter').value) || '';
   const status = ($('#reportStatusFilter') && $('#reportStatusFilter').value) || '';
   const q = ($('#reportSearchQ') && $('#reportSearchQ').value) || '';
-  window._REPORT_ACTIVE_FILTER = { cat, status, q };
+  const round = ($('#reportRoundFilter') && $('#reportRoundFilter').value) || '1';
+  const prev = window._REPORT_ACTIVE_FILTER || {};
+  const data = window._CURRENT_REPORT_DATA;
+  if (data && String(prev.round || '1') !== round) {
+    // เปลี่ยนรอบ: คำนวณกรรมการ/คะแนนใหม่ตามรอบ และล้างตัวกรองผลการตัดสิน (ตัวเลือกต่างกันระหว่างรอบ)
+    window._CURRENT_REPORT_DATA = buildReportDataForRound_(data.allWorks, round);
+    window._REPORT_ACTIVE_FILTER = { round, cat: window._CURRENT_REPORT_DATA.catNames.includes(cat) ? cat : '', status: '', q };
+  } else {
+    window._REPORT_ACTIVE_FILTER = { round, cat, status, q };
+  }
   renderAllWorksReportModalView();
+  setTimeout(() => { const el = $('#reportSearchQ'); if (el && q && document.activeElement !== el && prev.q !== q) { el.focus(); el.setSelectionRange(q.length, q.length); } }, 0);
 }
 
 function printAllWorksReport() {
@@ -7711,24 +7774,14 @@ function printAllWorksReport() {
   const filter = window._REPORT_ACTIVE_FILTER;
   const { enrichedWorks } = data;
 
-  const filteredList = enrichedWorks.filter(w => {
-    if (filter.cat && w.categoryName !== filter.cat) return false;
-    if (filter.status === 'PASS' && !w.resultText.includes('ผ่าน')) return false;
-    if (filter.status === 'REVISION' && !w.resultText.includes('แก้ไข')) return false;
-    if (filter.status === 'REJECT' && !w.resultText.includes('ไม่ผ่าน')) return false;
-    if (filter.status === 'WAIT' && !w.resultText.includes('รอ')) return false;
-    if (filter.q) {
-      const q = filter.q.toLowerCase();
-      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
-      if (!txt.includes(q)) return false;
-    }
-    return true;
-  });
+  const filteredList = filterReportWorks_(enrichedWorks, filter);
 
   const { catNames, groups } = groupAndSortWorks(filteredList);
 
   const totalWorks = filteredList.length;
-  const passedWorks = filteredList.filter(w => w.resultText.includes('ผ่าน')).length;
+  const isR2Report = data.round === '2';
+  const roundLabel = reportRoundLabel_(data.round);
+  const passedWorks = filteredList.filter(w => isR2Report ? w.resultKey === 'DONE' : isReportPassKey_(w)).length;
 
   const win = window.open('', '_blank');
   if (!win) return Swal.fire({ icon: 'warning', title: 'เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาตป็อปอัป' });
@@ -7737,7 +7790,7 @@ function printAllWorksReport() {
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <title>ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน</title>
+  <title>ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน (${roundLabel})</title>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     @page { size: A4 landscape; margin: 8mm 10mm; }
@@ -7784,7 +7837,7 @@ function printAllWorksReport() {
         <img src="/images/hacc-logo.png" alt="Logo" onerror="this.src='/images/tuh-logo.png'">
       </td>
       <td class="header-center">
-        <h1>ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน</h1>
+        <h1>ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน (${roundLabel})</h1>
         <h2>งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569</h2>
         <p>วันที่ 18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 ณ อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต</p>
       </td>
@@ -7797,7 +7850,7 @@ function printAllWorksReport() {
   </table>
 
   <div class="stats-bar">
-    <span><b>สรุปภาพรวม:</b> ผลงานทั้งหมด ${totalWorks} เรื่อง | ผ่านเกณฑ์ ${passedWorks} เรื่อง</span>
+    <span><b>สรุปภาพรวม:</b> ผลงานทั้งหมด ${totalWorks} เรื่อง | ${isR2Report ? 'ประเมินครบแล้ว' : 'ผ่านเกณฑ์'} ${passedWorks} เรื่อง</span>
     <span><b>การจัดเรียง:</b> จัดกลุ่มตามประเภทผลงาน & เรียงตามเลขรหัสผลงาน</span>
   </div>
 
@@ -7879,26 +7932,14 @@ function exportAllWorksReportToExcel() {
   const filter = window._REPORT_ACTIVE_FILTER;
   const { enrichedWorks } = data;
 
-  const filteredList = enrichedWorks.filter(w => {
-    if (filter.cat && w.categoryName !== filter.cat) return false;
-    if (filter.status === 'PASS' && !w.resultText.includes('ผ่าน')) return false;
-    if (filter.status === 'REVISION' && !w.resultText.includes('แก้ไข')) return false;
-    if (filter.status === 'REJECT' && !w.resultText.includes('ไม่ผ่าน')) return false;
-    if (filter.status === 'WAIT' && !w.resultText.includes('รอ')) return false;
-    if (filter.q) {
-      const q = filter.q.toLowerCase();
-      const txt = (w.workCode + ' ' + w.titleTH + ' ' + w.titleEN + ' ' + w.authors + ' ' + w.presenter).toLowerCase();
-      if (!txt.includes(q)) return false;
-    }
-    return true;
-  });
+  const filteredList = filterReportWorks_(enrichedWorks, filter);
 
   const { catNames, groups } = groupAndSortWorks(filteredList);
 
   const cleanCsv = (v) => '"' + String(v ?? '').replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"';
 
   const rows = [];
-  rows.push([cleanCsv('ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน')]);
+  rows.push([cleanCsv('ใบรายงานสรุปผลการประเมินผลงานวิชาการทุกผลงาน (' + reportRoundLabel_(data.round) + ')')]);
   rows.push([cleanCsv('งานมหกรรมคุณภาพโรงพยาบาล ครั้งที่ 19 และงาน HA-Regional Forum ครั้งที่ 1 ประจำปี 2569')]);
   rows.push([cleanCsv('วันที่ 18 พฤศจิกายน 2569 – 20 พฤศจิกายน 2569 ณ อาคารเรียนและปฏิบัติการรวม มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต')]);
   rows.push([]);
@@ -7965,7 +8006,7 @@ function exportAllWorksReportToExcel() {
   const link = document.createElement('a');
   link.setAttribute('href', url);
   const dateStr = new Date().toISOString().slice(0, 10);
-  link.setAttribute('download', `ใบรายงานสรุปผลการประเมินผลงาน_TUH19_${dateStr}.csv`);
+  link.setAttribute('download', `ใบรายงานสรุปผลการประเมินผลงาน_${data.round === '2' ? 'รอบตัดสิน' : 'รอบประเมิน'}_TUH19_${dateStr}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
